@@ -68,7 +68,7 @@ There are two separate pools — do not merge them:
 | 1     | Schema + seed                      | done                          |
 | 2     | Auth & roles                       | done                          |
 | 3     | Recognition core                   | done                          |
-| 4     | Profiles & leaderboard             | todo                          |
+| 4     | Profiles & leaderboard             | done                          |
 | 5     | Rewards & fulfilment               | todo                          |
 | 6     | Awards                             | todo                          |
 | 7     | Milestones cron                    | todo                          |

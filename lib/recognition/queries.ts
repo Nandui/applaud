@@ -99,6 +99,28 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
   };
 }
 
+/** Recognitions a given user has received, respecting the viewer's visibility. */
+export async function getReceivedCards(
+  userId: string,
+  viewerId: string,
+  take = 20,
+): Promise<FeedCard[]> {
+  const rows = await prisma.recognition.findMany({
+    where: {
+      recipients: { some: { userId } },
+      OR: [
+        { visibility: "public" },
+        { senderId: viewerId },
+        { recipients: { some: { userId: viewerId } } },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take,
+    include: feedInclude,
+  });
+  return rows.map((r) => toFeedCard(r, viewerId));
+}
+
 /** Feed visible to a viewer: public posts + their own sent/received private posts. */
 export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
   const rows = await prisma.recognition.findMany({
