@@ -70,6 +70,6 @@ There are two separate pools — do not merge them:
 | 3     | Recognition core                   | done                          |
 | 4     | Profiles & leaderboard             | done                          |
 | 5     | Rewards & fulfilment               | done                          |
-| 6     | Awards                             | todo                          |
+| 6     | Awards                             | done                          |
 | 7     | Milestones cron                    | todo                          |
 | 8     | Analytics & settings               | todo                          |
