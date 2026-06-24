@@ -5,7 +5,7 @@ export default function AdminSitesPage() {
     <Placeholder
       title="Sites"
       description="Manage locations across the organisation."
-      phase="Phase 2"
+      phase="Phase 8"
     />
   );
 }

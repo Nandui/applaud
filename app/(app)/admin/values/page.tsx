@@ -5,7 +5,7 @@ export default function AdminValuesPage() {
     <Placeholder
       title="Values"
       description="The company values recognition is given against."
-      phase="Phase 3"
+      phase="Phase 8"
     />
   );
 }

@@ -14,6 +14,7 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
+    "verify": "tsx scripts/verify.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
