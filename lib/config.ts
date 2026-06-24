@@ -36,3 +36,16 @@ export type NominationStatus = (typeof NOMINATION_STATUSES)[number];
 
 /** Reaction emojis offered in the feed UI. */
 export const REACTION_EMOJIS = ["👏", "🎉", "❤️", "🙌", "💪", "⭐"] as const;
+
+/**
+ * Recognition image attachments (photos / GIFs). Shared by the client uploader,
+ * the upload token route, and the server action so the limits stay in lockstep.
+ */
+export const MAX_RECOGNITION_IMAGES = 4;
+export const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+] as const;
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB per file

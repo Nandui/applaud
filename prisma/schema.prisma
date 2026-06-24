@@ -81,6 +81,7 @@ model Recognition {
   message    String
   visibility String   @default("public") // "public" | "private"
   system     Boolean  @default(false) // true = auto/milestone post
+  imageUrls  String[] // optional photos/GIFs (Vercel Blob public URLs)
   createdAt  DateTime @default(now())
 
   recipients RecognitionRecipient[]

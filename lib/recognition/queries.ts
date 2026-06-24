@@ -14,6 +14,7 @@ export type FeedCardComment = {
 export type FeedCard = {
   id: string;
   message: string;
+  imageUrls: string[];
   system: boolean;
   visibility: string;
   createdAtLabel: string;
@@ -65,6 +66,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
   return {
     id: r.id,
     message: r.message,
+    imageUrls: r.imageUrls,
     system: r.system,
     visibility: r.visibility,
     createdAtLabel: relativeTime(r.createdAt),

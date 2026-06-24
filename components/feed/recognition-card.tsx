@@ -138,6 +138,52 @@ export function RecognitionCard({
             {card.message}
           </p>
 
+          {/* Photos / GIFs */}
+          {card.imageUrls.length > 0 && (
+            <div
+              className={cn(
+                "grid gap-2",
+                card.imageUrls.length === 1 ? "grid-cols-1" : "grid-cols-2",
+              )}
+            >
+              {card.imageUrls.map((url, i) => {
+                const count = card.imageUrls.length;
+                // A lone third tile in a 2-col grid spans the full width so it
+                // doesn't sit orphaned beside an empty cell.
+                const wide = count === 3 && i === 2;
+                return (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      "border-border bg-secondary block overflow-hidden rounded-lg border",
+                      wide && "col-span-2",
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Recognition attachment ${i + 1} of ${count}`}
+                      loading="lazy"
+                      className={cn(
+                        "w-full",
+                        // Single image: show it whole (no crop). In the grid,
+                        // crop tiles to a uniform shape for a tidy gallery.
+                        count === 1
+                          ? "max-h-[28rem] object-contain"
+                          : wide
+                            ? "aspect-[2/1] object-cover"
+                            : "aspect-square object-cover",
+                      )}
+                    />
+                  </a>
+                );
+              })}
+            </div>
+          )}
+
           {/* Reactions */}
           <div className="flex flex-wrap items-center gap-1.5">
             {card.reactions.map((r) => (

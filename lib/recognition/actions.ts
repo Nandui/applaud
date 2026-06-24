@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { getOrgSettings } from "@/lib/org-settings";
 import { allowanceForRole, getMonthlyAllowanceUsage } from "@/lib/points";
-import { REACTION_EMOJIS } from "@/lib/config";
+import { REACTION_EMOJIS, MAX_RECOGNITION_IMAGES } from "@/lib/config";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -14,12 +14,46 @@ export type ActionResult =
 
 class AllowanceError extends Error {}
 
+// Pin attachment URLs to THIS project's Blob store, so a crafted submission
+// can't slip in an arbitrary public blob (another user's — or another Vercel
+// tenant's, since every store shares the `*.public.blob.vercel-storage.com`
+// suffix and all public blobs are world-readable). The store's public host is
+// `<storeId>.public.blob.vercel-storage.com`, and the storeId is the segment of
+// BLOB_READ_WRITE_TOKEN (`vercel_blob_rw_<storeId>_<secret>`). Our upload route
+// only ever mints tokens for this store, so every legitimate upload already
+// lands on that exact host. When no token is configured (local dev without
+// Blob), fall back to accepting any Vercel Blob public host.
+const BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+
+function expectedBlobHost(): string | null {
+  const storeId =
+    process.env.BLOB_READ_WRITE_TOKEN?.match(/^vercel_blob_rw_([a-z0-9]+)_/i)?.[1] ??
+    process.env.BLOB_STORE_ID;
+  return storeId ? `${storeId.toLowerCase()}${BLOB_HOST_SUFFIX}` : null;
+}
+
+const blobImageUrl = z.string().url().refine((value) => {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase();
+    const expected = expectedBlobHost();
+    return expected ? host === expected : host.endsWith(BLOB_HOST_SUFFIX);
+  } catch {
+    return false;
+  }
+}, "Unrecognised image URL.");
+
 const createSchema = z.object({
   recipientIds: z.array(z.string().min(1)).min(1, "Pick at least one recipient.").max(10),
   valueId: z.string().min(1, "Choose a value."),
   message: z.string().trim().min(3, "Write a short message.").max(500),
   points: z.coerce.number().int().min(0).max(100_000),
   visibility: z.enum(["public", "private"]).default("public"),
+  imageUrls: z
+    .array(blobImageUrl)
+    .max(MAX_RECOGNITION_IMAGES, `Attach at most ${MAX_RECOGNITION_IMAGES} images.`)
+    .default([]),
 });
 
 /**
@@ -40,12 +74,13 @@ export async function createRecognition(
     message: formData.get("message"),
     points: formData.get("points") ?? 0,
     visibility: formData.get("visibility") ?? "public",
+    imageUrls: formData.getAll("imageUrls").map(String),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const { valueId, message, points, visibility } = parsed.data;
+  const { valueId, message, points, visibility, imageUrls } = parsed.data;
   const recipientIds = [...new Set(parsed.data.recipientIds)];
   const settings = await getOrgSettings();
 
@@ -87,6 +122,7 @@ export async function createRecognition(
           valueId,
           message,
           visibility,
+          imageUrls,
           recipients: {
             create: recipientIds.map((userId) => ({ userId, points })),
           },

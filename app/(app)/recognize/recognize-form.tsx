@@ -1,11 +1,17 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
-import { Check, Search, X, Sparkles } from "lucide-react";
+import { Check, Search, X, Sparkles, ImagePlus, Loader2 } from "lucide-react";
 import { createRecognition, type ActionResult } from "@/lib/recognition/actions";
 import type { AllowanceStatus } from "@/lib/points";
+import {
+  MAX_RECOGNITION_IMAGES,
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+} from "@/lib/config";
 import { valueIcon } from "@/lib/value-icons";
 import { UserAvatar } from "@/components/user-avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +59,70 @@ export function RecognizeForm({
   const [isPrivate, setIsPrivate] = useState(false);
   const [search, setSearch] = useState("");
 
+  // Uploaded image attachments (Vercel Blob public URLs) + in-flight uploads.
+  const [images, setImages] = useState<{ url: string; name: string }[]>([]);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Committed + in-flight slot count. A ref (not state) so it updates
+  // synchronously: rapid successive picks reserve against the latest value
+  // before any await, instead of racing on a stale render closure.
+  const reservedRef = useRef(0);
+
+  async function handleFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    const room = MAX_RECOGNITION_IMAGES - reservedRef.current;
+    if (room <= 0) {
+      toast.error(`You can attach up to ${MAX_RECOGNITION_IMAGES} images.`);
+      return;
+    }
+    const candidates = Array.from(fileList).slice(0, room);
+    if (candidates.length < fileList.length) {
+      toast.error(`Only ${MAX_RECOGNITION_IMAGES} images allowed — extras skipped.`);
+    }
+    const valid = candidates.filter((file) => {
+      if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+        toast.error(`${file.name}: use a PNG, JPG, GIF, or WebP.`);
+        return false;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        toast.error(`${file.name}: images must be 8MB or smaller.`);
+        return false;
+      }
+      return true;
+    });
+    // Claim slots synchronously, before the first await, so a concurrent pick
+    // sees the reservation and can't push the total past the cap.
+    reservedRef.current += valid.length;
+    for (const file of valid) {
+      setUploadingCount((c) => c + 1);
+      try {
+        const blob = await upload(`recognitions/${file.name}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/recognition/upload",
+          contentType: file.type,
+        });
+        setImages((imgs) => [...imgs, { url: blob.url, name: file.name }]);
+      } catch {
+        reservedRef.current = Math.max(0, reservedRef.current - 1);
+        toast.error(`${file.name}: upload failed.`);
+      } finally {
+        setUploadingCount((c) => c - 1);
+      }
+    }
+  }
+
+  function removeImage(url: string) {
+    if (!images.some((img) => img.url === url)) return;
+    reservedRef.current = Math.max(0, reservedRef.current - 1);
+    setImages((imgs) => imgs.filter((img) => img.url !== url));
+    // NOTE: the blob itself is not deleted here. Client-direct uploads exist in
+    // Blob the moment they're picked, so removed (or abandoned) attachments
+    // leave orphans. Reclaim them with a scheduled cleanup that deletes blobs
+    // under `recognitions/` not referenced by any Recognition.imageUrls, rather
+    // than a client-triggered delete (the RW token must stay server-side, and
+    // an unscoped delete-by-URL would let one user delete another's blob).
+  }
+
   const byId = useMemo(
     () => new Map(recipients.map((r) => [r.id, r])),
     [recipients],
@@ -95,7 +165,7 @@ export function RecognizeForm({
   }
 
   const canSubmit =
-    selected.length > 0 && valueId !== "" && !pending;
+    selected.length > 0 && valueId !== "" && !pending && uploadingCount === 0;
 
   return (
     <form action={formAction} className="space-y-5">
@@ -106,6 +176,9 @@ export function RecognizeForm({
       <input type="hidden" name="valueId" value={valueId} />
       <input type="hidden" name="points" value={points} />
       <input type="hidden" name="visibility" value={isPrivate ? "private" : "public"} />
+      {images.map((img) => (
+        <input key={img.url} type="hidden" name="imageUrls" value={img.url} />
+      ))}
 
       <Card>
         <CardContent className="space-y-5">
@@ -227,6 +300,66 @@ export function RecognizeForm({
               maxLength={500}
               required
             />
+          </div>
+
+          {/* Photos / GIFs */}
+          <div className="space-y-2">
+            <Label>Photos / GIFs (optional)</Label>
+            <div className="flex flex-wrap gap-2">
+              {images.map((img) => (
+                <div
+                  key={img.url}
+                  className="border-border relative size-20 overflow-hidden rounded-lg border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.url}
+                    alt={img.name}
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(img.url)}
+                    aria-label={`Remove ${img.name}`}
+                    className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {Array.from({ length: uploadingCount }).map((_, i) => (
+                <div
+                  key={`uploading-${i}`}
+                  className="border-border flex size-20 items-center justify-center rounded-lg border border-dashed"
+                >
+                  <Loader2 className="text-muted size-5 animate-spin" />
+                </div>
+              ))}
+              {images.length + uploadingCount < MAX_RECOGNITION_IMAGES && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-border text-muted hover:bg-secondary flex size-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed transition-colors"
+                >
+                  <ImagePlus className="size-5" />
+                  <span className="text-[0.65rem]">Add</span>
+                </button>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ALLOWED_IMAGE_TYPES.join(",")}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <p className="text-muted text-xs">
+              Up to {MAX_RECOGNITION_IMAGES} · PNG, JPG, GIF, or WebP · max 8MB each
+            </p>
           </div>
 
           {/* Points */}
