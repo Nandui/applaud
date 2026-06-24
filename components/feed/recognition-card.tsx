@@ -9,7 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Sparkles, Lock, Globe, MessageCircle, SmilePlus } from "lucide-react";
+import { Sparkles, Lock, Globe, MessageCircle, SmilePlus, Send } from "lucide-react";
 import { toggleReaction, addComment } from "@/lib/recognition/actions";
 import { REACTION_EMOJIS } from "@/lib/config";
 import type { FeedCard } from "@/lib/recognition/queries";
@@ -141,6 +141,11 @@ export function RecognitionCard({
       applyReaction(emoji);
       await toggleReaction(fd);
     });
+  }
+
+  function replyTo(name: string) {
+    setBody((b) => (b.trim() ? b : `@${name} `));
+    commentInputRef.current?.focus();
   }
 
   function submitComment(e: React.FormEvent) {
@@ -368,37 +373,48 @@ export function RecognitionCard({
           </Popover>
         </div>
 
-        {/* Comments */}
+        {/* Comments — Facebook-style bubbles */}
         {comments.length > 0 && (
-          <div className="space-y-3 px-4 pt-3">
+          <div className="space-y-2.5 px-4 pt-3">
             {hiddenCount > 0 && (
               <button
                 onClick={() => setShowAllComments(true)}
-                className="text-muted hover:text-foreground text-xs font-medium"
+                className="text-muted hover:text-foreground text-xs font-semibold"
               >
-                View all {comments.length} comments
+                View {hiddenCount} more {hiddenCount === 1 ? "comment" : "comments"}
               </button>
             )}
             {visibleComments.map((c) => (
-              <div key={c.id} className="flex items-start gap-2.5">
-                <Link href={`/profile/${c.user.id}`} className="shrink-0">
+              <div key={c.id} className="flex items-start gap-2">
+                <Link href={`/profile/${c.user.id}`} className="mt-0.5 shrink-0">
                   <UserAvatar
                     name={c.user.name}
                     avatarUrl={c.user.avatarUrl}
-                    className="size-7"
+                    className="size-8"
                   />
                 </Link>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-snug">
+                <div className="min-w-0">
+                  <div className="bg-secondary w-fit max-w-full rounded-2xl px-3 py-2">
                     <Link
                       href={`/profile/${c.user.id}`}
-                      className="font-semibold hover:underline"
+                      className="block text-xs font-semibold hover:underline"
                     >
                       {c.user.name}
-                    </Link>{" "}
-                    <span className="text-foreground/90">{c.body}</span>
-                  </p>
-                  <span className="text-muted text-xs">{c.createdAtLabel}</span>
+                    </Link>
+                    <p className="text-foreground/90 text-sm leading-snug break-words whitespace-pre-line">
+                      {c.body}
+                    </p>
+                  </div>
+                  <div className="text-muted mt-1 flex items-center gap-3 px-3 text-xs font-semibold">
+                    <span>{c.createdAtLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() => replyTo(c.user.name)}
+                      className="hover:text-foreground"
+                    >
+                      Reply
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -413,23 +429,26 @@ export function RecognitionCard({
           <UserAvatar
             name={viewer.name}
             avatarUrl={viewer.avatarUrl}
-            className="size-7 shrink-0"
+            className="size-8 shrink-0"
           />
-          <input
-            ref={commentInputRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Add a comment…"
-            maxLength={500}
-            className="bg-secondary placeholder:text-muted focus:ring-primary/30 h-9 flex-1 rounded-full border-0 px-4 text-sm outline-none focus:ring-2"
-          />
-          <button
-            type="submit"
-            disabled={!body.trim()}
-            className="text-primary px-1 text-sm font-semibold disabled:opacity-40"
-          >
-            Post
-          </button>
+          <div className="bg-secondary focus-within:ring-primary/30 flex flex-1 items-center rounded-full focus-within:ring-2">
+            <input
+              ref={commentInputRef}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={`Comment as ${viewer.name}`}
+              maxLength={500}
+              className="placeholder:text-muted h-9 min-w-0 flex-1 border-0 bg-transparent px-4 text-sm outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!body.trim()}
+              aria-label="Post comment"
+              className="text-primary disabled:text-muted/40 mr-1 flex size-8 shrink-0 items-center justify-center transition-colors"
+            >
+              <Send className="size-4.5" />
+            </button>
+          </div>
         </form>
       </div>
     </motion.div>
