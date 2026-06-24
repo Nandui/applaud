@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { SessionUser } from "@/lib/auth/types";
 import { isAdmin } from "@/lib/auth/types";
+import { signOutAction } from "@/lib/auth/actions";
 import { initials } from "@/lib/format";
 
 export function UserMenu({ user }: { user: SessionUser }) {
@@ -60,10 +61,14 @@ export function UserMenu({ user }: { user: SessionUser }) {
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild variant="destructive">
-          <Link href="/api/auth/signout">
-            <LogOut className="size-4" /> Sign out
-          </Link>
+        <DropdownMenuItem
+          variant="destructive"
+          onSelect={(e) => {
+            e.preventDefault();
+            void signOutAction();
+          }}
+        >
+          <LogOut className="size-4" /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

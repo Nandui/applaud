@@ -65,8 +65,8 @@ There are two separate pools — do not merge them:
 | Phase | Scope                              | State                         |
 | ----- | ---------------------------------- | ----------------------------- |
 | 0     | Scaffold, design system, app shell | done                          |
-| 1     | Schema + seed                      | code done; migrate/seed on DB |
-| 2     | Auth & roles                       | todo                          |
+| 1     | Schema + seed                      | done                          |
+| 2     | Auth & roles                       | done                          |
 | 3     | Recognition core                   | todo                          |
 | 4     | Profiles & leaderboard             | todo                          |
 | 5     | Rewards & fulfilment               | todo                          |

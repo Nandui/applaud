@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { requireUser } from "@/lib/auth/guards";
 import { TopNav } from "@/components/app-shell/top-nav";
 
 export default async function AppLayout({
@@ -6,7 +6,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
+  const user = await requireUser();
 
   return (
     <div className="flex min-h-full flex-col">

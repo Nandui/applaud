@@ -1,11 +1,18 @@
+import { auth } from "@/auth";
+import type { Role } from "@/lib/config";
 import type { SessionUser } from "./types";
 
-/**
- * Returns the signed-in user, or null when signed out.
- *
- * Phase 0 stub: returns null (the shell renders a signed-out state).
- * Phase 2 replaces the body with next-auth's `auth()` session read.
- */
+/** Returns the signed-in user, or null when signed out. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  return null;
+  const session = await auth();
+  const u = session?.user;
+  if (!u?.id) return null;
+  return {
+    id: u.id,
+    name: u.name ?? "",
+    email: u.email ?? "",
+    role: (u.role ?? "staff") as Role,
+    siteId: u.siteId,
+    avatarUrl: u.image ?? null,
+  };
 }
