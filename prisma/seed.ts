@@ -12,7 +12,9 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { subDays, addDays } from "date-fns";
 import { PrismaClient } from "../lib/generated/prisma/client";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL,
+});
 const prisma = new PrismaClient({ adapter });
 
 // ---------- deterministic RNG so re-seeds are stable ----------
