@@ -69,7 +69,7 @@ There are two separate pools — do not merge them:
 | 2     | Auth & roles                       | done                          |
 | 3     | Recognition core                   | done                          |
 | 4     | Profiles & leaderboard             | done                          |
-| 5     | Rewards & fulfilment               | todo                          |
+| 5     | Rewards & fulfilment               | done                          |
 | 6     | Awards                             | todo                          |
 | 7     | Milestones cron                    | todo                          |
 | 8     | Analytics & settings               | todo                          |
