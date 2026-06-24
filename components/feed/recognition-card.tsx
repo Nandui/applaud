@@ -1,6 +1,12 @@
 "use client";
 
-import { Fragment, useRef, useState, useTransition } from "react";
+import {
+  Fragment,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Sparkles, Lock, Globe, MessageCircle, SmilePlus } from "lucide-react";
@@ -17,8 +23,30 @@ import {
 import { pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+type Viewer = { id: string; name: string; avatarUrl?: string | null };
+
 /** How many comments to show before the "View all" toggle. */
 const COMMENT_PREVIEW = 2;
+
+/** Apply a viewer reaction toggle to a reactions list (optimistic + pure). */
+function toggleEmoji(
+  state: FeedCard["reactions"],
+  emoji: string,
+): FeedCard["reactions"] {
+  const existing = state.find((r) => r.emoji === emoji);
+  if (!existing) return [...state, { emoji, count: 1, reacted: true }];
+  if (existing.reacted) {
+    const count = existing.count - 1;
+    return count <= 0
+      ? state.filter((r) => r.emoji !== emoji)
+      : state.map((r) =>
+          r.emoji === emoji ? { ...r, count, reacted: false } : r,
+        );
+  }
+  return state.map((r) =>
+    r.emoji === emoji ? { ...r, count: r.count + 1, reacted: true } : r,
+  );
+}
 
 function RecipientNames({
   recipients,
@@ -50,21 +78,18 @@ function RecipientNames({
 function ActionButton({
   onClick,
   active,
-  disabled,
   children,
 }: {
   onClick: () => void;
   active?: boolean;
-  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       className={cn(
-        "hover:bg-secondary flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors disabled:opacity-50",
+        "hover:bg-secondary flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors",
         active ? "text-primary" : "text-muted hover:text-foreground",
       )}
     >
@@ -75,23 +100,46 @@ function ActionButton({
 
 export function RecognitionCard({
   card,
+  viewer,
   index = 0,
 }: {
   card: FeedCard;
+  viewer: Viewer;
   index?: number;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [, startReaction] = useTransition();
+  const [, startComment] = useTransition();
   const [body, setBody] = useState("");
-  const [commentPending, startComment] = useTransition();
   const [showAllComments, setShowAllComments] = useState(false);
   const commentInputRef = useRef<HTMLInputElement>(null);
+
+  // Optimistic state so claps and comments land instantly, then reconcile with
+  // the server's revalidated data — the snappy feel of a social app.
+  const [reactions, applyReaction] = useOptimistic(card.reactions, toggleEmoji);
+  const [comments, addOptimisticComment] = useOptimistic(
+    card.comments,
+    (state: FeedCard["comments"], text: string) => [
+      ...state,
+      {
+        id: `optimistic-${state.length}`,
+        body: text,
+        createdAtLabel: "Just now",
+        user: {
+          id: viewer.id,
+          name: viewer.name,
+          avatarUrl: viewer.avatarUrl ?? null,
+        },
+      },
+    ],
+  );
 
   function react(emoji: string) {
     const fd = new FormData();
     fd.set("recognitionId", card.id);
     fd.set("emoji", emoji);
-    startTransition(() => {
-      void toggleReaction(fd);
+    startReaction(async () => {
+      applyReaction(emoji);
+      await toggleReaction(fd);
     });
   }
 
@@ -102,25 +150,26 @@ export function RecognitionCard({
     const fd = new FormData();
     fd.set("recognitionId", card.id);
     fd.set("body", value);
+    setBody("");
     startComment(async () => {
-      const res = await addComment(fd);
-      if (res.ok) setBody("");
+      addOptimisticComment(value);
+      await addComment(fd);
     });
   }
 
-  const totalReactions = card.reactions.reduce((sum, r) => sum + r.count, 0);
-  const distinctEmojis = card.reactions.map((r) => r.emoji).slice(0, 3);
+  const totalReactions = reactions.reduce((sum, r) => sum + r.count, 0);
+  const distinctEmojis = reactions.map((r) => r.emoji).slice(0, 3);
   const viewerClapped =
-    card.reactions.find((r) => r.emoji === "👏")?.reacted ?? false;
-  const viewerReacted = card.reactions.some((r) => r.reacted);
+    reactions.find((r) => r.emoji === "👏")?.reacted ?? false;
+  const viewerReacted = reactions.some((r) => r.reacted);
 
   const hiddenCount =
-    !showAllComments && card.comments.length > COMMENT_PREVIEW
-      ? card.comments.length - COMMENT_PREVIEW
+    !showAllComments && comments.length > COMMENT_PREVIEW
+      ? comments.length - COMMENT_PREVIEW
       : 0;
   const visibleComments = hiddenCount
-    ? card.comments.slice(-COMMENT_PREVIEW)
-    : card.comments;
+    ? comments.slice(-COMMENT_PREVIEW)
+    : comments;
 
   return (
     <motion.div
@@ -212,8 +261,6 @@ export function RecognitionCard({
           >
             {card.imageUrls.map((url, i) => {
               const count = card.imageUrls.length;
-              // A lone third tile spans the full width instead of sitting
-              // orphaned beside an empty cell.
               const wide = count === 3 && i === 2;
               return (
                 <a
@@ -247,7 +294,7 @@ export function RecognitionCard({
         )}
 
         {/* Reactions + comment count summary */}
-        {(totalReactions > 0 || card.comments.length > 0) && (
+        {(totalReactions > 0 || comments.length > 0) && (
           <div className="text-muted flex items-center justify-between px-4 pt-3 text-xs">
             {totalReactions > 0 ? (
               <span className="flex items-center gap-1.5">
@@ -266,10 +313,10 @@ export function RecognitionCard({
             ) : (
               <span />
             )}
-            {card.comments.length > 0 && (
+            {comments.length > 0 && (
               <span>
-                {card.comments.length}{" "}
-                {card.comments.length === 1 ? "comment" : "comments"}
+                {comments.length}{" "}
+                {comments.length === 1 ? "comment" : "comments"}
               </span>
             )}
           </div>
@@ -277,11 +324,7 @@ export function RecognitionCard({
 
         {/* Action bar */}
         <div className="border-border mx-4 mt-2 grid grid-cols-3 border-t pt-1">
-          <ActionButton
-            onClick={() => react("👏")}
-            active={viewerClapped}
-            disabled={pending}
-          >
+          <ActionButton onClick={() => react("👏")} active={viewerClapped}>
             <span className="text-base leading-none">👏</span> Clap
           </ActionButton>
           <ActionButton onClick={() => commentInputRef.current?.focus()}>
@@ -293,7 +336,9 @@ export function RecognitionCard({
                 type="button"
                 className={cn(
                   "hover:bg-secondary flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors",
-                  viewerReacted ? "text-primary" : "text-muted hover:text-foreground",
+                  viewerReacted
+                    ? "text-primary"
+                    : "text-muted hover:text-foreground",
                 )}
               >
                 <SmilePlus className="size-4" /> React
@@ -302,7 +347,7 @@ export function RecognitionCard({
             <PopoverContent className="w-auto p-1.5" align="center">
               <div className="flex gap-1">
                 {REACTION_EMOJIS.map((emoji) => {
-                  const active = card.reactions.find(
+                  const active = reactions.find(
                     (r) => r.emoji === emoji,
                   )?.reacted;
                   return (
@@ -324,14 +369,14 @@ export function RecognitionCard({
         </div>
 
         {/* Comments */}
-        {card.comments.length > 0 && (
+        {comments.length > 0 && (
           <div className="space-y-3 px-4 pt-3">
             {hiddenCount > 0 && (
               <button
                 onClick={() => setShowAllComments(true)}
                 className="text-muted hover:text-foreground text-xs font-medium"
               >
-                View all {card.comments.length} comments
+                View all {comments.length} comments
               </button>
             )}
             {visibleComments.map((c) => (
@@ -365,6 +410,11 @@ export function RecognitionCard({
           onSubmit={submitComment}
           className="flex items-center gap-2 px-4 pt-3 pb-4"
         >
+          <UserAvatar
+            name={viewer.name}
+            avatarUrl={viewer.avatarUrl}
+            className="size-7 shrink-0"
+          />
           <input
             ref={commentInputRef}
             value={body}
@@ -375,7 +425,7 @@ export function RecognitionCard({
           />
           <button
             type="submit"
-            disabled={commentPending || !body.trim()}
+            disabled={!body.trim()}
             className="text-primary px-1 text-sm font-semibold disabled:opacity-40"
           >
             Post

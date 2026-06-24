@@ -150,7 +150,16 @@ export default async function ProfilePage({
         ) : (
           <div className="space-y-4">
             {received.map((card, i) => (
-              <RecognitionCard key={card.id} card={card} index={i} />
+              <RecognitionCard
+                key={card.id}
+                card={card}
+                index={i}
+                viewer={{
+                  id: viewer.id,
+                  name: viewer.name,
+                  avatarUrl: viewer.avatarUrl ?? null,
+                }}
+              />
             ))}
           </div>
         )}

@@ -186,6 +186,7 @@ export async function toggleReaction(formData: FormData): Promise<ActionResult> 
     });
   }
   revalidatePath("/");
+  revalidatePath("/profile/[id]", "page");
   return { ok: true };
 }
 
@@ -211,5 +212,6 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
     },
   });
   revalidatePath("/");
+  revalidatePath("/profile/[id]", "page");
   return { ok: true };
 }

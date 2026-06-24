@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/guards";
 import { TopNav } from "@/components/app-shell/top-nav";
+import { BottomNav } from "@/components/app-shell/bottom-nav";
 
 export default async function AppLayout({
   children,
@@ -11,9 +12,10 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-full flex-col">
       <TopNav user={user} />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-24 sm:px-6 sm:pt-8 md:pb-10">
         {children}
       </main>
+      <BottomNav user={user} />
     </div>
   );
 }
