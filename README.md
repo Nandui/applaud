@@ -72,4 +72,4 @@ There are two separate pools — do not merge them:
 | 5     | Rewards & fulfilment               | done                          |
 | 6     | Awards                             | done                          |
 | 7     | Milestones cron                    | done                          |
-| 8     | Analytics & settings               | todo                          |
+| 8     | Analytics & settings               | done                          |
