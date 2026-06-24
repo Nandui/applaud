@@ -33,6 +33,15 @@ async function main() {
     `Invariant: ${users.length - mismatches}/${users.length} users OK, ${mismatches} mismatch(es)`,
   );
 
+  const celebrations = await prisma.celebration.groupBy({
+    by: ["type"],
+    _count: true,
+  });
+  const total = celebrations.reduce((s, c) => s + c._count, 0);
+  console.log(
+    `Celebrations: ${total} total — ${celebrations.map((c) => `${c.type}=${c._count}`).join(", ") || "none"}`,
+  );
+
   if (email) {
     const u = await prisma.user.findUnique({
       where: { email },

@@ -71,5 +71,5 @@ There are two separate pools — do not merge them:
 | 4     | Profiles & leaderboard             | done                          |
 | 5     | Rewards & fulfilment               | done                          |
 | 6     | Awards                             | done                          |
-| 7     | Milestones cron                    | todo                          |
+| 7     | Milestones cron                    | done                          |
 | 8     | Analytics & settings               | todo                          |
