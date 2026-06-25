@@ -115,9 +115,11 @@ async function main() {
   console.log("Creating milestone rules…");
   await prisma.milestoneRule.createMany({
     data: [
-      { type: "work_anniversary", config: { years: [1, 3, 5, 10] }, points: 250 },
+      // Birthday is the only automated celebration enabled for now. The others
+      // are seeded inactive — switch them on in Admin → Milestones to resume.
       { type: "birthday", config: {}, points: 100 },
-      { type: "onboarding", config: { dayOffset: 30 }, points: 50 },
+      { type: "work_anniversary", config: { years: [1, 3, 5, 10] }, points: 250, active: false },
+      { type: "onboarding", config: { dayOffset: 30 }, points: 50, active: false },
     ],
   });
 
