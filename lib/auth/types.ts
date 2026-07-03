@@ -10,7 +10,17 @@ export type SessionUser = {
   avatarUrl?: string | null;
 };
 
-const RANK: Record<Role, number> = { staff: 0, manager: 1, admin: 2 };
+// Access hierarchy: staff < manager < admin. `operations` and `ceo` are
+// specialist roles that carry NO elevated page/action access — they sit at the
+// staff level here; their only extra power (applying boosts) is checked
+// separately via canApplyBoost, not through this ranking.
+const RANK: Record<Role, number> = {
+  staff: 0,
+  operations: 0,
+  ceo: 0,
+  manager: 1,
+  admin: 2,
+};
 
 /** True if `role` meets or exceeds `min` in the staff < manager < admin order. */
 export function roleAtLeast(role: string | undefined | null, min: Role): boolean {

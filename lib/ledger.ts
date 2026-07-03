@@ -9,6 +9,7 @@ export const LEDGER_TYPE_META: Record<
   REDEMPTION: { label: "Redemption", tone: "spend" },
   EXPIRY: { label: "Expiry", tone: "spend" },
   ADJUSTMENT: { label: "Adjustment", tone: "neutral" },
+  BOOST: { label: "Boost", tone: "earn" },
 };
 
 export function ledgerTypeMeta(type: string) {

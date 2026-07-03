@@ -29,12 +29,14 @@ npm run dev                   # http://localhost:3000
 
 ### Environment
 
-| Var            | Purpose                                       |
-| -------------- | --------------------------------------------- |
-| `DATABASE_URL` | Postgres connection string (Neon, or local)   |
-| `AUTH_SECRET`  | next-auth signing secret (`npx auth secret`)  |
-| `AUTH_URL`     | App base URL                                  |
-| `CRON_SECRET`  | Bearer token for the milestone cron endpoint  |
+| Var                     | Purpose                                              |
+| ----------------------- | ---------------------------------------------------- |
+| `DATABASE_URL`          | Postgres connection string (Neon, or local)          |
+| `AUTH_SECRET`           | next-auth signing secret (`npx auth secret`)         |
+| `AUTH_URL`              | App base URL                                         |
+| `CRON_SECRET`           | Bearer token for the milestone cron endpoint         |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob store — recognition photo/GIF uploads    |
+| `GIPHY_API_KEY`         | GIPHY GIF-library search in the composer (optional)  |
 
 ## Scripts
 

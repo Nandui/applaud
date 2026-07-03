@@ -2,7 +2,13 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { relativeTime, fullTimestamp } from "@/lib/datetime";
 
-export type ReactionSummary = { emoji: string; count: number; reacted: boolean };
+export type ReactionUser = { id: string; name: string; avatarUrl: string | null };
+export type ReactionSummary = {
+  emoji: string;
+  count: number;
+  reacted: boolean;
+  users: ReactionUser[];
+};
 
 export type FeedCardComment = {
   id: string;
@@ -15,6 +21,7 @@ export type FeedCard = {
   id: string;
   message: string;
   imageUrls: string[];
+  boostType: string | null;
   system: boolean;
   visibility: string;
   createdAtLabel: string;
@@ -43,7 +50,13 @@ const feedInclude = {
   recipients: {
     include: { user: { select: { id: true, name: true, avatarUrl: true } } },
   },
-  reactions: { select: { emoji: true, userId: true } },
+  reactions: {
+    select: {
+      emoji: true,
+      userId: true,
+      user: { select: { id: true, name: true, avatarUrl: true } },
+    },
+  },
   comments: {
     orderBy: { createdAt: "asc" as const },
     include: { user: { select: { id: true, name: true, avatarUrl: true } } },
@@ -55,11 +68,19 @@ type RawRecognition = Prisma.RecognitionGetPayload<{
 }>;
 
 export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
-  const grouped = new Map<string, { count: number; reacted: boolean }>();
+  const grouped = new Map<
+    string,
+    { count: number; reacted: boolean; users: ReactionUser[] }
+  >();
   for (const reaction of r.reactions) {
-    const g = grouped.get(reaction.emoji) ?? { count: 0, reacted: false };
+    const g = grouped.get(reaction.emoji) ?? { count: 0, reacted: false, users: [] };
     g.count += 1;
     if (reaction.userId === viewerId) g.reacted = true;
+    g.users.push({
+      id: reaction.user.id,
+      name: reaction.user.name,
+      avatarUrl: reaction.user.avatarUrl,
+    });
     grouped.set(reaction.emoji, g);
   }
 
@@ -67,6 +88,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
     id: r.id,
     message: r.message,
     imageUrls: r.imageUrls,
+    boostType: r.boostType,
     system: r.system,
     visibility: r.visibility,
     createdAtLabel: relativeTime(r.createdAt),
@@ -91,6 +113,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       emoji,
       count: g.count,
       reacted: g.reacted,
+      users: g.users,
     })),
     comments: r.comments.map((c) => ({
       id: c.id,

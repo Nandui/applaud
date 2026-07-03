@@ -13,7 +13,12 @@ export const dynamic = "force-dynamic";
 export default async function FeedPage() {
   const me = await requireUser();
   const cards = await getFeedCards(me.id);
-  const viewer = { id: me.id, name: me.name, avatarUrl: me.avatarUrl ?? null };
+  const viewer = {
+    id: me.id,
+    name: me.name,
+    avatarUrl: me.avatarUrl ?? null,
+    role: me.role,
+  };
 
   // Build the "stories" strip from people recently active in the feed.
   const peopleMap = new Map<

@@ -82,6 +82,12 @@ model Recognition {
   visibility String   @default("public") // "public" | "private"
   system     Boolean  @default(false) // true = auto/milestone post
   imageUrls  String[] // optional photos/GIFs (Vercel Blob public URLs)
+  // Point-multiplier boost applied to this recognition (null | "operations" |
+  // "ceo"). Mutually exclusive; the wallet credit is booked to RewardLedger so
+  // boostType is just the current display/authorisation state.
+  boostType  String?
+  boostById  String? // user who applied the current boost
+  boostAt    DateTime?
   createdAt  DateTime @default(now())
 
   recipients RecognitionRecipient[]
@@ -111,7 +117,8 @@ model Reaction {
   emoji         String
   createdAt     DateTime    @default(now())
 
-  @@unique([recognitionId, userId, emoji])
+  // One reaction per person per recognition — reacting again switches the emoji.
+  @@unique([recognitionId, userId])
 }
 
 model Comment {

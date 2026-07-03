@@ -1,7 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
-import { LogIn, ShieldCheck, UserCog, User as UserIcon } from "lucide-react";
+import {
+  LogIn,
+  ShieldCheck,
+  UserCog,
+  Crown,
+  Wrench,
+  User as UserIcon,
+} from "lucide-react";
 import {
   authenticate,
   quickSignIn,
@@ -30,6 +37,8 @@ const ROLE_ICON: Record<string, typeof UserIcon> = {
   admin: ShieldCheck,
   manager: UserCog,
   staff: UserIcon,
+  operations: Wrench,
+  ceo: Crown,
 };
 
 export function SignInForm({ samples }: { samples: Sample[] }) {

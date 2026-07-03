@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
+import { isProjectBlobUrl } from "@/lib/blob";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -106,7 +107,7 @@ export async function setSiteActive(formData: FormData): Promise<ActionResult> {
 
 // ---------- Users ----------
 
-const ROLES = ["staff", "manager", "admin"];
+const ROLES = ["staff", "manager", "admin", "operations", "ceo"];
 
 export async function saveUser(
   _prev: ActionResult | undefined,
@@ -123,6 +124,7 @@ export async function saveUser(
   const active = String(formData.get("active") ?? "true") === "true";
   const hireDate = parseDate(formData.get("hireDate"));
   const birthday = parseDate(formData.get("birthday"));
+  const avatarUrl = String(formData.get("avatarUrl") ?? "").trim();
 
   if (name.length < 2) return { ok: false, error: "Name is too short." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
@@ -132,6 +134,9 @@ export async function saveUser(
   if (!siteId) return { ok: false, error: "Pick a site." };
   if (managerId && managerId === id) {
     return { ok: false, error: "A user can't be their own manager." };
+  }
+  if (avatarUrl && !isProjectBlobUrl(avatarUrl)) {
+    return { ok: false, error: "Unrecognised picture URL." };
   }
 
   const data = {
@@ -144,6 +149,7 @@ export async function saveUser(
     active,
     hireDate,
     birthday,
+    avatarUrl: avatarUrl || null,
   };
   try {
     if (id) await prisma.user.update({ where: { id }, data });

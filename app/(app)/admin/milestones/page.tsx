@@ -36,7 +36,7 @@ export default async function AdminMilestonesPage() {
     <div>
       <PageHeader
         title="Milestones"
-        description="Automatically celebrate birthdays. Work anniversaries and onboarding are paused — switch them on to resume."
+        description="Automated milestone celebrations are paused. Switch one on to resume its daily auto-posts and point awards."
       />
 
       <MilestonesManager rules={ruleRows} />

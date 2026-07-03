@@ -10,8 +10,15 @@ import {
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Sparkles, Lock, Globe, MessageCircle, SmilePlus, Send } from "lucide-react";
-import { toggleReaction, addComment } from "@/lib/recognition/actions";
-import { REACTION_EMOJIS } from "@/lib/config";
+import { toast } from "sonner";
+import { toggleReaction, addComment, toggleBoost } from "@/lib/recognition/actions";
+import {
+  REACTION_EMOJIS,
+  BOOSTS,
+  boostForRole,
+  boostMultiplier,
+  type BoostType,
+} from "@/lib/config";
 import type { FeedCard } from "@/lib/recognition/queries";
 import { UserAvatar } from "@/components/user-avatar";
 import { ValueChip } from "@/components/value-chip";
@@ -23,28 +30,128 @@ import {
 import { pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Viewer = { id: string; name: string; avatarUrl?: string | null };
+type Viewer = {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  role: string;
+};
 
 /** How many comments to show before the "View all" toggle. */
 const COMMENT_PREVIEW = 2;
 
-/** Apply a viewer reaction toggle to a reactions list (optimistic + pure). */
-function toggleEmoji(
+/** Fixed display order for reaction chips so reacting never reshuffles them. */
+function reactionRank(emoji: string): number {
+  const i = (REACTION_EMOJIS as readonly string[]).indexOf(emoji);
+  return i === -1 ? REACTION_EMOJIS.length : i;
+}
+
+/**
+ * Optimistically set the viewer's single reaction (one per person): the same
+ * emoji toggles off, a different one switches. Keeps per-emoji counts and the
+ * reactor lists in sync so the hover/click list updates instantly too.
+ */
+function switchReaction(
   state: FeedCard["reactions"],
   emoji: string,
+  viewer: Viewer,
 ): FeedCard["reactions"] {
-  const existing = state.find((r) => r.emoji === emoji);
-  if (!existing) return [...state, { emoji, count: 1, reacted: true }];
-  if (existing.reacted) {
-    const count = existing.count - 1;
-    return count <= 0
-      ? state.filter((r) => r.emoji !== emoji)
-      : state.map((r) =>
-          r.emoji === emoji ? { ...r, count, reacted: false } : r,
-        );
-  }
-  return state.map((r) =>
-    r.emoji === emoji ? { ...r, count: r.count + 1, reacted: true } : r,
+  const me = { id: viewer.id, name: viewer.name, avatarUrl: viewer.avatarUrl ?? null };
+  const current = state.find((r) => r.reacted)?.emoji ?? null;
+
+  const dropMine = (list: FeedCard["reactions"], target: string) =>
+    list
+      .map((r) =>
+        r.emoji === target
+          ? {
+              ...r,
+              count: r.count - 1,
+              reacted: false,
+              users: r.users.filter((u) => u.id !== viewer.id),
+            }
+          : r,
+      )
+      .filter((r) => r.count > 0);
+
+  // Toggle my current reaction off.
+  if (current === emoji) return dropMine(state, emoji);
+
+  // Otherwise switch: remove my old reaction (if any), then add the new one.
+  const without = current ? dropMine(state, current) : [...state];
+  return without.some((r) => r.emoji === emoji)
+    ? without.map((r) =>
+        r.emoji === emoji
+          ? { ...r, count: r.count + 1, reacted: true, users: [...r.users, me] }
+          : r,
+      )
+    : [...without, { emoji, count: 1, reacted: true, users: [me] }];
+}
+
+/**
+ * A single reaction pill: shows the emoji + count, highlights when the viewer
+ * reacted, previews reactor names on hover (native title), and opens the full
+ * list on click.
+ */
+function ReactionChip({
+  reaction,
+}: {
+  reaction: FeedCard["reactions"][number];
+}) {
+  const names = reaction.users.map((u) => u.name);
+  const preview =
+    names.slice(0, 10).join(", ") +
+    (names.length > 10 ? ` and ${names.length - 10} more` : "");
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <motion.button
+          type="button"
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 500, damping: 24 }}
+          whileTap={{ scale: 0.9 }}
+          title={preview}
+          aria-label={`${reaction.count} reacted ${reaction.emoji}. See who.`}
+          className={cn(
+            "flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors",
+            reaction.reacted
+              ? "border-primary/40 bg-primary/10 text-primary"
+              : "border-border hover:bg-secondary",
+          )}
+        >
+          <span className="text-base leading-none">{reaction.emoji}</span>
+          <span data-numeric className="text-xs font-semibold">
+            {reaction.count}
+          </span>
+        </motion.button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-0" align="start">
+        <div className="text-muted flex items-center gap-1.5 border-b px-3 py-2 text-xs font-semibold">
+          <span className="text-base leading-none">{reaction.emoji}</span>
+          <span>
+            <span data-numeric>{reaction.count}</span>{" "}
+            {reaction.count === 1 ? "reaction" : "reactions"}
+          </span>
+        </div>
+        <ul className="max-h-56 overflow-y-auto py-1">
+          {reaction.users.map((u) => (
+            <li key={u.id}>
+              <Link
+                href={`/profile/${u.id}`}
+                className="hover:bg-secondary flex items-center gap-2 px-3 py-1.5"
+              >
+                <UserAvatar
+                  name={u.name}
+                  avatarUrl={u.avatarUrl}
+                  className="size-6"
+                />
+                <span className="truncate text-sm">{u.name}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -85,16 +192,17 @@ function ActionButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      whileTap={{ scale: 0.92 }}
       className={cn(
         "hover:bg-secondary flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors",
         active ? "text-primary" : "text-muted hover:text-foreground",
       )}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }
 
@@ -109,13 +217,19 @@ export function RecognitionCard({
 }) {
   const [, startReaction] = useTransition();
   const [, startComment] = useTransition();
+  const [boostPending, startBoost] = useTransition();
   const [body, setBody] = useState("");
   const [showAllComments, setShowAllComments] = useState(false);
+  const [reactOpen, setReactOpen] = useState(false);
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   // Optimistic state so claps and comments land instantly, then reconcile with
   // the server's revalidated data — the snappy feel of a social app.
-  const [reactions, applyReaction] = useOptimistic(card.reactions, toggleEmoji);
+  const [reactions, applyReaction] = useOptimistic(
+    card.reactions,
+    (state: FeedCard["reactions"], emoji: string) =>
+      switchReaction(state, emoji, viewer),
+  );
   const [comments, addOptimisticComment] = useOptimistic(
     card.comments,
     (state: FeedCard["comments"], text: string) => [
@@ -143,6 +257,21 @@ export function RecognitionCard({
     });
   }
 
+  function pickReaction(emoji: string) {
+    react(emoji);
+    setReactOpen(false);
+  }
+
+  function onBoost(type: BoostType) {
+    const fd = new FormData();
+    fd.set("recognitionId", card.id);
+    fd.set("type", type);
+    startBoost(async () => {
+      const res = await toggleBoost(fd);
+      if (!res.ok) toast.error(res.error);
+    });
+  }
+
   function replyTo(name: string) {
     setBody((b) => (b.trim() ? b : `@${name} `));
     commentInputRef.current?.focus();
@@ -162,11 +291,30 @@ export function RecognitionCard({
     });
   }
 
-  const totalReactions = reactions.reduce((sum, r) => sum + r.count, 0);
-  const distinctEmojis = reactions.map((r) => r.emoji).slice(0, 3);
-  const viewerClapped =
-    reactions.find((r) => r.emoji === "👏")?.reacted ?? false;
   const viewerReacted = reactions.some((r) => r.reacted);
+
+  // Point-multiplier boost display + the current viewer's ability to change it.
+  const activeType =
+    card.boostType && card.boostType in BOOSTS
+      ? (card.boostType as BoostType)
+      : null;
+  const activeBoost = activeType ? BOOSTS[activeType] : null;
+  const effectivePoints = activeBoost
+    ? card.pointsEach * activeBoost.multiplier
+    : card.pointsEach;
+
+  const myBoostType = boostForRole(viewer.role);
+  // What the viewer can do: remove their own boost, apply onto an unboosted or
+  // lower-boosted post, or nothing (a higher boost is already applied).
+  let boostMode: "apply" | "remove" | null = null;
+  if (myBoostType && card.pointsEach > 0) {
+    if (activeType === myBoostType) boostMode = "remove";
+    else if (
+      activeType === null ||
+      boostMultiplier(myBoostType) > boostMultiplier(activeType)
+    )
+      boostMode = "apply";
+  }
 
   const hiddenCount =
     !showAllComments && comments.length > COMMENT_PREVIEW
@@ -242,7 +390,14 @@ export function RecognitionCard({
                   data-numeric
                   className="text-success bg-success/10 rounded-full px-2 py-0.5 text-xs font-semibold"
                 >
-                  +{pts(card.pointsEach)}
+                  +{pts(effectivePoints)}
+                </span>
+              )}
+              {activeBoost && (
+                <span className="bg-accent/15 text-accent inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold">
+                  <span aria-hidden>{activeBoost.emoji}</span>
+                  {activeBoost.label} ·{" "}
+                  <span data-numeric>{activeBoost.multiplier}×</span>
                 </span>
               )}
             </div>
@@ -298,44 +453,51 @@ export function RecognitionCard({
           </div>
         )}
 
-        {/* Reactions + comment count summary */}
-        {(totalReactions > 0 || comments.length > 0) && (
-          <div className="text-muted flex items-center justify-between px-4 pt-3 text-xs">
-            {totalReactions > 0 ? (
-              <span className="flex items-center gap-1.5">
-                <span className="flex -space-x-1">
-                  {distinctEmojis.map((e) => (
-                    <span
-                      key={e}
-                      className="bg-background ring-card flex size-5 items-center justify-center rounded-full text-[0.7rem] ring-2"
-                    >
-                      {e}
-                    </span>
-                  ))}
-                </span>
-                <span data-numeric>{totalReactions}</span>
-              </span>
-            ) : (
-              <span />
-            )}
-            {comments.length > 0 && (
-              <span>
-                {comments.length}{" "}
-                {comments.length === 1 ? "comment" : "comments"}
-              </span>
-            )}
+        {/* Reactions — prominent chips; hover previews who, click opens the list */}
+        {reactions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
+            {[...reactions]
+              .sort((a, b) => reactionRank(a.emoji) - reactionRank(b.emoji))
+              .map((r) => (
+                <ReactionChip key={r.emoji} reaction={r} />
+              ))}
+          </div>
+        )}
+
+        {comments.length > 0 && (
+          <div className="text-muted px-4 pt-2 text-xs">
+            {comments.length} {comments.length === 1 ? "comment" : "comments"}
+          </div>
+        )}
+
+        {/* Boost control — shown only to a role that can change this post's boost */}
+        {boostMode && myBoostType && (
+          <div className="px-4 pt-2">
+            <button
+              type="button"
+              onClick={() => onBoost(myBoostType)}
+              disabled={boostPending}
+              className={cn(
+                "flex w-full items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-semibold transition-colors disabled:opacity-50",
+                boostMode === "remove"
+                  ? "border-accent/40 bg-accent/10 text-accent"
+                  : "border-border text-foreground hover:bg-secondary",
+              )}
+            >
+              <span aria-hidden>{BOOSTS[myBoostType].emoji}</span>
+              {boostMode === "remove"
+                ? `Remove ${BOOSTS[myBoostType].label} boost`
+                : `Apply ${BOOSTS[myBoostType].label} boost · ${BOOSTS[myBoostType].multiplier}×`}
+            </button>
           </div>
         )}
 
         {/* Action bar */}
-        <div className="border-border mx-4 mt-2 grid grid-cols-3 border-t pt-1">
-          <ActionButton onClick={() => react("👏")} active={viewerClapped}>
-            <span className="text-base leading-none">👏</span> Clap
-          </ActionButton>
+        <div className="border-border mx-4 mt-2 grid grid-cols-2 border-t pt-1">
           <ActionButton onClick={() => commentInputRef.current?.focus()}>
             <MessageCircle className="size-4" /> Comment
           </ActionButton>
-          <Popover>
+          <Popover open={reactOpen} onOpenChange={setReactOpen}>
             <PopoverTrigger asChild>
               <button
                 type="button"
@@ -350,22 +512,26 @@ export function RecognitionCard({
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-1.5" align="center">
-              <div className="flex gap-1">
+              <div className="flex gap-0.5">
                 {REACTION_EMOJIS.map((emoji) => {
                   const active = reactions.find(
                     (r) => r.emoji === emoji,
                   )?.reacted;
                   return (
-                    <button
+                    <motion.button
                       key={emoji}
-                      onClick={() => react(emoji)}
+                      type="button"
+                      onClick={() => pickReaction(emoji)}
+                      whileHover={{ scale: 1.3, y: -2 }}
+                      whileTap={{ scale: 0.9 }}
+                      aria-label={`React ${emoji}`}
                       className={cn(
-                        "hover:bg-secondary rounded-md p-1.5 text-lg transition-colors",
-                        active && "bg-primary/10",
+                        "rounded-lg p-1.5 text-2xl leading-none transition-colors",
+                        active ? "bg-primary/10" : "hover:bg-secondary",
                       )}
                     >
                       {emoji}
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>

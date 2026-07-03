@@ -1,18 +1,25 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { toast } from "sonner";
+import { upload } from "@vercel/blob/client";
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Upload, Loader2 } from "lucide-react";
 import { saveUser, setUserActive, type ActionResult } from "@/lib/admin/actions";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { DataTable } from "@/components/data-table";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +39,7 @@ export type UserRow = {
   id: string;
   name: string;
   email: string;
+  avatarUrl: string | null;
   jobTitle: string | null;
   role: string;
   siteId: string;
@@ -46,6 +54,17 @@ export type UserRow = {
 type Option = { id: string; name: string };
 
 const NONE = "__none__";
+
+// Base UI's Select shows the trigger label from a value→label `items` map (it
+// renders the raw value otherwise). Roles are fixed; sites/managers are built
+// from props.
+const ROLE_LABELS: Record<string, string> = {
+  staff: "Staff",
+  manager: "Manager",
+  admin: "Admin",
+  operations: "Operations",
+  ceo: "CEO",
+};
 
 function UserFormDialog({
   open,
@@ -68,6 +87,34 @@ function UserFormDialog({
   const [siteId, setSiteId] = useState(editing?.siteId ?? sites[0]?.id ?? "");
   const [managerId, setManagerId] = useState(editing?.managerId ?? "");
   const [active, setActive] = useState(editing?.active ?? true);
+  const [name, setName] = useState(editing?.name ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(editing?.avatarUrl ?? "");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAvatarFile(file: File) {
+    if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+      toast.error("Use a PNG, JPG, GIF, or WebP.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("Picture must be 8MB or smaller.");
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const blob = await upload(`avatars/${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/admin/avatar/upload",
+        contentType: file.type,
+      });
+      setAvatarUrl(blob.url);
+    } catch {
+      toast.error("Picture upload failed.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
 
   useEffect(() => {
     if (state?.ok) {
@@ -75,6 +122,14 @@ function UserFormDialog({
       onOpenChange(false);
     } else if (state && !state.ok) toast.error(state.error);
   }, [state, onOpenChange]);
+
+  const siteItems = Object.fromEntries(sites.map((s) => [s.id, s.name]));
+  const managerItems: Record<string, string> = {
+    [NONE]: "No manager",
+    ...Object.fromEntries(
+      managers.filter((m) => m.id !== editing?.id).map((m) => [m.id, m.name]),
+    ),
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,11 +143,71 @@ function UserFormDialog({
           <input type="hidden" name="siteId" value={siteId} />
           <input type="hidden" name="managerId" value={managerId} />
           <input type="hidden" name="active" value={String(active)} />
+          <input type="hidden" name="avatarUrl" value={avatarUrl} />
+
+          {/* Picture */}
+          <div className="flex items-center gap-4">
+            <UserAvatar
+              name={name || "New user"}
+              avatarUrl={avatarUrl || null}
+              className="size-16 text-lg"
+            />
+            <div className="space-y-1.5">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept={ALLOWED_IMAGE_TYPES.join(",")}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleAvatarFile(file);
+                  e.target.value = "";
+                }}
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadingAvatar}
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  {uploadingAvatar ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="size-4" />
+                      {avatarUrl ? "Change picture" : "Upload picture"}
+                    </>
+                  )}
+                </Button>
+                {avatarUrl && !uploadingAvatar && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAvatarUrl("")}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <p className="text-muted text-xs">PNG, JPG, GIF, or WebP · max 8MB</p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" name="name" defaultValue={editing?.name ?? ""} required />
+              <Input
+                id="name"
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="jobTitle">Job title</Label>
@@ -116,7 +231,7 @@ function UserFormDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Select value={role} onValueChange={setRole}>
+              <Select value={role} onValueChange={setRole} items={ROLE_LABELS}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -124,12 +239,14 @@ function UserFormDialog({
                   <SelectItem value="staff">Staff</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="operations">Operations</SelectItem>
+                  <SelectItem value="ceo">CEO</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Site</Label>
-              <Select value={siteId} onValueChange={setSiteId}>
+              <Select value={siteId} onValueChange={setSiteId} items={siteItems}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a site" />
                 </SelectTrigger>
@@ -148,6 +265,7 @@ function UserFormDialog({
             <Select
               value={managerId === "" ? NONE : managerId}
               onValueChange={(v) => setManagerId(v === NONE ? "" : v)}
+              items={managerItems}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -192,7 +310,7 @@ function UserFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || uploadingAvatar}>
               {pending ? "Saving…" : editing ? "Save" : "Create"}
             </Button>
           </DialogFooter>
@@ -225,6 +343,8 @@ const ROLE_TONE: Record<string, string> = {
   admin: "bg-primary/15 text-primary",
   manager: "bg-accent/15 text-accent",
   staff: "bg-secondary text-muted",
+  operations: "bg-success/15 text-success",
+  ceo: "bg-warning/15 text-warning",
 };
 
 export function UsersManager({
@@ -245,7 +365,11 @@ export function UsersManager({
       header: "Name",
       cell: ({ row }) => (
         <div className="flex items-center gap-2.5">
-          <UserAvatar name={row.original.name} className="size-8" />
+          <UserAvatar
+            name={row.original.name}
+            avatarUrl={row.original.avatarUrl}
+            className="size-8"
+          />
           <div className="min-w-0">
             <Link
               href={`/profile/${row.original.id}`}

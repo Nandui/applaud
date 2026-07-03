@@ -13,6 +13,8 @@ import {
   MAX_IMAGE_BYTES,
 } from "@/lib/config";
 import { valueIcon } from "@/lib/value-icons";
+import type { GifResult } from "@/lib/recognition/gif";
+import { GifPicker } from "@/components/recognize/gif-picker";
 import { UserAvatar } from "@/components/user-avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,6 +123,19 @@ export function RecognizeForm({
     // under `recognitions/` not referenced by any Recognition.imageUrls, rather
     // than a client-triggered delete (the RW token must stay server-side, and
     // an unscoped delete-by-URL would let one user delete another's blob).
+  }
+
+  // A GIF picked from library search is stored like an uploaded attachment —
+  // its URL joins the same `images`/`imageUrls` set and shares the cap. It's
+  // already hosted (no upload), so it commits immediately.
+  function addGif(gif: GifResult) {
+    if (reservedRef.current >= MAX_RECOGNITION_IMAGES) {
+      toast.error(`You can attach up to ${MAX_RECOGNITION_IMAGES} images.`);
+      return;
+    }
+    if (images.some((img) => img.url === gif.url)) return;
+    reservedRef.current += 1;
+    setImages((imgs) => [...imgs, { url: gif.url, name: gif.title || "GIF" }]);
   }
 
   const byId = useMemo(
@@ -336,14 +351,17 @@ export function RecognizeForm({
                 </div>
               ))}
               {images.length + uploadingCount < MAX_RECOGNITION_IMAGES && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-border text-muted hover:bg-secondary flex size-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed transition-colors"
-                >
-                  <ImagePlus className="size-5" />
-                  <span className="text-[0.65rem]">Add</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-border text-muted hover:bg-secondary flex size-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed transition-colors"
+                  >
+                    <ImagePlus className="size-5" />
+                    <span className="text-[0.65rem]">Add</span>
+                  </button>
+                  <GifPicker onSelect={addGif} />
+                </>
               )}
             </div>
             <input

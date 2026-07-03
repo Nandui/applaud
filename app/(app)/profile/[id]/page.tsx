@@ -158,6 +158,7 @@ export default async function ProfilePage({
                   id: viewer.id,
                   name: viewer.name,
                   avatarUrl: viewer.avatarUrl ?? null,
+                  role: viewer.role,
                 }}
               />
             ))}
