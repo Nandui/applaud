@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { isProjectBlobUrl } from "@/lib/blob";
+import { MANAGER_GROUP_IDS } from "@/lib/config";
 import { writeAudit } from "@/lib/audit";
 
 export type ActionResult =
@@ -227,6 +228,7 @@ export async function saveUser(
   const role = String(formData.get("role") ?? "staff");
   const siteId = String(formData.get("siteId") ?? "").trim();
   const managerId = String(formData.get("managerId") ?? "").trim();
+  const managerGroup = String(formData.get("managerGroup") ?? "").trim();
   const active = String(formData.get("active") ?? "true") === "true";
   const hireDate = parseDate(formData.get("hireDate"));
   const birthday = parseDate(formData.get("birthday"));
@@ -241,6 +243,13 @@ export async function saveUser(
   if (managerId && managerId === id) {
     return { ok: false, error: "A user can't be their own manager." };
   }
+  // The manager is a named person or a group rota — never both.
+  if (managerGroup && !(MANAGER_GROUP_IDS as string[]).includes(managerGroup)) {
+    return { ok: false, error: "Unknown manager group." };
+  }
+  if (managerGroup && managerId) {
+    return { ok: false, error: "Pick a person or a manager group, not both." };
+  }
   if (avatarUrl && !isProjectBlobUrl(avatarUrl)) {
     return { ok: false, error: "Unrecognised picture URL." };
   }
@@ -252,6 +261,7 @@ export async function saveUser(
     role,
     siteId,
     managerId: managerId || null,
+    managerGroup: managerGroup || null,
     active,
     hireDate,
     birthday,
@@ -287,7 +297,14 @@ export async function saveUser(
     entityType: "user",
     entityId,
     summary: id ? `Updated user ${name} (${role})` : `Created user ${name} (${role})`,
-    metadata: { email, role, siteId, active },
+    metadata: {
+      email,
+      role,
+      siteId,
+      active,
+      jobTitle: jobTitle || null,
+      manager: managerGroup || managerId || null,
+    },
     siteId,
   });
   revalidatePath("/admin/users");
@@ -345,7 +362,7 @@ export async function deleteUser(formData: FormData): Promise<ActionResult> {
     archived = true;
     await prisma.user.update({
       where: { id },
-      data: { active: false, siteId: null, managerId: null },
+      data: { active: false, siteId: null, managerId: null, managerGroup: null },
     });
   }
 

@@ -28,16 +28,20 @@ model User {
   email     String    @unique
   name      String
   avatarUrl String?
-  jobTitle  String?
-  role      String    @default("staff") // "staff" | "manager" | "admin"
+  jobTitle  String?   // the job in the company, e.g. "Duty Manager", "Lifeguard"
+  role      String    @default("staff") // app permission: "staff" | "manager" | "admin" | "operations" | "ceo"
   // Nullable so a removed person can be detached from their site: hard-delete
   // is refused by the content FKs below, and a site with users assigned can't
   // be deleted. Detached users are treated as removed everywhere.
   siteId    String?
   site      Site?     @relation(fields: [siteId], references: [id])
-  managerId String?
-  manager   User?     @relation("Reports", fields: [managerId], references: [id])
-  reports   User[]    @relation("Reports")
+  // A person's manager is either a named person (managerId) or a group rota
+  // (managerGroup, currently only "duty_manager"). At most one is set; a group
+  // manager means there is no named manager to route approvals to.
+  managerId    String?
+  manager      User?  @relation("Reports", fields: [managerId], references: [id])
+  reports      User[] @relation("Reports")
+  managerGroup String?
   hireDate  DateTime?
   birthday  DateTime? // store full date; celebrate on month/day
   active    Boolean   @default(true)

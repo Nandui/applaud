@@ -143,6 +143,8 @@ export async function nominate(
   return { ok: true, message: `Awarded! ${nominee.name} received ${program.points} pts.` };
 }
 
+// managerId is null for group-managed (duty manager) nominees, so the checks
+// below fall through to admins rather than matching a reviewer.
 async function loadReviewable(id: string) {
   return prisma.nomination.findUnique({
     where: { id },

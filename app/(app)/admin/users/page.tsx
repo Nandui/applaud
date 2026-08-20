@@ -29,6 +29,7 @@ export default async function AdminUsersPage() {
         hireDate: true,
         birthday: true,
         active: true,
+        managerGroup: true,
         site: { select: { name: true } },
         manager: { select: { id: true, name: true } },
       },
@@ -51,6 +52,7 @@ export default async function AdminUsersPage() {
     siteName: u.site?.name ?? "—",
     managerId: u.manager?.id ?? null,
     managerName: u.manager?.name ?? null,
+    managerGroup: u.managerGroup,
     hireDate: isoDate(u.hireDate),
     birthday: isoDate(u.birthday),
     active: u.active,
@@ -62,7 +64,7 @@ export default async function AdminUsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Manage people, sites, managers, and roles."
+        description="Manage people, sites, managers, company roles, and app roles."
       />
       <UsersManager
         rows={rows}

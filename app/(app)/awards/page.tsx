@@ -39,6 +39,8 @@ export default async function AwardsPage() {
   }));
 
   // Review queue: admins see all pending; managers see their reports' pending.
+  // Someone managed by a group (duty manager) has no named manager, so their
+  // nominations only surface for admins.
   const pending = isManager(me)
     ? await prisma.nomination.findMany({
         where: {
