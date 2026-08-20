@@ -5,6 +5,7 @@ import { LogOut, User as UserIcon, Wallet, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -35,31 +36,35 @@ export function UserMenu({ user }: { user: SessionUser }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-1">
-          <span className="truncate font-medium">{user.name}</span>
-          <span className="text-muted truncate text-xs font-normal">{user.email}</span>
-          <Badge variant="secondary" className="mt-1 w-fit capitalize">
-            {user.role}
-          </Badge>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href={`/profile/${user.id}`}>
-            <UserIcon className="size-4" /> My profile
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/me">
-            <Wallet className="size-4" /> My wallet
-          </Link>
-        </DropdownMenuItem>
-        {isAdmin(user) ? (
+        {/* Base UI ties a GroupLabel to its enclosing group — a
+            DropdownMenuLabel outside a DropdownMenuGroup throws on open. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col gap-1">
+            <span className="truncate font-medium">{user.name}</span>
+            <span className="text-muted truncate text-xs font-normal">{user.email}</span>
+            <Badge variant="secondary" className="mt-1 w-fit capitalize">
+              {user.role}
+            </Badge>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/admin">
-              <Shield className="size-4" /> Admin
+            <Link href={user.id ? `/profile/${user.id}` : "/profile"}>
+              <UserIcon className="size-4" /> My profile
             </Link>
           </DropdownMenuItem>
-        ) : null}
+          <DropdownMenuItem asChild>
+            <Link href="/me">
+              <Wallet className="size-4" /> My wallet
+            </Link>
+          </DropdownMenuItem>
+          {isAdmin(user) ? (
+            <DropdownMenuItem asChild>
+              <Link href="/admin">
+                <Shield className="size-4" /> Admin
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"

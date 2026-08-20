@@ -14,14 +14,17 @@ export const authConfig = {
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.sub = user.id;
         token.role = user.role;
         token.siteId = user.siteId;
       }
+      if (!token.id && token.sub) token.id = token.sub;
       return token;
     },
     session({ session, token }) {
       if (session.user) {
-        session.user.id = (token.id as string) ?? session.user.id;
+        session.user.id =
+          (token.id as string) || (token.sub as string) || session.user.id;
         session.user.role = (token.role as Role) ?? "staff";
         session.user.siteId = token.siteId as string;
       }

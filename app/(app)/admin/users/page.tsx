@@ -11,10 +11,12 @@ function isoDate(d: Date | null): string | null {
 }
 
 export default async function AdminUsersPage() {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const [users, sites] = await Promise.all([
     prisma.user.findMany({
+      // Removed people are detached from their site; they stay out of the list.
+      where: { siteId: { not: null } },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -28,7 +30,10 @@ export default async function AdminUsersPage() {
         birthday: true,
         active: true,
         site: { select: { name: true } },
-        manager: { select: { id: true, name: true } },
+        managers: {
+          orderBy: { manager: { name: "asc" } },
+          select: { manager: { select: { id: true, name: true } } },
+        },
       },
     }),
     prisma.site.findMany({
@@ -45,10 +50,10 @@ export default async function AdminUsersPage() {
     avatarUrl: u.avatarUrl,
     jobTitle: u.jobTitle,
     role: u.role,
-    siteId: u.siteId,
-    siteName: u.site.name,
-    managerId: u.manager?.id ?? null,
-    managerName: u.manager?.name ?? null,
+    siteId: u.siteId ?? "",
+    siteName: u.site?.name ?? "—",
+    managerIds: u.managers.map((m) => m.manager.id),
+    managerNames: u.managers.map((m) => m.manager.name),
     hireDate: isoDate(u.hireDate),
     birthday: isoDate(u.birthday),
     active: u.active,
@@ -60,9 +65,14 @@ export default async function AdminUsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Manage people, sites, managers, and roles."
+        description="Manage people, sites, managers, company roles, and app roles."
       />
-      <UsersManager rows={rows} sites={sites} managers={managers} />
+      <UsersManager
+        rows={rows}
+        sites={sites}
+        managers={managers}
+        currentUserId={admin.id}
+      />
     </div>
   );
 }
