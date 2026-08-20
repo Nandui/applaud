@@ -11,8 +11,13 @@ import { toast } from "sonner";
 import { upload } from "@vercel/blob/client";
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { Pencil, Plus, Upload, Loader2 } from "lucide-react";
-import { saveUser, setUserActive, type ActionResult } from "@/lib/admin/actions";
+import { Pencil, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import {
+  deleteUser,
+  saveUser,
+  setUserActive,
+  type ActionResult,
+} from "@/lib/admin/actions";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { DataTable } from "@/components/data-table";
 import { UserAvatar } from "@/components/user-avatar";
@@ -23,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -320,6 +326,55 @@ function UserFormDialog({
   );
 }
 
+function DeleteUserDialog({
+  user,
+  onOpenChange,
+}: {
+  user: UserRow | null;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [pending, start] = useTransition();
+
+  return (
+    <Dialog open={!!user} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove user</DialogTitle>
+          <DialogDescription>
+            {user
+              ? `${user.name} will be removed from ${user.siteName} and the people list. If they have recognition or points history, that history is kept and their record is archived instead of deleted. This can't be undone.`
+              : null}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={pending}
+            onClick={() => {
+              if (!user) return;
+              const fd = new FormData();
+              fd.set("id", user.id);
+              start(async () => {
+                const res = await deleteUser(fd);
+                if (res.ok) {
+                  toast.success(res.message ?? "User removed.");
+                  onOpenChange(false);
+                } else toast.error(res.error);
+              });
+            }}
+          >
+            {pending ? "Removing…" : "Remove"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ActiveToggle({ row }: { row: UserRow }) {
   const [pending, start] = useTransition();
   return (
@@ -351,13 +406,16 @@ export function UsersManager({
   rows,
   sites,
   managers,
+  currentUserId,
 }: {
   rows: UserRow[];
   sites: Option[];
   managers: Option[];
+  currentUserId: string;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState<UserRow | null>(null);
 
   const columns: ColumnDef<UserRow>[] = [
     {
@@ -410,7 +468,7 @@ export function UsersManager({
       header: () => <span className="sr-only">Actions</span>,
       enableSorting: false,
       cell: ({ row }) => (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <Button
             size="xs"
             variant="outline"
@@ -421,6 +479,16 @@ export function UsersManager({
           >
             <Pencil className="size-3.5" /> Edit
           </Button>
+          {row.original.id !== currentUserId && (
+            <Button
+              size="xs"
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setDeleting(row.original)}
+            >
+              <Trash2 className="size-3.5" /> Remove
+            </Button>
+          )}
         </div>
       ),
     },
@@ -452,6 +520,12 @@ export function UsersManager({
         editing={editing}
         sites={sites}
         managers={managers}
+      />
+      <DeleteUserDialog
+        user={deleting}
+        onOpenChange={(o) => {
+          if (!o) setDeleting(null);
+        }}
       />
     </>
   );

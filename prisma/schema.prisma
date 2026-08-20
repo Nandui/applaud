@@ -30,8 +30,11 @@ model User {
   avatarUrl String?
   jobTitle  String?
   role      String    @default("staff") // "staff" | "manager" | "admin"
-  siteId    String
-  site      Site      @relation(fields: [siteId], references: [id])
+  // Nullable so a removed person can be detached from their site: hard-delete
+  // is refused by the content FKs below, and a site with users assigned can't
+  // be deleted. Detached users are treated as removed everywhere.
+  siteId    String?
+  site      Site?     @relation(fields: [siteId], references: [id])
   managerId String?
   manager   User?     @relation("Reports", fields: [managerId], references: [id])
   reports   User[]    @relation("Reports")

@@ -265,7 +265,20 @@ export async function saveUser(
       entityId = created.id;
     }
   } catch (e) {
-    if (isUniqueError(e)) return { ok: false, error: "That email is already in use." };
+    if (isUniqueError(e)) {
+      // A removed person keeps their row (and email) when history blocked the
+      // delete, so say which kind of clash this is.
+      const clash = await prisma.user.findUnique({
+        where: { email },
+        select: { siteId: true },
+      });
+      return {
+        ok: false,
+        error: clash && clash.siteId === null
+          ? "That email belongs to a removed user."
+          : "That email is already in use.",
+      };
+    }
     throw e;
   }
   await writeAudit({
@@ -297,4 +310,62 @@ export async function setUserActive(formData: FormData): Promise<ActionResult> {
   });
   revalidatePath("/admin/users");
   return { ok: true };
+}
+
+/**
+ * Removes a person. Hard-deletes when nothing references them so they leave
+ * the directory outright and their site's user count drops. Recognitions,
+ * ledger rows, redemptions and the rest all restrict the delete, so a person
+ * with history is instead deactivated and detached from their site — gone from
+ * the people list, and no longer blocking that site's removal.
+ */
+export async function deleteUser(formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { ok: false, error: "Missing user." };
+  if (id === admin.id) {
+    return { ok: false, error: "You can't remove your own account." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, name: true, email: true, role: true, siteId: true },
+  });
+  if (!user) return { ok: false, error: "That user no longer exists." };
+
+  // Reports would block the delete on their own, and either way nobody should
+  // keep pointing at a removed manager.
+  await prisma.user.updateMany({ where: { managerId: id }, data: { managerId: null } });
+
+  let archived = false;
+  try {
+    await prisma.user.delete({ where: { id } });
+  } catch (e) {
+    if (!isForeignKeyError(e)) throw e;
+    archived = true;
+    await prisma.user.update({
+      where: { id },
+      data: { active: false, siteId: null, managerId: null },
+    });
+  }
+
+  await writeAudit({
+    actor: admin,
+    action: "user.deleted",
+    entityType: "user",
+    entityId: id,
+    summary: archived
+      ? `Removed user ${user.name} (${user.email}) — archived, history kept`
+      : `Deleted user ${user.name} (${user.email})`,
+    metadata: { email: user.email, role: user.role, archived },
+    siteId: user.siteId,
+  });
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/sites");
+  return {
+    ok: true,
+    message: archived
+      ? `${user.name} removed. Their recognition history meant the record was archived, not deleted.`
+      : `${user.name} removed.`,
+  };
 }

@@ -35,7 +35,7 @@ export default async function AwardsPage() {
     id: c.id,
     name: c.name,
     jobTitle: c.jobTitle,
-    siteCode: c.site.code,
+    siteCode: c.site?.code ?? "",
   }));
 
   // Review queue: admins see all pending; managers see their reports' pending.
