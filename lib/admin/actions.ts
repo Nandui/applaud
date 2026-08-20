@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { isProjectBlobUrl } from "@/lib/blob";
+import { writeAudit } from "@/lib/audit";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -31,7 +32,7 @@ export async function saveValue(
   _prev: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -49,19 +50,39 @@ export async function saveValue(
     order: Number.isFinite(order) ? order : 0,
     active,
   };
+  let entityId = id;
   if (id) await prisma.value.update({ where: { id }, data });
-  else await prisma.value.create({ data });
+  else {
+    const created = await prisma.value.create({ data });
+    entityId = created.id;
+  }
+  await writeAudit({
+    actor: admin,
+    action: id ? "value.updated" : "value.created",
+    entityType: "value",
+    entityId,
+    summary: id ? `Updated value ${name}` : `Created value ${name}`,
+    metadata: { active, order: data.order },
+  });
   revalidatePath("/admin/values");
   revalidatePath("/recognize");
   return { ok: true, message: id ? "Value updated." : "Value created." };
 }
 
 export async function setValueActive(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return { ok: false, error: "Missing value." };
   await prisma.value.update({ where: { id }, data: { active } });
+  await writeAudit({
+    actor: admin,
+    action: "value.updated",
+    entityType: "value",
+    entityId: id,
+    summary: active ? "Reactivated a value" : "Deactivated a value",
+    metadata: { active },
+  });
   revalidatePath("/admin/values");
   return { ok: true };
 }
@@ -72,7 +93,7 @@ export async function saveSite(
   _prev: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
@@ -84,23 +105,45 @@ export async function saveSite(
   }
 
   const data = { name, code, timezone, active };
+  let entityId = id;
   try {
     if (id) await prisma.site.update({ where: { id }, data });
-    else await prisma.site.create({ data });
+    else {
+      const created = await prisma.site.create({ data });
+      entityId = created.id;
+    }
   } catch (e) {
     if (isUniqueError(e)) return { ok: false, error: "That site code is taken." };
     throw e;
   }
+  await writeAudit({
+    actor: admin,
+    action: id ? "site.updated" : "site.created",
+    entityType: "site",
+    entityId,
+    summary: id ? `Updated site ${name} (${code})` : `Created site ${name} (${code})`,
+    metadata: { code, active, timezone },
+    siteId: entityId || null,
+  });
   revalidatePath("/admin/sites");
   return { ok: true, message: id ? "Site updated." : "Site created." };
 }
 
 export async function setSiteActive(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return { ok: false, error: "Missing site." };
   await prisma.site.update({ where: { id }, data: { active } });
+  await writeAudit({
+    actor: admin,
+    action: "site.updated",
+    entityType: "site",
+    entityId: id,
+    summary: active ? "Reactivated a site" : "Deactivated a site",
+    metadata: { active },
+    siteId: id,
+  });
   revalidatePath("/admin/sites");
   return { ok: true };
 }
@@ -113,7 +156,7 @@ export async function saveUser(
   _prev: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -151,23 +194,44 @@ export async function saveUser(
     birthday,
     avatarUrl: avatarUrl || null,
   };
+  let entityId = id;
   try {
     if (id) await prisma.user.update({ where: { id }, data });
-    else await prisma.user.create({ data });
+    else {
+      const created = await prisma.user.create({ data });
+      entityId = created.id;
+    }
   } catch (e) {
     if (isUniqueError(e)) return { ok: false, error: "That email is already in use." };
     throw e;
   }
+  await writeAudit({
+    actor: admin,
+    action: id ? "user.updated" : "user.created",
+    entityType: "user",
+    entityId,
+    summary: id ? `Updated user ${name} (${role})` : `Created user ${name} (${role})`,
+    metadata: { email, role, siteId, active },
+    siteId,
+  });
   revalidatePath("/admin/users");
   return { ok: true, message: id ? "User updated." : "User created." };
 }
 
 export async function setUserActive(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return { ok: false, error: "Missing user." };
   await prisma.user.update({ where: { id }, data: { active } });
+  await writeAudit({
+    actor: admin,
+    action: "user.updated",
+    entityType: "user",
+    entityId: id,
+    summary: active ? "Reactivated a user" : "Deactivated a user",
+    metadata: { active },
+  });
   revalidatePath("/admin/users");
   return { ok: true };
 }

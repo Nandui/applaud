@@ -14,16 +14,20 @@ export default async function AdminRewardsPage() {
 
   const [rewards, sites] = await Promise.all([
     prisma.reward.findMany({
-      orderBy: [{ active: "desc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
         id: true,
         name: true,
         description: true,
+        imageUrl: true,
         category: true,
         pointsCost: true,
         stock: true,
         siteId: true,
         active: true,
+        fulfilment: true,
+        type: true,
+        sortOrder: true,
       },
     }),
     prisma.site.findMany({
@@ -39,7 +43,7 @@ export default async function AdminRewardsPage() {
     <div>
       <PageHeader
         title="Rewards"
-        description="Manage the reward catalogue, pricing, and stock."
+        description="Create and edit what staff can redeem. Changes appear on the Rewards store immediately. Hide an offering instead of deleting it."
       />
       <RewardsManager rows={rows} sites={sites} />
     </div>

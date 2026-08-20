@@ -24,7 +24,7 @@ export default async function RewardsPage() {
         active: true,
         OR: [{ siteId: null }, { siteId: me.siteId }],
       },
-      orderBy: [{ pointsCost: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { pointsCost: "asc" }, { name: "asc" }],
       select: {
         id: true,
         name: true,

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { requireUser, requireManager, requireAdmin } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
+import { writeAudit } from "@/lib/audit";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -97,8 +98,17 @@ export async function nominate(
   if (!nominee) return { ok: false, error: "That colleague is unavailable." };
 
   if (program.requiresApproval) {
-    await prisma.nomination.create({
+    const nom = await prisma.nomination.create({
       data: { programId, nominatorId: me.id, nomineeId, justification, status: "pending" },
+    });
+    await writeAudit({
+      actor: me,
+      action: "nomination.created",
+      entityType: "nomination",
+      entityId: nom.id,
+      summary: `Nominated ${nominee.name} for ${program.name}`,
+      metadata: { programId, nomineeId, status: "pending" },
+      siteId: me.siteId,
     });
     revalidatePath("/awards");
     revalidatePath("/admin/nominations");
@@ -106,16 +116,27 @@ export async function nominate(
   }
 
   // Auto-approve programs award immediately.
+  let nomId: string | undefined;
   await prisma.$transaction(async (tx) => {
     const nom = await tx.nomination.create({
       data: { programId, nominatorId: me.id, nomineeId, justification, status: "pending" },
     });
+    nomId = nom.id;
     await applyAward(
       tx,
       { id: nom.id, nomineeId, nomineeName: nominee.name },
       { name: program.name, points: program.points },
       me.id,
     );
+  });
+  await writeAudit({
+    actor: me,
+    action: "nomination.created",
+    entityType: "nomination",
+    entityId: nomId,
+    summary: `Nominated ${nominee.name} for ${program.name} (auto-approved)`,
+    metadata: { programId, nomineeId, status: "approved", auto: true, points: program.points },
+    siteId: me.siteId,
   });
   revalidatePath("/awards");
   revalidatePath("/");
@@ -155,6 +176,15 @@ export async function approveNomination(formData: FormData): Promise<ActionResul
       reviewer.id,
     );
   });
+  await writeAudit({
+    actor: reviewer,
+    action: "nomination.reviewed",
+    entityType: "nomination",
+    entityId: nomination.id,
+    summary: `Approved nomination of ${nomination.nominee.name} for ${nomination.program.name}`,
+    metadata: { status: "approved", points: nomination.program.points },
+    siteId: reviewer.siteId,
+  });
   revalidatePath("/admin/nominations");
   revalidatePath("/awards");
   revalidatePath("/");
@@ -175,6 +205,15 @@ export async function rejectNomination(formData: FormData): Promise<ActionResult
   await prisma.nomination.update({
     where: { id },
     data: { status: "rejected", reviewedById: reviewer.id, reviewedAt: new Date() },
+  });
+  await writeAudit({
+    actor: reviewer,
+    action: "nomination.reviewed",
+    entityType: "nomination",
+    entityId: nomination.id,
+    summary: `Rejected nomination of ${nomination.nominee.name} for ${nomination.program.name}`,
+    metadata: { status: "rejected" },
+    siteId: reviewer.siteId,
   });
   revalidatePath("/admin/nominations");
   revalidatePath("/awards");
@@ -198,7 +237,7 @@ export async function saveAwardProgram(
   _prev: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const d = parseProgramForm(formData);
   if (d.name.length < 2) return { ok: false, error: "Name is too short." };
@@ -214,20 +253,39 @@ export async function saveAwardProgram(
     requiresApproval: d.requiresApproval,
     active: d.active,
   };
+  let entityId = id;
   if (id) await prisma.awardProgram.update({ where: { id }, data });
-  else await prisma.awardProgram.create({ data });
-
+  else {
+    const created = await prisma.awardProgram.create({ data });
+    entityId = created.id;
+  }
+  await writeAudit({
+    actor: admin,
+    action: id ? "award.updated" : "award.created",
+    entityType: "award_program",
+    entityId,
+    summary: id ? `Updated award program ${d.name}` : `Created award program ${d.name}`,
+    metadata: { points: d.points, active: d.active, cadence: d.cadence },
+  });
   revalidatePath("/admin/awards");
   revalidatePath("/awards");
   return { ok: true, message: id ? "Program updated." : "Program created." };
 }
 
 export async function setAwardProgramActive(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return { ok: false, error: "Missing program." };
   await prisma.awardProgram.update({ where: { id }, data: { active } });
+  await writeAudit({
+    actor: admin,
+    action: "award.updated",
+    entityType: "award_program",
+    entityId: id,
+    summary: active ? "Reactivated an award program" : "Deactivated an award program",
+    metadata: { active },
+  });
   revalidatePath("/admin/awards");
   revalidatePath("/awards");
   return { ok: true };

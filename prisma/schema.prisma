@@ -53,6 +53,7 @@ model User {
   ledger               RewardLedger[]
   redemptions          Redemption[]
   celebrations         Celebration[]
+  auditEvents          AuditEvent[]
 
   // next-auth adapter relations
   accounts Account[]
@@ -174,6 +175,7 @@ model Reward {
   stock       Int? // null = unlimited
   siteId      String? // null = all sites
   active      Boolean      @default(true)
+  sortOrder   Int          @default(0)
   createdAt   DateTime     @default(now())
   redemptions Redemption[]
 }
@@ -229,6 +231,29 @@ model Celebration {
   createdAt     DateTime @default(now())
 
   @@unique([userId, type, occurredOn]) // idempotency guard for the cron
+}
+
+// ---------- Audit (append-only mutation trail) ----------
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  actorUserId String?
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorEmail  String? // snapshot at write time
+  actorRole   String? // snapshot at write time
+  action      String // e.g. recognition.created, reward.archived
+  entityType  String
+  entityId    String?
+  summary     String // human one-liner
+  metadata    Json?
+  siteId      String? // optional denormalised site scope
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorUserId])
+  @@index([siteId])
+  @@index([entityType, entityId])
 }
 
 // ---------- Config ----------
