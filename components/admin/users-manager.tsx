@@ -34,13 +34,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ManagerPicker } from "@/components/admin/manager-picker";
 
 export type UserRow = {
   id: string;
@@ -142,9 +142,6 @@ function UserFormDialog({
   const siteItems = Object.fromEntries(sites.map((s) => [s.id, s.name]));
   // Nobody manages themselves, so the editing user is never an option.
   const managerOptions = managers.filter((m) => m.id !== editing?.id);
-  const managerItems = Object.fromEntries(
-    managerOptions.map((m) => [m.id, m.name]),
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -280,24 +277,11 @@ function UserFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Managers</Label>
-            <MultiSelect
+            <ManagerPicker
+              options={managerOptions}
               value={managerIds}
-              onValueChange={setManagerIds}
-              items={managerItems}
-            >
-              {/* Several names can be selected, so cap the trigger at the
-                  dialog width and let the value line-clamp. */}
-              <SelectTrigger className="max-w-full">
-                <SelectValue placeholder="No manager" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                {managerOptions.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </MultiSelect>
+              onChange={setManagerIds}
+            />
             <p className="text-muted text-xs">
               Pick as many as apply — they can all review this person&apos;s
               nominations. Leave empty for no manager.
