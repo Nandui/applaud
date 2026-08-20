@@ -19,6 +19,19 @@ function isUniqueError(e: unknown): boolean {
   );
 }
 
+function isForeignKeyError(e: unknown): boolean {
+  return (
+    !!e &&
+    typeof e === "object" &&
+    "code" in e &&
+    (e as { code?: string }).code === "P2003"
+  );
+}
+
+function stillHasPeople(name: string, count: number): string {
+  return `${name} still has ${count} ${count === 1 ? "person" : "people"} assigned. Move them to another site first — removing a site never deletes its people.`;
+}
+
 function parseDate(value: FormDataEntryValue | null): Date | null {
   const s = String(value ?? "").trim();
   if (!s) return null;
@@ -146,6 +159,56 @@ export async function setSiteActive(formData: FormData): Promise<ActionResult> {
   });
   revalidatePath("/admin/sites");
   return { ok: true };
+}
+
+/**
+ * Hard-deletes a site. People are never cascaded: a site with users assigned is
+ * refused, so the only way to remove one is to move its people off it first.
+ */
+export async function deleteSite(formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { ok: false, error: "Missing site." };
+
+  const site = await prisma.site.findUnique({
+    where: { id },
+    include: { _count: { select: { users: true } } },
+  });
+  if (!site) return { ok: false, error: "That site no longer exists." };
+  if (site._count.users > 0) return { ok: false, error: stillHasPeople(site.name, site._count.users) };
+
+  // Rewards carry a plain siteId (no FK), so they survive the delete but stop
+  // matching anyone. Record the count so the audit trail explains the gap.
+  const scopedRewards = await prisma.reward.count({ where: { siteId: id } });
+
+  try {
+    await prisma.site.delete({ where: { id } });
+  } catch (e) {
+    // Someone assigned a user between the count and the delete.
+    if (isForeignKeyError(e)) {
+      const users = await prisma.user.count({ where: { siteId: id } });
+      return { ok: false, error: stillHasPeople(site.name, users) };
+    }
+    throw e;
+  }
+
+  await writeAudit({
+    actor: admin,
+    action: "site.deleted",
+    entityType: "site",
+    entityId: id,
+    summary: `Deleted site ${site.name} (${site.code})`,
+    metadata: {
+      code: site.code,
+      timezone: site.timezone,
+      active: site.active,
+      scopedRewards,
+    },
+    siteId: id,
+  });
+  revalidatePath("/admin/sites");
+  revalidatePath("/admin/users");
+  return { ok: true, message: `${site.name} removed.` };
 }
 
 // ---------- Users ----------

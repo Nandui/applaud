@@ -3,8 +3,13 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Pencil, Plus } from "lucide-react";
-import { saveSite, setSiteActive, type ActionResult } from "@/lib/admin/actions";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  deleteSite,
+  saveSite,
+  setSiteActive,
+  type ActionResult,
+} from "@/lib/admin/actions";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -14,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -103,6 +109,64 @@ function SiteFormDialog({
   );
 }
 
+function DeleteSiteDialog({
+  site,
+  onOpenChange,
+}: {
+  site: SiteRow | null;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [pending, start] = useTransition();
+
+  // The server re-checks this; the count here just explains the block up front.
+  const blocked = !!site && site.userCount > 0;
+
+  return (
+    <Dialog open={!!site} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove site</DialogTitle>
+          <DialogDescription>
+            {site
+              ? blocked
+                ? `${site.name} (${site.code}) still has ${site.userCount} ${
+                    site.userCount === 1 ? "person" : "people"
+                  } assigned. Move them to another site first — removing a site never deletes its people.`
+                : `${site.name} (${site.code}) will be deleted permanently. This can't be undone.`
+              : null}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {blocked ? "Close" : "Cancel"}
+          </Button>
+          {!blocked && (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={pending}
+              onClick={() => {
+                if (!site) return;
+                const fd = new FormData();
+                fd.set("id", site.id);
+                start(async () => {
+                  const res = await deleteSite(fd);
+                  if (res.ok) {
+                    toast.success(res.message ?? "Site removed.");
+                    onOpenChange(false);
+                  } else toast.error(res.error);
+                });
+              }}
+            >
+              {pending ? "Removing…" : "Remove"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ActiveToggle({ row }: { row: SiteRow }) {
   const [pending, start] = useTransition();
   return (
@@ -125,6 +189,7 @@ function ActiveToggle({ row }: { row: SiteRow }) {
 export function SitesManager({ rows }: { rows: SiteRow[] }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SiteRow | null>(null);
+  const [deleting, setDeleting] = useState<SiteRow | null>(null);
 
   const columns: ColumnDef<SiteRow>[] = [
     { accessorKey: "name", header: "Name" },
@@ -150,7 +215,7 @@ export function SitesManager({ rows }: { rows: SiteRow[] }) {
       header: () => <span className="sr-only">Actions</span>,
       enableSorting: false,
       cell: ({ row }) => (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <Button
             size="xs"
             variant="outline"
@@ -160,6 +225,14 @@ export function SitesManager({ rows }: { rows: SiteRow[] }) {
             }}
           >
             <Pencil className="size-3.5" /> Edit
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleting(row.original)}
+          >
+            <Trash2 className="size-3.5" /> Remove
           </Button>
         </div>
       ),
@@ -189,6 +262,12 @@ export function SitesManager({ rows }: { rows: SiteRow[] }) {
         open={open}
         onOpenChange={setOpen}
         editing={editing}
+      />
+      <DeleteSiteDialog
+        site={deleting}
+        onOpenChange={(o) => {
+          if (!o) setDeleting(null);
+        }}
       />
     </>
   );
