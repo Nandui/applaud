@@ -44,7 +44,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={`/profile/${user.id}`}>
+          <Link href={user.id ? `/profile/${user.id}` : "/profile"}>
             <UserIcon className="size-4" /> My profile
           </Link>
         </DropdownMenuItem>
