@@ -74,6 +74,7 @@ async function main() {
     { code: "BAL", name: "Ballincollig Sports Hub" },
     { code: "CFC", name: "City Fitness Centre" },
     { code: "SPC", name: "Southside Pool & Spa" },
+    { code: "BT", name: "LeisureWorld Bishopstown" },
   ];
   const sites = await Promise.all(
     siteSeed.map((s) =>
@@ -165,10 +166,11 @@ async function main() {
     name: string;
     role: "staff" | "manager" | "admin";
     site: string;
-    jobTitle: string;
+    jobTitle?: string;
     managerName?: string;
-    hireDate: Date;
-    birthday: Date;
+    hireDate?: Date;
+    birthday?: Date;
+    email?: string; // real address; otherwise derived as name@applaud.test
   };
 
   const yearsAgo = (n: number, ref: Date = now) => new Date(Date.UTC(ref.getUTCFullYear() - n, randInt(0, 11), randInt(1, 28)));
@@ -181,9 +183,10 @@ async function main() {
   const within7 = addDays(now, 4); // a birthday a few days out
 
   const userSeed: UserSeed[] = [
-    // Admins (ops, HQ at MAH)
+    // Admins
+    { name: "Fernando Serina", role: "admin", site: "BT", email: "fernandoserina@leisureworldcork.com" },
     { name: "Orla Kennedy", role: "admin", site: "MAH", jobTitle: "Operations Admin", hireDate: yearsAgo(7), birthday: bday(1986, 2, 14) },
-    { name: "Cian Doyle", role: "admin", site: "MAH", jobTitle: "People & Rewards Admin", hireDate: yearsAgo(4), birthday: bday(1990, 9, 3) },
+    { name: "Cian Doyle", role: "staff", site: "MAH", jobTitle: "People & Rewards Admin", hireDate: yearsAgo(4), birthday: bday(1990, 9, 3) },
 
     // Managers (one per site)
     { name: "Niamh Walsh", role: "manager", site: "MAH", jobTitle: "Duty Manager", hireDate: anniversaryToday, birthday: bday(1988, 5, 21) },
@@ -231,7 +234,7 @@ async function main() {
   for (const u of userSeed) {
     const created = await prisma.user.create({
       data: {
-        email: emailFor(u.name),
+        email: u.email ?? emailFor(u.name),
         name: u.name,
         role: u.role,
         jobTitle: u.jobTitle,
