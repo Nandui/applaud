@@ -18,12 +18,7 @@ import {
   setUserActive,
   type ActionResult,
 } from "@/lib/admin/actions";
-import {
-  ALLOWED_IMAGE_TYPES,
-  MANAGER_GROUPS,
-  MAX_IMAGE_BYTES,
-  managerGroupLabel,
-} from "@/lib/config";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { DataTable } from "@/components/data-table";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
@@ -39,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -55,17 +51,14 @@ export type UserRow = {
   role: string;
   siteId: string;
   siteName: string;
-  managerId: string | null;
-  managerName: string | null;
-  managerGroup: string | null; // e.g. "duty_manager" — set instead of managerId
+  managerIds: string[]; // zero or more people, name-sorted
+  managerNames: string[];
   hireDate: string | null; // yyyy-MM-dd
   birthday: string | null;
   active: boolean;
 };
 
 type Option = { id: string; name: string };
-
-const NONE = "__none__";
 
 // Base UI's Select shows the trigger label from a value→label `items` map (it
 // renders the raw value otherwise). App roles are fixed; sites/managers are
@@ -78,12 +71,13 @@ const ROLE_LABELS: Record<string, string> = {
   ceo: "CEO",
 };
 
-// The manager select mixes people with the group rotas, so group ids share the
-// value space with user ids (cuids never collide with these keys).
-const GROUP_OPTIONS = Object.entries(MANAGER_GROUPS);
+// Beyond this many, the table shows a count instead of a list of names.
+const MANAGER_NAMES_SHOWN = 2;
 
-function isManagerGroup(value: string): boolean {
-  return value in MANAGER_GROUPS;
+function managerSummary(names: string[]): string {
+  if (names.length === 0) return "—";
+  if (names.length <= MANAGER_NAMES_SHOWN) return names.join(", ");
+  return `${names.length} managers`;
 }
 
 function UserFormDialog({
@@ -105,9 +99,8 @@ function UserFormDialog({
   >(saveUser, undefined);
   const [role, setRole] = useState(editing?.role ?? "staff");
   const [siteId, setSiteId] = useState(editing?.siteId ?? sites[0]?.id ?? "");
-  // One select for both kinds of manager: "" (none), a group id, or a user id.
-  const [manager, setManager] = useState(
-    editing?.managerGroup ?? editing?.managerId ?? "",
+  const [managerIds, setManagerIds] = useState<string[]>(
+    editing?.managerIds ?? [],
   );
   const [active, setActive] = useState(editing?.active ?? true);
   const [name, setName] = useState(editing?.name ?? "");
@@ -147,13 +140,11 @@ function UserFormDialog({
   }, [state, onOpenChange]);
 
   const siteItems = Object.fromEntries(sites.map((s) => [s.id, s.name]));
-  const managerItems: Record<string, string> = {
-    [NONE]: "No manager",
-    ...Object.fromEntries(GROUP_OPTIONS),
-    ...Object.fromEntries(
-      managers.filter((m) => m.id !== editing?.id).map((m) => [m.id, m.name]),
-    ),
-  };
+  // Nobody manages themselves, so the editing user is never an option.
+  const managerOptions = managers.filter((m) => m.id !== editing?.id);
+  const managerItems = Object.fromEntries(
+    managerOptions.map((m) => [m.id, m.name]),
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -165,16 +156,9 @@ function UserFormDialog({
           {editing && <input type="hidden" name="id" value={editing.id} />}
           <input type="hidden" name="role" value={role} />
           <input type="hidden" name="siteId" value={siteId} />
-          <input
-            type="hidden"
-            name="managerId"
-            value={isManagerGroup(manager) ? "" : manager}
-          />
-          <input
-            type="hidden"
-            name="managerGroup"
-            value={isManagerGroup(manager) ? manager : ""}
-          />
+          {managerIds.map((m) => (
+            <input key={m} type="hidden" name="managerIds" value={m} />
+          ))}
           <input type="hidden" name="active" value={String(active)} />
           <input type="hidden" name="avatarUrl" value={avatarUrl} />
 
@@ -295,31 +279,29 @@ function UserFormDialog({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Manager</Label>
-            <Select
-              value={manager === "" ? NONE : manager}
-              onValueChange={(v) => setManager(v === NONE ? "" : v)}
+            <Label>Managers</Label>
+            <MultiSelect
+              value={managerIds}
+              onValueChange={setManagerIds}
               items={managerItems}
             >
-              <SelectTrigger>
-                <SelectValue />
+              {/* Several names can be selected, so cap the trigger at the
+                  dialog width and let the value line-clamp. */}
+              <SelectTrigger className="max-w-full">
+                <SelectValue placeholder="No manager" />
               </SelectTrigger>
               <SelectContent className="max-h-60">
-                <SelectItem value={NONE}>No manager</SelectItem>
-                {GROUP_OPTIONS.map(([id, label]) => (
-                  <SelectItem key={id} value={id}>
-                    {label}
+                {managerOptions.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
                   </SelectItem>
                 ))}
-                {managers
-                  .filter((m) => m.id !== editing?.id)
-                  .map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
               </SelectContent>
-            </Select>
+            </MultiSelect>
+            <p className="text-muted text-xs">
+              Pick as many as apply — they can all review this person&apos;s
+              nominations. Leave empty for no manager.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -491,12 +473,16 @@ export function UsersManager({
     },
     { accessorKey: "siteName", header: "Site" },
     {
-      accessorKey: "managerName",
-      header: "Manager",
-      cell: ({ row }) =>
-        managerGroupLabel(row.original.managerGroup) ??
-        row.original.managerName ??
-        "—",
+      id: "managers",
+      // Accessor (not just a cell) so search and sort still see every name
+      // even when the cell shows a count.
+      accessorFn: (row) => row.managerNames.join(", "),
+      header: "Managers",
+      cell: ({ row }) => (
+        <span title={row.original.managerNames.join(", ")}>
+          {managerSummary(row.original.managerNames)}
+        </span>
+      ),
     },
     {
       id: "active",

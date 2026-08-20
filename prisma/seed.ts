@@ -246,12 +246,14 @@ async function main() {
     userByName.set(u.name, created);
   }
 
-  // Pass 2: wire managers.
+  // Pass 2: wire managers. Everyone seeded has one; the join allows more.
   for (const u of userSeed) {
     if (!u.managerName) continue;
     const self = userByName.get(u.name)!;
     const mgr = userByName.get(u.managerName)!;
-    await prisma.user.update({ where: { id: self.id }, data: { managerId: mgr.id } });
+    await prisma.userManager.create({
+      data: { userId: self.id, managerId: mgr.id },
+    });
   }
 
   const allUsers = [...userByName.entries()].map(([name, u]) => ({ name, id: u.id }));

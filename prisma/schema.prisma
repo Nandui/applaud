@@ -24,28 +24,26 @@ model Site {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
+  id        String        @id @default(cuid())
+  email     String        @unique
   name      String
   avatarUrl String?
-  jobTitle  String?   // the job in the company, e.g. "Duty Manager", "Lifeguard"
-  role      String    @default("staff") // app permission: "staff" | "manager" | "admin" | "operations" | "ceo"
+  jobTitle  String? // the job in the company, e.g. "Duty Manager", "Lifeguard"
+  role      String        @default("staff") // app permission: "staff" | "manager" | "admin" | "operations" | "ceo"
   // Nullable so a removed person can be detached from their site: hard-delete
   // is refused by the content FKs below, and a site with users assigned can't
   // be deleted. Detached users are treated as removed everywhere.
   siteId    String?
-  site      Site?     @relation(fields: [siteId], references: [id])
-  // A person's manager is either a named person (managerId) or a group rota
-  // (managerGroup, currently only "duty_manager"). At most one is set; a group
-  // manager means there is no named manager to route approvals to.
-  managerId    String?
-  manager      User?  @relation("Reports", fields: [managerId], references: [id])
-  reports      User[] @relation("Reports")
-  managerGroup String?
+  site      Site?         @relation(fields: [siteId], references: [id])
+  // A person can have several managers, and every one of them is a real user.
+  // The UserManager join below is the only source of truth: `managers` are the
+  // people who manage this user, `reports` the people this user manages.
+  managers  UserManager[] @relation("ManagedUser")
+  reports   UserManager[] @relation("ManagerUser")
   hireDate  DateTime?
   birthday  DateTime? // store full date; celebrate on month/day
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
 
   // Cached wallet balance. Always written inside the same transaction as the
   // ledger row; RewardLedger SUM remains the source of truth (recompute action exists).
@@ -67,28 +65,42 @@ model User {
   sessions Session[]
 }
 
+/// Who manages whom. A person has zero or more managers, each a real user.
+/// Both sides cascade: removing a person drops their rows here rather than
+/// leaving a reference that blocks the delete (and so blocks site removal).
+model UserManager {
+  userId    String
+  user      User     @relation("ManagedUser", fields: [userId], references: [id], onDelete: Cascade)
+  managerId String
+  manager   User     @relation("ManagerUser", fields: [managerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, managerId])
+  @@index([managerId])
+}
+
 // ---------- Recognition ----------
 
 model Value {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  icon        String? // lucide icon name
-  color       String? // hex or token
-  order       Int           @default(0)
-  active      Boolean       @default(true)
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  icon         String? // lucide icon name
+  color        String? // hex or token
+  order        Int           @default(0)
+  active       Boolean       @default(true)
   recognitions Recognition[]
 }
 
 model Recognition {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   senderId   String
-  sender     User     @relation("Sender", fields: [senderId], references: [id])
+  sender     User      @relation("Sender", fields: [senderId], references: [id])
   valueId    String?
-  value      Value?   @relation(fields: [valueId], references: [id])
+  value      Value?    @relation(fields: [valueId], references: [id])
   message    String
-  visibility String   @default("public") // "public" | "private"
-  system     Boolean  @default(false) // true = auto/milestone post
+  visibility String    @default("public") // "public" | "private"
+  system     Boolean   @default(false) // true = auto/milestone post
   imageUrls  String[] // optional photos/GIFs (Vercel Blob public URLs)
   // Point-multiplier boost applied to this recognition (null | "operations" |
   // "ceo"). Mutually exclusive; the wallet credit is booked to RewardLedger so
@@ -96,7 +108,7 @@ model Recognition {
   boostType  String?
   boostById  String? // user who applied the current boost
   boostAt    DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   recipients RecognitionRecipient[]
   reactions  Reaction[]

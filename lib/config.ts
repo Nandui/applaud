@@ -15,21 +15,6 @@ export const APP_TAGLINE = "Recognise great work.";
 export const ROLES = ["staff", "manager", "admin", "operations", "ceo"] as const;
 export type Role = (typeof ROLES)[number];
 
-/**
- * Manager groups — a person's manager can be a named person OR one of these
- * rotas (User.managerGroup). Group-managed people have no named manager, so
- * approvals that route to a manager fall to admins.
- */
-export const MANAGER_GROUPS = { duty_manager: "Duty manager" } as const;
-export type ManagerGroup = keyof typeof MANAGER_GROUPS;
-export const MANAGER_GROUP_IDS = Object.keys(MANAGER_GROUPS) as ManagerGroup[];
-
-export function managerGroupLabel(group: string | null | undefined): string | null {
-  return group && group in MANAGER_GROUPS
-    ? MANAGER_GROUPS[group as ManagerGroup]
-    : null;
-}
-
 /** Reward ledger entry types — every point movement is one of these. */
 export const LEDGER_TYPES = [
   "RECOGNITION",

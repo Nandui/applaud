@@ -22,6 +22,24 @@ function Select({
   return <Root data-slot="select" {...props} />
 }
 
+// Same primitive in multiple mode: the value is the array of selected item
+// values, and picking an item toggles it without closing the popup.
+function MultiSelect({
+  ...props
+}: Omit<
+  React.ComponentProps<typeof SelectPrimitive.Root>,
+  "value" | "defaultValue" | "onValueChange" | "multiple"
+> & {
+  value?: string[]
+  defaultValue?: string[]
+  onValueChange?: (value: string[]) => void
+}) {
+  const Root = SelectPrimitive.Root as React.ComponentType<
+    Record<string, unknown>
+  >
+  return <Root data-slot="select" multiple {...props} />
+}
+
 function SelectGroup({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Group>) {
@@ -175,6 +193,7 @@ function SelectScrollDownButton({
 }
 
 export {
+  MultiSelect,
   Select,
   SelectContent,
   SelectGroup,

@@ -24,7 +24,10 @@ export async function getProfileData(userId: string) {
       createdAt: true,
       active: true,
       site: { select: { name: true, code: true } },
-      manager: { select: { id: true, name: true } },
+      managers: {
+        orderBy: { manager: { name: "asc" } },
+        select: { manager: { select: { id: true, name: true } } },
+      },
     },
   });
   if (!user) return null;

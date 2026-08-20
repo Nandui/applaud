@@ -143,16 +143,31 @@ export async function nominate(
   return { ok: true, message: `Awarded! ${nominee.name} received ${program.points} pts.` };
 }
 
-// managerId is null for group-managed (duty manager) nominees, so the checks
-// below fall through to admins rather than matching a reviewer.
 async function loadReviewable(id: string) {
   return prisma.nomination.findUnique({
     where: { id },
     include: {
-      nominee: { select: { id: true, name: true, managerId: true } },
+      nominee: {
+        select: {
+          id: true,
+          name: true,
+          managers: { select: { managerId: true } },
+        },
+      },
       program: { select: { name: true, points: true } },
     },
   });
+}
+
+/**
+ * Any one of the nominee's managers can review, and admins always can. A
+ * nominee with no managers at all is left to the admins.
+ */
+function canReview(
+  reviewerId: string,
+  nominee: { managers: { managerId: string }[] },
+): boolean {
+  return nominee.managers.some((m) => m.managerId === reviewerId);
 }
 
 export async function approveNomination(formData: FormData): Promise<ActionResult> {
@@ -162,7 +177,7 @@ export async function approveNomination(formData: FormData): Promise<ActionResul
   if (!nomination || nomination.status !== "pending") {
     return { ok: false, error: "This nomination can't be approved." };
   }
-  if (!isAdmin(reviewer) && nomination.nominee.managerId !== reviewer.id) {
+  if (!isAdmin(reviewer) && !canReview(reviewer.id, nomination.nominee)) {
     return { ok: false, error: "You can only review your own reports." };
   }
 
@@ -200,7 +215,7 @@ export async function rejectNomination(formData: FormData): Promise<ActionResult
   if (!nomination || nomination.status !== "pending") {
     return { ok: false, error: "This nomination can't be rejected." };
   }
-  if (!isAdmin(reviewer) && nomination.nominee.managerId !== reviewer.id) {
+  if (!isAdmin(reviewer) && !canReview(reviewer.id, nomination.nominee)) {
     return { ok: false, error: "You can only review your own reports." };
   }
 

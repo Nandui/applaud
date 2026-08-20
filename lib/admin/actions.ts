@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { isProjectBlobUrl } from "@/lib/blob";
-import { MANAGER_GROUP_IDS } from "@/lib/config";
 import { writeAudit } from "@/lib/audit";
 
 export type ActionResult =
@@ -227,8 +226,15 @@ export async function saveUser(
   const jobTitle = String(formData.get("jobTitle") ?? "").trim();
   const role = String(formData.get("role") ?? "staff");
   const siteId = String(formData.get("siteId") ?? "").trim();
-  const managerId = String(formData.get("managerId") ?? "").trim();
-  const managerGroup = String(formData.get("managerGroup") ?? "").trim();
+  // Zero or more managers, each a real user; the select posts one entry per pick.
+  const managerIds = [
+    ...new Set(
+      formData
+        .getAll("managerIds")
+        .map((v) => String(v).trim())
+        .filter(Boolean),
+    ),
+  ];
   const active = String(formData.get("active") ?? "true") === "true";
   const hireDate = parseDate(formData.get("hireDate"));
   const birthday = parseDate(formData.get("birthday"));
@@ -240,15 +246,14 @@ export async function saveUser(
   }
   if (!ROLES.includes(role)) return { ok: false, error: "Invalid role." };
   if (!siteId) return { ok: false, error: "Pick a site." };
-  if (managerId && managerId === id) {
+  if (id && managerIds.includes(id)) {
     return { ok: false, error: "A user can't be their own manager." };
   }
-  // The manager is a named person or a group rota — never both.
-  if (managerGroup && !(MANAGER_GROUP_IDS as string[]).includes(managerGroup)) {
-    return { ok: false, error: "Unknown manager group." };
-  }
-  if (managerGroup && managerId) {
-    return { ok: false, error: "Pick a person or a manager group, not both." };
+  if (managerIds.length > 0) {
+    const found = await prisma.user.count({ where: { id: { in: managerIds } } });
+    if (found !== managerIds.length) {
+      return { ok: false, error: "One of those managers no longer exists." };
+    }
   }
   if (avatarUrl && !isProjectBlobUrl(avatarUrl)) {
     return { ok: false, error: "Unrecognised picture URL." };
@@ -260,18 +265,24 @@ export async function saveUser(
     jobTitle: jobTitle || null,
     role,
     siteId,
-    managerId: managerId || null,
-    managerGroup: managerGroup || null,
     active,
     hireDate,
     birthday,
     avatarUrl: avatarUrl || null,
   };
+  // The picked set replaces whatever was there — no partial merge.
+  const managers = managerIds.map((managerId) => ({ managerId }));
   let entityId = id;
   try {
-    if (id) await prisma.user.update({ where: { id }, data });
-    else {
-      const created = await prisma.user.create({ data });
+    if (id) {
+      await prisma.user.update({
+        where: { id },
+        data: { ...data, managers: { deleteMany: {}, create: managers } },
+      });
+    } else {
+      const created = await prisma.user.create({
+        data: { ...data, managers: { create: managers } },
+      });
       entityId = created.id;
     }
   } catch (e) {
@@ -303,7 +314,7 @@ export async function saveUser(
       siteId,
       active,
       jobTitle: jobTitle || null,
-      manager: managerGroup || managerId || null,
+      managerIds,
     },
     siteId,
   });
@@ -350,9 +361,12 @@ export async function deleteUser(formData: FormData): Promise<ActionResult> {
   });
   if (!user) return { ok: false, error: "That user no longer exists." };
 
-  // Reports would block the delete on their own, and either way nobody should
-  // keep pointing at a removed manager.
-  await prisma.user.updateMany({ where: { managerId: id }, data: { managerId: null } });
+  // Clear both directions of the manager join: nobody should keep pointing at a
+  // removed manager, and no leftover row should stand between them and the
+  // hard-delete (or, in turn, between their site and its removal).
+  await prisma.userManager.deleteMany({
+    where: { OR: [{ userId: id }, { managerId: id }] },
+  });
 
   let archived = false;
   try {
@@ -362,7 +376,7 @@ export async function deleteUser(formData: FormData): Promise<ActionResult> {
     archived = true;
     await prisma.user.update({
       where: { id },
-      data: { active: false, siteId: null, managerId: null, managerGroup: null },
+      data: { active: false, siteId: null },
     });
   }
 
