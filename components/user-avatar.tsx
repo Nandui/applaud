@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { isFrameImage, type FrameArt } from "@/lib/cosmetics";
+import { RARITY, isFrameImage, type FrameArt, type Rarity } from "@/lib/cosmetics";
 import { splitFrameImage } from "@/lib/frame-fit";
 
 /**
@@ -55,6 +55,10 @@ export function UserAvatar({
  * shifted so its see-through hole sits on the avatar, like Discord avatar
  * decorations. Without a frame it's a plain avatar with the same gap,
  * so layouts don't jump when someone equips one.
+ *
+ * Pass `shine` (the frame's rarity) where the avatar is the focus, such as a
+ * profile header: epic and legendary frames then catch the light now and
+ * then, and legendary ones glow softly too. Feeds leave it off to stay calm.
  */
 export function FramedAvatar({
   name,
@@ -63,6 +67,7 @@ export function FramedAvatar({
   className,
   gapClassName,
   large = false,
+  shine,
 }: {
   name: string;
   avatarUrl?: string | null;
@@ -73,36 +78,57 @@ export function FramedAvatar({
   gapClassName?: string;
   /** Profile-sized: thicker frame. */
   large?: boolean;
+  /** The frame's rarity, to add its shimmer (see above). */
+  shine?: Rarity | null;
 }) {
+  const shiny = frame && (shine === "epic" || shine === "legendary");
+  const shineClass = cn("frame-shine", shine === "legendary" && "frame-shine-legendary");
   return (
     <span className="relative inline-flex shrink-0 rounded-full">
-      <span className={cn("bg-background rounded-full", large ? "p-[6px]" : "p-[3px]", gapClassName)}>
+      {shiny && shine === "legendary" ? (
+        <span
+          aria-hidden
+          className="frame-aura"
+          style={{ "--aura": `${RARITY.legendary.color}66` } as React.CSSProperties}
+        />
+      ) : null}
+      <span className={cn("bg-background relative rounded-full", large ? "p-[6px]" : "p-[3px]", gapClassName)}>
         <UserAvatar name={name} avatarUrl={avatarUrl} className={className} />
       </span>
       {frame && isFrameImage(frame) ? (
-        <FrameImage art={frame} />
+        <FrameImage art={frame} shineClassName={shiny ? shineClass : undefined} />
       ) : frame ? (
-        <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")} />
+        <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")}>
+          {shiny ? <span className={cn(shineClass, "inset-0")} /> : null}
+        </span>
       ) : null}
     </span>
   );
 }
 
-/** An uploaded frame picture, sized and shifted by its fit so its hole sits on the avatar. */
-function FrameImage({ art }: { art: FrameArt }) {
+/**
+ * An uploaded frame picture, sized and shifted by its fit so its hole sits on
+ * the avatar, with its shimmer (masked to the picture) when it has one.
+ */
+function FrameImage({ art, shineClassName }: { art: FrameArt; shineClassName?: string }) {
   const { src, fit } = splitFrameImage(art);
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- uploaded Blob art, any size
-    <img
-      src={src}
-      alt=""
+    <span
       aria-hidden
-      draggable={false}
-      className="pointer-events-none absolute top-1/2 left-1/2 h-auto max-w-none select-none"
+      className="pointer-events-none absolute top-1/2 left-1/2 block"
       style={{
         width: `${fit.size * 100}%`,
         transform: `translate(${-fit.x * 100}%, ${-fit.y * 100}%)`,
       }}
-    />
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- uploaded Blob art, any size */}
+      <img src={src} alt="" draggable={false} className="block h-auto w-full max-w-none select-none" />
+      {shineClassName ? (
+        <span
+          className={cn(shineClassName, "frame-shine-image inset-0")}
+          style={{ "--frame-mask": `url("${encodeURI(src)}")` } as React.CSSProperties}
+        />
+      ) : null}
+    </span>
   );
 }

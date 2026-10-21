@@ -396,7 +396,12 @@ function ItemDialog({
 
           <div>
             <p className="text-muted mb-1.5 text-xs">How it looks on a profile</p>
-            <ProfilePreview name={sample.name} avatarUrl={sample.avatarUrl} look={look} />
+            <ProfilePreview
+              name={sample.name}
+              avatarUrl={sample.avatarUrl}
+              look={look}
+              frameRarity={kind === "frame" ? rarity : null}
+            />
           </div>
 
           {kind === "theme" ? (

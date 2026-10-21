@@ -295,3 +295,131 @@
     animation: none !important;
   }
 }
+
+/* ---- Profile motion ----
+ * Small, cheap touches (transform and opacity only, so phones composite them
+ * without repainting): the banner drifts and parallaxes, rarer frames catch
+ * the light, the header rises in and an equipped item gives a small bounce.
+ * People who ask their phone for less motion get none of it.
+ */
+
+@keyframes banner-drift {
+  from {
+    transform: scale(1.04) translate3d(-1%, 0, 0);
+  }
+  to {
+    transform: scale(1.04) translate3d(1%, -1%, 0);
+  }
+}
+@keyframes banner-parallax {
+  to {
+    transform: translate3d(0, 30%, 0);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+@keyframes frame-glint {
+  0% {
+    transform: translate3d(-120%, 0, 0) rotate(20deg);
+  }
+  /* A quick sweep, then a long rest so it reads as a glint, not a strobe. */
+  22%,
+  100% {
+    transform: translate3d(120%, 0, 0) rotate(20deg);
+  }
+}
+@keyframes frame-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.04);
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.12);
+  }
+  65% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Shine on epic and legendary frames, clipped to the frame's own shape. */
+.frame-shine {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+.frame-shine::after {
+  content: "";
+  position: absolute;
+  inset: -20% 0;
+  background: linear-gradient(90deg, transparent 35%, rgb(255 255 255 / 0.75) 50%, transparent 65%);
+  transform: translate3d(-120%, 0, 0);
+  mix-blend-mode: soft-light;
+}
+.frame-shine-image {
+  -webkit-mask: var(--frame-mask) center / contain no-repeat;
+  mask: var(--frame-mask) center / contain no-repeat;
+}
+.frame-shine-image::after {
+  mix-blend-mode: normal;
+  background: linear-gradient(90deg, transparent 38%, rgb(255 255 255 / 0.55) 50%, transparent 62%);
+}
+/* Legendary frames also breathe a soft glow in their rarity colour. */
+.frame-aura {
+  position: absolute;
+  inset: -14%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, var(--aura) 55%, transparent);
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .banner-drift {
+    animation: banner-drift 18s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  /* Scrolling away, the banner slides at a slower pace than the page. */
+  @supports (animation-timeline: view()) {
+    .banner-frame {
+      view-timeline-name: --banner;
+    }
+    .banner-parallax {
+      animation: banner-parallax linear both;
+      animation-timeline: --banner;
+      animation-range: exit;
+    }
+  }
+  .rise-in {
+    animation: rise-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(var(--rise, 0) * 60ms);
+  }
+  .frame-shine::after {
+    animation: frame-glint 6s ease-in-out 0.8s infinite;
+  }
+  .frame-shine-legendary::after {
+    animation-duration: 4s;
+  }
+  .frame-aura {
+    animation: frame-glow 3.2s ease-in-out infinite;
+  }
+  .pop {
+    animation: pop 0.45s cubic-bezier(0.3, 0.7, 0.4, 1.4);
+  }
+}

@@ -14,6 +14,7 @@ import {
   type Cosmetic,
   type CosmeticKind,
   type Look,
+  type Rarity,
 } from "@/lib/cosmetics";
 import { formatNumber, pts } from "@/lib/format";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/sheet";
 import { FramedAvatar } from "@/components/user-avatar";
 import { ProfilePreview } from "@/components/shop/profile-preview";
+import { PopOnChange } from "@/components/fx/pop-on-change";
 
 export type Wearer = {
   name: string;
@@ -34,6 +36,8 @@ export type Wearer = {
   look: Look;
   /** The item ids they wear in each slot (null = nothing, or the default). */
   worn: Record<CosmeticKind, string | null>;
+  /** The rarity of the frame they wear, for its shimmer. */
+  frameRarity: Rarity | null;
 };
 
 /** Their look with this item swapped in, for the try-it-on preview. */
@@ -103,14 +107,17 @@ export function ShopItem({
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button type="button" className="text-left transition-opacity active:opacity-70">
-          <span className="bg-surface border-border relative block aspect-square overflow-hidden rounded-xl border">
-            <ItemArt item={item} me={me} />
-            {wearing ? (
-              <span className="bg-foreground text-background absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full">
-                <Check className="size-3" strokeWidth={3} />
-              </span>
-            ) : null}
-          </span>
+          {/* Bounces when it's put on or taken off. */}
+          <PopOnChange value={String(wearing)} className="block w-full">
+            <span className="bg-surface border-border relative block aspect-square w-full overflow-hidden rounded-xl border">
+              <ItemArt item={item} me={me} />
+              {wearing ? (
+                <span className="bg-foreground text-background absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full">
+                  <Check className="size-3" strokeWidth={3} />
+                </span>
+              ) : null}
+            </span>
+          </PopOnChange>
           <span className="mt-1.5 block truncate text-sm font-semibold">{item.name}</span>
           <span className="flex items-center justify-between gap-1 text-xs">
             <span style={{ color: rarity.color }} className="font-semibold">
@@ -131,7 +138,12 @@ export function ShopItem({
           <SheetDescription>This is how it looks on your profile.</SheetDescription>
         </SheetHeader>
         <div className="px-4">
-          <ProfilePreview name={me.name} avatarUrl={me.avatarUrl} look={preview} />
+          <ProfilePreview
+            name={me.name}
+            avatarUrl={me.avatarUrl}
+            look={preview}
+            frameRarity={item.kind === "frame" ? item.rarity : me.frameRarity}
+          />
         </div>
         <div className="pb-safe mt-4 space-y-2 px-4 pb-4">
           {!owned ? (
