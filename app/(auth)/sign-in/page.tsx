@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Mark, Wordmark } from "@/components/app-shell/brand";
+import { Wordmark } from "@/components/app-shell/brand";
 import { SignInForm } from "./sign-in-form";
 
 export const metadata = { title: "Sign in" };
@@ -37,8 +37,7 @@ export default async function SignInPage() {
   return (
     <div className="flex w-full flex-1 flex-col md:max-w-md md:flex-none">
       <div className="pt-safe flex flex-1 flex-col items-center justify-center gap-4 px-6 pt-12 pb-10 text-center md:flex-none">
-        <Mark className="shadow-float rounded-[0.28em] text-[4.5rem]" />
-        <Wordmark className="text-5xl" withMark={false} />
+        <Wordmark className="text-5xl" />
         <p className="text-muted max-w-xs text-base font-medium">
           Hype your team. Get hyped back. 👏
         </p>

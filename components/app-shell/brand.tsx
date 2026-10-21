@@ -1,50 +1,20 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { MARK_HEAD, MARK_STROKE, MARK_STROKE_WIDTH } from "@/lib/pwa/mark";
+import { APP_NAME } from "@/lib/config";
+import logo from "@/public/brand/yayup-logo.png";
+import logoDark from "@/public/brand/yayup-logo-dark.png";
 
-/** The Yayup mark (a cheering "Y") in white on a violet tile. */
-export function Mark({ className }: { className?: string }) {
+/**
+ * The Yayup logo (mark + "yayup"). Sized by font size like text: the image is
+ * 1.15em tall. The dark-mode copy has white lettering.
+ */
+export function Wordmark({ className }: { className?: string }) {
+  const img = "h-[1.15em] w-auto";
   return (
-    <span
-      aria-hidden
-      className={cn(
-        "bg-primary inline-flex size-[1.1em] shrink-0 items-center justify-center rounded-[0.3em] text-white",
-        className,
-      )}
-    >
-      <svg viewBox="0 0 24 24" className="size-[0.86em]">
-        <path
-          d={MARK_STROKE}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={MARK_STROKE_WIDTH}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle cx={MARK_HEAD.cx} cy={MARK_HEAD.cy} r={MARK_HEAD.r} fill="currentColor" />
-      </svg>
-    </span>
-  );
-}
-
-/** The "yayup" wordmark: the mark, then heavy lowercase Geist. */
-export function Wordmark({
-  className,
-  withMark = true,
-}: {
-  className?: string;
-  /** Hide the mark where it already appears big beside the wordmark. */
-  withMark?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-[0.28em] text-[1.6rem] leading-none font-extrabold tracking-[-0.05em]",
-        className,
-      )}
-    >
-      {withMark && <Mark />}
-      <span className="-mt-[0.12em]">yayup</span>
+    <span className={cn("inline-flex items-center text-[1.6rem] leading-none", className)}>
+      <Image src={logo} alt={APP_NAME} unoptimized preload className={cn(img, "dark:hidden")} />
+      <Image src={logoDark} alt={APP_NAME} unoptimized className={cn(img, "hidden dark:block")} />
     </span>
   );
 }
