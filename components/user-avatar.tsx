@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { isFrameImage, type FrameArt } from "@/lib/cosmetics";
+import { RARITY, isFrameImage, type FrameArt, type Rarity } from "@/lib/cosmetics";
 
 /**
  * Default-avatar palettes (Discord gives everyone a coloured default). Picked
@@ -53,6 +53,10 @@ export function UserAvatar({
  * frames are drawn 20% bigger than the avatar and centred on it, like Discord
  * avatar decorations. Without a frame it's a plain avatar with the same gap,
  * so layouts don't jump when someone equips one.
+ *
+ * Pass `shine` (the frame's rarity) where the avatar is the focus, such as a
+ * profile header: epic and legendary frames then catch the light now and
+ * then, and legendary ones glow softly too. Feeds leave it off to stay calm.
  */
 export function FramedAvatar({
   name,
@@ -61,6 +65,7 @@ export function FramedAvatar({
   className,
   gapClassName,
   large = false,
+  shine,
 }: {
   name: string;
   avatarUrl?: string | null;
@@ -71,10 +76,21 @@ export function FramedAvatar({
   gapClassName?: string;
   /** Profile-sized: thicker frame. */
   large?: boolean;
+  /** The frame's rarity, to add its shimmer (see above). */
+  shine?: Rarity | null;
 }) {
+  const shiny = frame && (shine === "epic" || shine === "legendary");
+  const shineClass = cn("frame-shine", shine === "legendary" && "frame-shine-legendary");
   return (
     <span className="relative inline-flex shrink-0 rounded-full">
-      <span className={cn("bg-background rounded-full", large ? "p-[6px]" : "p-[3px]", gapClassName)}>
+      {shiny && shine === "legendary" ? (
+        <span
+          aria-hidden
+          className="frame-aura"
+          style={{ "--aura": `${RARITY.legendary.color}66` } as React.CSSProperties}
+        />
+      ) : null}
+      <span className={cn("bg-background relative rounded-full", large ? "p-[6px]" : "p-[3px]", gapClassName)}>
         <UserAvatar name={name} avatarUrl={avatarUrl} className={className} />
       </span>
       {frame && isFrameImage(frame) ? (
@@ -87,7 +103,16 @@ export function FramedAvatar({
           className="pointer-events-none absolute inset-[-10%] size-[120%] max-w-none object-contain select-none"
         />
       ) : frame ? (
-        <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")} />
+        <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")}>
+          {shiny ? <span className={cn(shineClass, "inset-0")} /> : null}
+        </span>
+      ) : null}
+      {shiny && isFrameImage(frame) ? (
+        <span
+          aria-hidden
+          className={cn(shineClass, "frame-shine-image inset-[-10%] size-[120%]")}
+          style={{ "--frame-mask": `url("${encodeURI(frame)}")` } as React.CSSProperties}
+        />
       ) : null}
     </span>
   );

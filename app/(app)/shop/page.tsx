@@ -34,15 +34,17 @@ export default async function ShopPage() {
   const grouped = new Set(categories.map((cat) => cat.id));
   const byKind = shown.filter((c) => !c.categoryId || !grouped.has(c.categoryId));
   const kindOrder = (c: Cosmetic) => COSMETIC_KINDS.indexOf(c.kind);
+  const frame = wornItem(custom, "frame", catalogue);
   const wearer = {
     name: me.name,
     avatarUrl: me.avatarUrl,
     look: resolveLook(custom, catalogue),
     worn: {
-      frame: wornItem(custom, "frame", catalogue)?.id ?? null,
+      frame: frame?.id ?? null,
       banner: wornItem(custom, "banner", catalogue)?.id ?? null,
       theme: wornItem(custom, "theme", catalogue)?.id ?? null,
     },
+    frameRarity: frame?.rarity ?? null,
   };
 
   return (
@@ -55,7 +57,14 @@ export default async function ShopPage() {
           {formatNumber(me.walletBalance)} pts to spend
         </p>
       </div>
-      <ProfilePreview name={wearer.name} avatarUrl={wearer.avatarUrl} look={wearer.look} className="mt-2" />
+      <ProfilePreview
+        name={wearer.name}
+        avatarUrl={wearer.avatarUrl}
+        look={wearer.look}
+        frameRarity={wearer.frameRarity}
+        popKey={Object.values(wearer.worn).join("|")}
+        className="mt-2"
+      />
 
       <div className="mt-6 space-y-7">
         {categories.map((cat) => {
