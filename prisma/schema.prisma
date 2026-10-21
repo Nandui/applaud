@@ -190,25 +190,25 @@ model Nomination {
 // ---------- Rewards & wallet ----------
 
 model Reward {
-  id          String       @id @default(cuid())
-  name        String
-  description String?
-  imageUrl    String?
-  category    String?
-  pointsCost  Int
-  type        String       @default("internal") // "internal" | "giftcard" (future adapter)
-  fulfilment  String       @default("manual") // "manual" | "auto"
-  stock       Int? // null = unlimited
+  id            String       @id @default(cuid())
+  name          String
+  description   String?
+  imageUrl      String?
+  category      String?
+  pointsCost    Int
+  type          String       @default("internal") // "internal" | "giftcard" (future adapter)
+  fulfilment    String       @default("manual") // "manual" | "auto"
+  stock         Int? // null = unlimited
   /// Real cash cost in euro cents (0 for in-house perks). Claims draw on the
   /// company-wide OrgSettings.monthlyRewardBudgetCents.
-  euroCostCents Int     @default(0)
+  euroCostCents Int          @default(0)
   /// Claims allowed per calendar month (Irish time); null = no monthly limit.
   monthlyStock  Int?
-  siteId      String? // null = all sites
-  active      Boolean      @default(true)
-  sortOrder   Int          @default(0)
-  createdAt   DateTime     @default(now())
-  redemptions Redemption[]
+  siteId        String? // null = all sites
+  active        Boolean      @default(true)
+  sortOrder     Int          @default(0)
+  createdAt     DateTime     @default(now())
+  redemptions   Redemption[]
 }
 
 model Redemption {
@@ -248,20 +248,35 @@ model RewardLedger {
 /// as "frame-neon" because User.profile.owned stores ids; admin-added items
 /// get a cuid. Hide items instead of deleting them once anyone owns one.
 model Cosmetic {
-  id        String   @id @default(cuid())
-  kind      String // "frame" | "banner" | "theme"
-  name      String
-  price     Int      @default(1) // points; 0 = free starter everyone owns
-  rarity    String   @default("common") // common | rare | epic | legendary
+  id         String            @id @default(cuid())
+  kind       String // "frame" | "banner" | "theme"
+  name       String
+  price      Int               @default(1) // points; 0 = free starter everyone owns
+  rarity     String            @default("common") // common | rare | epic | legendary
   /// Frame: built-in CSS class. Banner: CSS background. Theme: #rrggbb.
-  style     String?
+  style      String?
   /// Uploaded picture (Vercel Blob): a frame overlay or a banner image.
-  imageUrl  String?
-  active    Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
+  imageUrl   String?
+  active     Boolean           @default(true)
+  sortOrder  Int               @default(0)
+  createdAt  DateTime          @default(now())
+  /// Optional Store category (e.g. "Flags"); each category sells as a bundle.
+  categoryId String?
+  category   CosmeticCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([kind, sortOrder])
+  @@index([categoryId])
+}
+
+/// A group of Store items of any kind (e.g. "Flags", "Pride"), shown together
+/// in the profile shop with a "Buy all" bundle at the plain sum of the prices.
+model CosmeticCategory {
+  id        String     @id @default(cuid())
+  name      String
+  active    Boolean    @default(true)
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  items     Cosmetic[]
 }
 
 // ---------- Milestones ----------
@@ -312,24 +327,24 @@ model AuditEvent {
 // ---------- Config ----------
 
 model OrgSettings {
-  id                      String  @id @default("singleton")
-  appName                 String  @default("Applaud")
-  monthlyAllowanceStaff   Int     @default(400)
-  monthlyAllowanceManager Int     @default(1200)
+  id                          String  @id @default("singleton")
+  appName                     String  @default("Applaud")
+  monthlyAllowanceStaff       Int     @default(400)
+  monthlyAllowanceManager     Int     @default(1200)
   /// How many points make one euro (the internal conversion; staff never see euros).
-  pointsPerEuro               Int @default(100)
+  pointsPerEuro               Int     @default(100)
   /// Legacy: profile Store price overrides from before the Cosmetic table.
   /// Copied into Cosmetic.price by migration 20261021230000; no longer read.
   cosmeticPrices              Json?
   /// Company-wide cash budget for real rewards per month, in euro cents.
-  monthlyRewardBudgetCents    Int @default(50000)
+  monthlyRewardBudgetCents    Int     @default(50000)
   /// Most points one recipient can get from a single shout-out (0 = no limit).
-  maxPointsPerShoutoutStaff   Int @default(100)
-  maxPointsPerShoutoutManager Int @default(300)
+  maxPointsPerShoutoutStaff   Int     @default(100)
+  maxPointsPerShoutoutManager Int     @default(300)
   /// Points per month for boosts and approved awards/milestones, outside anyone's allowance.
-  monthlyBonusPool            Int @default(4400)
-  pointsExpiryMonths      Int? // null = never expire
-  allowSelfRecognition    Boolean @default(false)
+  monthlyBonusPool            Int     @default(4400)
+  pointsExpiryMonths          Int? // null = never expire
+  allowSelfRecognition        Boolean @default(false)
 }
 
 // ---------- next-auth (Auth.js Prisma adapter) ----------

@@ -64,6 +64,7 @@ async function wipe() {
   await prisma.site.deleteMany();
   await prisma.orgSettings.deleteMany();
   await prisma.cosmetic.deleteMany();
+  await prisma.cosmeticCategory.deleteMany();
 }
 
 async function main() {
