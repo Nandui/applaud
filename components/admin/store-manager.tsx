@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
+import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import { ArrowDown, ArrowUp, Images, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
@@ -64,7 +65,7 @@ function checkFile(file: File): string | null {
 
 /** Upload one picture straight from the browser to Vercel Blob. */
 async function uploadPicture(kind: CosmeticKind, file: File): Promise<string> {
-  const blob = await upload(`store/${kind}/${file.name}`, file, {
+  const blob = await uploadPresigned(`store/${kind}/${file.name}`, file, {
     access: "public",
     handleUploadUrl: "/api/admin/reward/upload",
     contentType: file.type,
@@ -142,8 +143,8 @@ function ItemDialog({
     try {
       setImageUrl(await uploadPicture(kind, file));
       if (!name) setName(nameFromFile(file.name));
-    } catch {
-      toast.error("Picture upload failed.");
+    } catch (error) {
+      toast.error(uploadErrorMessage(error));
     } finally {
       setUploading(false);
     }
@@ -349,8 +350,8 @@ function BulkDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: b
     for (const file of files) {
       try {
         items.push({ name: nameFromFile(file.name), imageUrl: await uploadPicture(kind, file) });
-      } catch {
-        toast.error(`${file.name} didn't upload.`);
+      } catch (error) {
+        toast.error(`${file.name}: ${uploadErrorMessage(error, "didn't upload.")}`);
       }
       setProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
     }
