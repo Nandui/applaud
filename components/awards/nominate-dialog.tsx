@@ -79,7 +79,7 @@ export function NominateDialog({
           <SheetDescription>
             {program.requiresApproval
               ? "Your nomination goes to their manager or an admin to approve."
-              : "This award is granted straight away."}
+              : `Granted straight away, using ${program.points} of your points to give this month.`}
           </SheetDescription>
         </SheetHeader>
         <form action={formAction} className="flex min-h-0 flex-1 flex-col px-4">

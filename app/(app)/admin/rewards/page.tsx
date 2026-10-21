@@ -1,6 +1,9 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
+import { getOrgSettings } from "@/lib/org-settings";
+import { getEconomyStatus, getMonthlyClaimCounts } from "@/lib/budget";
 import { PageHeader } from "@/components/page-header";
+import { BudgetCard } from "@/components/admin/budget-card";
 import {
   RewardsManager,
   type RewardRow,
@@ -12,7 +15,8 @@ export const metadata = { title: "Rewards" };
 export default async function AdminRewardsPage() {
   await requireAdmin();
 
-  const [rewards, sites] = await Promise.all([
+  const settings = await getOrgSettings();
+  const [rewards, sites, claims, status] = await Promise.all([
     prisma.reward.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
@@ -23,6 +27,8 @@ export default async function AdminRewardsPage() {
         category: true,
         pointsCost: true,
         stock: true,
+        euroCostCents: true,
+        monthlyStock: true,
         siteId: true,
         active: true,
         fulfilment: true,
@@ -35,17 +41,32 @@ export default async function AdminRewardsPage() {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    getMonthlyClaimCounts(),
+    getEconomyStatus(settings),
   ]);
 
-  const rows: RewardRow[] = rewards;
+  const rows: RewardRow[] = rewards.map((r) => ({
+    ...r,
+    claimedThisMonth: claims.get(r.id) ?? 0,
+  }));
 
   return (
     <div>
       <PageHeader
         title="Rewards"
-        description="Create and edit what staff can redeem. Changes appear on the Rewards store immediately. Hide an offering instead of deleting it."
+        description="Create and edit what staff can redeem. Set the conversion and budget in Economy. Claims stop for the month once the rewards budget is used, and per-month stock refills on the 1st. Hide an offering instead of deleting it."
       />
-      <RewardsManager rows={rows} sites={sites} />
+      <div className="mb-6">
+        <BudgetCard status={status} />
+      </div>
+      <RewardsManager
+        rows={rows}
+        sites={sites}
+        economy={{
+          pointsPerEuro: settings.pointsPerEuro,
+          monthlyRewardBudgetCents: settings.monthlyRewardBudgetCents,
+        }}
+      />
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { getOrgSettings } from "@/lib/org-settings";
-import { allowanceForRole, getMonthlyAllowanceUsage } from "@/lib/points";
+import { allowanceForRole, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
+import { maxPointsPerShoutout } from "@/lib/economy";
 import {
   MAX_RECOGNITION_IMAGES,
   REACTION_EMOJIS,
@@ -18,6 +19,7 @@ import {
 import { isGiphyMediaUrl } from "@/lib/recognition/gif";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
+import { lockPool } from "@/lib/locks";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -95,6 +97,11 @@ export async function createRecognition(
   });
   if (!value) return { ok: false, error: "That value is unavailable." };
 
+  const perShoutoutMax = maxPointsPerShoutout(me.role, settings);
+  if (perShoutoutMax > 0 && points > perShoutoutMax) {
+    return { ok: false, error: `A shout-out can carry at most ${perShoutoutMax} points per person.` };
+  }
+
   const totalPoints = points * recipientIds.length;
   let createdId: string | undefined;
 
@@ -105,7 +112,7 @@ export async function createRecognition(
         const allowance = allowanceForRole(me.role, settings);
         if (used + totalPoints > allowance) {
           throw new AllowanceError(
-            `That would exceed your monthly allowance — ${Math.max(0, allowance - used)} left.`,
+            `That's more than you have left to give this month (${Math.max(0, allowance - used)}).`,
           );
         }
       }
@@ -290,6 +297,7 @@ export async function toggleBoost(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: `Only ${BOOSTS[type].label} can apply that boost.` };
   }
 
+  const settings = await getOrgSettings();
   let applied: { previous: BoostType | null; target: BoostType | null };
   try {
     applied = await prisma.$transaction(async (tx) => {
@@ -331,6 +339,18 @@ export async function toggleBoost(formData: FormData): Promise<ActionResult> {
       // apply the target's. Base is the points originally granted per recipient.
       const removeMult = current ? boostMultiplier(current) - 1 : 0;
       const addMult = target ? boostMultiplier(target) - 1 : 0;
+
+      // Boost bonuses come out of the company's monthly bonus pool.
+      const totalNet = totalBase * (addMult - removeMult);
+      if (totalNet > 0) {
+        await lockPool(tx, "bonusPool");
+        const used = await getMonthlyBonusUsage(new Date(), tx);
+        if (used + totalNet > settings.monthlyBonusPool) {
+          throw new BoostError(
+            `This month's bonus pool has ${Math.max(0, settings.monthlyBonusPool - used)} points left, not enough for this boost.`,
+          );
+        }
+      }
       for (const r of rec.recipients) {
         if (r.points <= 0) continue;
         const net = r.points * (addMult - removeMult);

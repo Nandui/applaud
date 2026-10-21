@@ -1,7 +1,8 @@
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
-import { COSMETICS, KIND_LABELS, type CosmeticKind } from "@/lib/cosmetics";
+import { KIND_LABELS, parseCosmeticPrices, pricedCosmetics, type CosmeticKind } from "@/lib/cosmetics";
+import { getOrgSettings } from "@/lib/org-settings";
 import { ownsItem, parseProfile } from "@/lib/profile-custom";
 import { AppBar } from "@/components/app-shell/app-bar";
 import { StoreTabs } from "@/components/shop/store-tabs";
@@ -25,6 +26,7 @@ export default async function ShopPage() {
     select: { name: true, avatarUrl: true, walletBalance: true, profile: true },
   });
   const custom = parseProfile(me.profile);
+  const catalogue = pricedCosmetics(parseCosmeticPrices((await getOrgSettings()).cosmeticPrices));
   const wearer = {
     name: me.name,
     avatarUrl: me.avatarUrl,
@@ -50,7 +52,7 @@ export default async function ShopPage() {
           <section key={kind}>
             <h2 className="mb-3 text-lg font-bold">{KIND_LABELS[kind].many}</h2>
             <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4">
-              {COSMETICS.filter((c) => c.kind === kind).map((item) => (
+              {catalogue.filter((c) => c.kind === kind).map((item) => (
                 <ShopItem
                   key={item.id}
                   item={item}

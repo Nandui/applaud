@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Check } from "lucide-react";
 import { buyItem, equipItem } from "@/lib/profile-actions";
 import { KIND_LABELS, RARITY, type Cosmetic } from "@/lib/cosmetics";
-import { formatNumber } from "@/lib/format";
+import { formatNumber, pts } from "@/lib/format";
 import {
   Sheet,
   SheetContent,
@@ -96,7 +96,7 @@ export function ShopItem({
               {rarity.label}
             </span>
             <span className="text-muted font-medium" data-numeric>
-              {owned ? "Owned" : item.price === 0 ? "Free" : `${formatNumber(item.price)} pts`}
+              {owned ? "Owned" : item.price === 0 ? "Free" : pts(item.price)}
             </span>
           </span>
         </button>
@@ -124,8 +124,8 @@ export function ShopItem({
                 {pending
                   ? "Buying…"
                   : short > 0
-                    ? `You need ${formatNumber(short)} more pts`
-                    : `Buy for ${formatNumber(item.price)} pts`}
+                    ? `You need ${pts(short)} more`
+                    : `Buy for ${pts(item.price)}`}
               </button>
               <p className="text-muted text-center text-xs" data-numeric>
                 You have {formatNumber(balance)} pts

@@ -152,7 +152,7 @@ export default async function AwardsPage() {
                 <h3 className="text-[1.05rem] leading-tight font-bold">{p.name}</h3>
                 <p className="text-muted mt-0.5 text-[0.82rem]">
                   <span className="capitalize">{p.cadence ?? "Any time"}</span> ·{" "}
-                  {p.requiresApproval ? "needs approval" : "instant"}
+                  {p.requiresApproval ? "needs approval" : "instant, from your points to give"}
                 </p>
               </div>
               <span data-numeric className="text-primary shrink-0 text-sm font-bold">

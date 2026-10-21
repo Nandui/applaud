@@ -7,6 +7,9 @@ import { requireUser, requireAdmin } from "@/lib/auth/guards";
 import { getFulfilmentAdapter } from "@/lib/rewards/adapter";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
+import { getOrgSettings } from "@/lib/org-settings";
+import { checkClaim, economyMonth, parseEurosToCents, resetDateLabel, SUGGESTED_REWARDS } from "@/lib/economy";
+import { lockPool } from "@/lib/locks";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -27,6 +30,7 @@ export async function redeemReward(
   if (!parsed.success) return { ok: false, error: "Invalid reward." };
   const { rewardId } = parsed.data;
 
+  const settings = await getOrgSettings();
   let redeemed: { id: string; name: string; pointsCost: number };
   try {
     redeemed = await prisma.$transaction(async (tx) => {
@@ -48,6 +52,32 @@ export async function redeemReward(
         throw new RedeemError("You don't have enough points for this reward.");
       }
 
+      // Monthly stock and the company-wide monthly € budget. The lock makes
+      // "sum this month's claims, then add one" atomic across requests.
+      await lockPool(tx, "rewardBudget");
+      const month = economyMonth();
+      const live = { createdAt: month, status: { not: "cancelled" } };
+      const [claimedThisMonth, spent] = await Promise.all([
+        reward.monthlyStock === null
+          ? Promise.resolve(0)
+          : tx.redemption.count({ where: { ...live, rewardId } }),
+        tx.redemption.aggregate({ _sum: { euroCostCents: true }, where: live }),
+      ]);
+      const check = checkClaim({
+        euroCostCents: reward.euroCostCents,
+        monthlyStock: reward.monthlyStock,
+        claimedThisMonth,
+        spentCents: spent._sum.euroCostCents ?? 0,
+        budgetCents: settings.monthlyRewardBudgetCents,
+      });
+      if (!check.ok) {
+        throw new RedeemError(
+          check.reason === "monthlyStock"
+            ? `All of this month's ${reward.name} are claimed. More on ${resetDateLabel()}.`
+            : `This month's rewards are all claimed. Back on ${resetDateLabel()}.`,
+        );
+      }
+
       // Atomic stock guard: only decrement if still in stock.
       if (reward.stock !== null) {
         const dec = await tx.reward.updateMany({
@@ -64,6 +94,7 @@ export async function redeemReward(
           userId: me.id,
           rewardId,
           pointsCost: reward.pointsCost, // captured at redemption time
+          euroCostCents: reward.euroCostCents,
           status: "requested",
         },
       });
@@ -119,6 +150,9 @@ function parseRewardForm(fd: FormData) {
   const active = String(fd.get("active") ?? "true") === "true";
   const fulfilment = String(fd.get("fulfilment") ?? "manual").trim() || "manual";
   const type = "internal";
+  const euroCostCents = parseEurosToCents(String(fd.get("euroCost") ?? ""));
+  const monthlyRaw = String(fd.get("monthlyStock") ?? "").trim();
+  const monthlyStock = monthlyRaw === "" ? null : Math.max(0, Math.floor(Number(monthlyRaw)));
   const sortRaw = String(fd.get("sortOrder") ?? "").trim();
   const sortOrder = sortRaw === "" ? 0 : Math.floor(Number(sortRaw));
   return {
@@ -128,6 +162,8 @@ function parseRewardForm(fd: FormData) {
     imageUrl,
     pointsCost,
     stock,
+    euroCostCents,
+    monthlyStock,
     siteId,
     active,
     fulfilment,
@@ -141,6 +177,9 @@ function validateReward(d: ReturnType<typeof parseRewardForm>): string | null {
   if (!Number.isFinite(d.pointsCost) || d.pointsCost < 0) return "Enter a valid points cost.";
   if (d.stock !== null && (!Number.isFinite(d.stock) || d.stock < 0))
     return "Enter a valid stock value.";
+  if (d.euroCostCents === null) return "Enter the euro cost, e.g. 4.50 (0 for perks).";
+  if (d.monthlyStock !== null && !Number.isFinite(d.monthlyStock))
+    return "Enter a valid monthly stock, or leave it blank for no limit.";
   if (!Number.isFinite(d.sortOrder)) return "Enter a valid sort order.";
   if (d.imageUrl && !isProjectBlobUrl(d.imageUrl)) return "Unrecognised picture URL.";
   if (!FULFILMENT_TYPES.has(d.fulfilment)) return "Only manual fulfilment is supported.";
@@ -155,6 +194,8 @@ function rewardData(d: ReturnType<typeof parseRewardForm>) {
     imageUrl: d.imageUrl || null,
     pointsCost: d.pointsCost,
     stock: d.stock,
+    euroCostCents: d.euroCostCents ?? 0,
+    monthlyStock: d.monthlyStock,
     siteId: d.siteId,
     active: d.active,
     fulfilment: d.fulfilment,
@@ -179,7 +220,7 @@ export async function createReward(
     entityType: "reward",
     entityId: created.id,
     summary: `Created reward ${d.name} (${d.pointsCost} pts)`,
-    metadata: { pointsCost: d.pointsCost, stock: d.stock, active: d.active, sortOrder: d.sortOrder },
+    metadata: { pointsCost: d.pointsCost, euroCostCents: d.euroCostCents, stock: d.stock, monthlyStock: d.monthlyStock, active: d.active, sortOrder: d.sortOrder },
     siteId: d.siteId,
   });
   revalidatePath("/admin/rewards");
@@ -205,7 +246,7 @@ export async function updateReward(
     entityType: "reward",
     entityId: id,
     summary: `Updated reward ${d.name}`,
-    metadata: { pointsCost: d.pointsCost, stock: d.stock, active: d.active, sortOrder: d.sortOrder },
+    metadata: { pointsCost: d.pointsCost, euroCostCents: d.euroCostCents, stock: d.stock, monthlyStock: d.monthlyStock, active: d.active, sortOrder: d.sortOrder },
     siteId: d.siteId,
   });
   revalidatePath("/admin/rewards");
@@ -287,6 +328,34 @@ export async function reorderReward(formData: FormData): Promise<ActionResult> {
   revalidatePath("/admin/rewards");
   revalidatePath("/rewards");
   return { ok: true };
+}
+
+/**
+ * Add the economy's starter catalogue (lib/economy.ts SUGGESTED_REWARDS),
+ * skipping any reward whose name already exists. Never edits or removes
+ * existing rewards, so it is safe to run on the live catalogue.
+ */
+export async function loadSuggestedRewards(): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const existing = await prisma.reward.findMany({ select: { name: true, sortOrder: true } });
+  const names = new Set(existing.map((r) => r.name.trim().toLowerCase()));
+  const missing = SUGGESTED_REWARDS.filter((r) => !names.has(r.name.toLowerCase()));
+  if (missing.length === 0) return { ok: true, message: "All suggested rewards are already in the catalogue." };
+
+  let order = existing.reduce((max, r) => Math.max(max, r.sortOrder), 0);
+  await prisma.reward.createMany({
+    data: missing.map((r) => ({ ...r, sortOrder: ++order })),
+  });
+  await writeAudit({
+    actor: admin,
+    action: "reward.created",
+    entityType: "reward",
+    summary: `Loaded ${missing.length} suggested rewards`,
+    metadata: { names: missing.map((r) => r.name) },
+  });
+  revalidatePath("/admin/rewards");
+  revalidatePath("/rewards");
+  return { ok: true, message: `Added ${missing.length} rewards. Check prices and euro costs below.` };
 }
 
 // ---------- Fulfilment queue (admin) ----------

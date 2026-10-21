@@ -7,6 +7,9 @@ import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { RewardCard } from "@/components/rewards/reward-card";
 import { StoreTabs } from "@/components/shop/store-tabs";
 import { cn } from "@/lib/utils";
+import { getOrgSettings } from "@/lib/org-settings";
+import { getEconomyStatus, getMonthlyClaimCounts } from "@/lib/budget";
+import { checkClaim } from "@/lib/economy";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
@@ -23,7 +26,8 @@ export default async function RewardsPage({
   const { c: activeCategory } = await searchParams;
   const me = await requireUser();
 
-  const [user, rewards] = await Promise.all([
+  const settings = await getOrgSettings();
+  const [user, catalogue, claims, economy] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: me.id },
       select: { walletBalance: true },
@@ -42,9 +46,30 @@ export default async function RewardsPage({
         imageUrl: true,
         pointsCost: true,
         stock: true,
+        euroCostCents: true,
+        monthlyStock: true,
       },
     }),
+    getMonthlyClaimCounts(),
+    getEconomyStatus(settings),
   ]);
+  // Monthly stock and the company budget decide what can be claimed right now.
+  // Staff never see euros: a reward over budget just shows "All claimed".
+  const rewards = catalogue.map(({ euroCostCents, monthlyStock, ...r }) => {
+    const claimedThisMonth = claims.get(r.id) ?? 0;
+    const check = checkClaim({
+      euroCostCents,
+      monthlyStock,
+      claimedThisMonth,
+      spentCents: economy.spentCents,
+      budgetCents: economy.budgetCents,
+    });
+    return {
+      ...r,
+      monthLeft: monthlyStock === null ? null : Math.max(0, monthlyStock - claimedThisMonth),
+      backOn: check.ok ? null : economy.resetsOn,
+    };
+  });
   const balance = user.walletBalance;
 
   // Group by category for display.
@@ -60,10 +85,10 @@ export default async function RewardsPage({
 
   // The cheapest in-stock reward you can't afford yet: the "next unlock".
   const next = rewards
-    .filter((r) => r.pointsCost > balance && (r.stock === null || r.stock > 0))
+    .filter((r) => r.pointsCost > balance && (r.stock === null || r.stock > 0) && !r.backOn)
     .sort((a, b) => a.pointsCost - b.pointsCost)[0];
   const affordable = rewards.filter(
-    (r) => r.pointsCost <= balance && (r.stock === null || r.stock > 0),
+    (r) => r.pointsCost <= balance && (r.stock === null || r.stock > 0) && !r.backOn,
   ).length;
 
   return (

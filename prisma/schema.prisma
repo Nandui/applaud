@@ -199,6 +199,11 @@ model Reward {
   type        String       @default("internal") // "internal" | "giftcard" (future adapter)
   fulfilment  String       @default("manual") // "manual" | "auto"
   stock       Int? // null = unlimited
+  /// Real cash cost in euro cents (0 for in-house perks). Claims draw on the
+  /// company-wide OrgSettings.monthlyRewardBudgetCents.
+  euroCostCents Int     @default(0)
+  /// Claims allowed per calendar month (Irish time); null = no monthly limit.
+  monthlyStock  Int?
   siteId      String? // null = all sites
   active      Boolean      @default(true)
   sortOrder   Int          @default(0)
@@ -213,6 +218,7 @@ model Redemption {
   rewardId      String
   reward        Reward    @relation(fields: [rewardId], references: [id])
   pointsCost    Int // captured at redemption time
+  euroCostCents Int       @default(0) // captured at redemption time; counts against the monthly budget
   status        String    @default("requested") // requested | approved | fulfilled | cancelled
   fulfilledById String?
   fulfilledAt   DateTime?
@@ -220,6 +226,7 @@ model Redemption {
   createdAt     DateTime  @default(now())
 
   @@index([status])
+  @@index([createdAt])
 }
 
 /// Append-only. Wallet balance = SUM(amount) for a user. Never mutate/delete rows.
@@ -287,8 +294,19 @@ model AuditEvent {
 model OrgSettings {
   id                      String  @id @default("singleton")
   appName                 String  @default("Applaud")
-  monthlyAllowanceStaff   Int     @default(100)
-  monthlyAllowanceManager Int     @default(200)
+  monthlyAllowanceStaff   Int     @default(400)
+  monthlyAllowanceManager Int     @default(1200)
+  /// How many points make one euro (the internal conversion; staff never see euros).
+  pointsPerEuro               Int @default(100)
+  /// Admin price overrides for profile Store items: { "<cosmetic id>": points }.
+  cosmeticPrices              Json?
+  /// Company-wide cash budget for real rewards per month, in euro cents.
+  monthlyRewardBudgetCents    Int @default(50000)
+  /// Most points one recipient can get from a single shout-out (0 = no limit).
+  maxPointsPerShoutoutStaff   Int @default(100)
+  maxPointsPerShoutoutManager Int @default(300)
+  /// Points per month for boosts and approved awards/milestones, outside anyone's allowance.
+  monthlyBonusPool            Int @default(4400)
   pointsExpiryMonths      Int? // null = never expire
   allowSelfRecognition    Boolean @default(false)
 }

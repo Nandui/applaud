@@ -23,6 +23,10 @@ export type RewardCardData = {
   imageUrl: string | null;
   pointsCost: number;
   stock: number | null;
+  /** Claims left this month (monthly stock), null when there's no monthly limit. */
+  monthLeft: number | null;
+  /** Set when this month's allocation is all claimed: the day it comes back, e.g. "1 November". */
+  backOn: string | null;
 };
 
 // Placeholder art when a reward has no image: a gradient picked from the name.
@@ -80,7 +84,11 @@ export function RewardCard({
   }, undefined);
 
   const canAfford = balance >= reward.pointsCost;
-  const outOfStock = reward.stock !== null && reward.stock <= 0;
+  const outOfStock = (reward.stock !== null && reward.stock <= 0) || reward.backOn !== null;
+  const left =
+    reward.stock !== null && reward.monthLeft !== null
+      ? Math.min(reward.stock, reward.monthLeft)
+      : (reward.stock ?? reward.monthLeft);
   const disabled = !canAfford || outOfStock;
   const after = balance - reward.pointsCost;
   const progress = Math.min(100, Math.round((balance / reward.pointsCost) * 100));
@@ -98,7 +106,7 @@ export function RewardCard({
             <RewardArt reward={reward} />
             {outOfStock ? (
               <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-bold text-white">
-                Sold out
+                {reward.backOn ? "All claimed" : "Sold out"}
               </span>
             ) : !canAfford ? (
               <span className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur">
@@ -120,11 +128,13 @@ export function RewardCard({
               </span>
               <span className="text-muted truncate text-[11px] font-medium" data-numeric>
                 {outOfStock
-                  ? "Out of stock"
+                  ? reward.backOn
+                    ? `Back ${reward.backOn}`
+                    : "Out of stock"
                   : !canAfford
                     ? `${formatNumber(reward.pointsCost - balance)} to go`
-                    : reward.stock !== null
-                      ? `${reward.stock} left`
+                    : left !== null
+                      ? `${left} left${reward.monthLeft !== null ? " this month" : ""}`
                       : "Ready"}
               </span>
             </span>
@@ -152,6 +162,9 @@ export function RewardCard({
         <dl className="bg-surface-2 mx-4 space-y-2 rounded-2xl p-4 text-sm">
           <Row label="Cost" value={pts(reward.pointsCost)} />
           <Row label="Your balance" value={pts(balance)} />
+          {left !== null && !outOfStock ? (
+            <Row label={reward.monthLeft !== null ? "Left this month" : "Left"} value={formatNumber(left)} />
+          ) : null}
           <div className="border-border border-t pt-2">
             <Row label="After redeeming" value={canAfford ? pts(after) : "Not enough yet"} strong />
           </div>
@@ -173,7 +186,9 @@ export function RewardCard({
             {pending
               ? "Redeeming…"
               : outOfStock
-                ? "Sold out"
+                ? reward.backOn
+                  ? `All claimed, back on ${reward.backOn}`
+                  : "Sold out"
                 : canAfford
                   ? `Redeem for ${pts(reward.pointsCost)}`
                   : `${formatNumber(reward.pointsCost - balance)} more pts to go`}

@@ -5,7 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 import { isProjectBlobUrl } from "@/lib/blob";
-import { KIND_LABELS, cosmeticById, type CosmeticKind } from "@/lib/cosmetics";
+import {
+  KIND_LABELS,
+  cosmeticById,
+  effectivePrice,
+  parseCosmeticPrices,
+  type CosmeticKind,
+} from "@/lib/cosmetics";
+import { getOrgSettings } from "@/lib/org-settings";
 import {
   MAX_PINNED,
   ownsItem,
@@ -112,8 +119,10 @@ export async function togglePin(recognitionId: string): Promise<ProfileActionRes
  */
 export async function buyItem(itemId: string): Promise<ProfileActionResult> {
   const me = await requireUser();
-  const item = cosmeticById(itemId);
-  if (!item) return { ok: false, error: "That item isn't in the shop." };
+  const base = cosmeticById(itemId);
+  if (!base) return { ok: false, error: "That item isn't in the shop." };
+  const settings = await getOrgSettings();
+  const item = { ...base, price: effectivePrice(base, parseCosmeticPrices(settings.cosmeticPrices)) };
 
   try {
     await prisma.$transaction(async (tx) => {

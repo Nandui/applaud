@@ -11,6 +11,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { subDays, addDays } from "date-fns";
 import { PrismaClient } from "../lib/generated/prisma/client";
+import { SUGGESTED_REWARDS } from "../lib/economy";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL,
@@ -91,8 +92,8 @@ async function main() {
     data: {
       id: "singleton",
       appName: "Applaud",
-      monthlyAllowanceStaff: 100,
-      monthlyAllowanceManager: 200,
+      monthlyAllowanceStaff: 400,
+      monthlyAllowanceManager: 1200,
       pointsExpiryMonths: null,
       allowSelfRecognition: false,
     },
@@ -130,7 +131,7 @@ async function main() {
     data: {
       name: "Employee of the Month",
       description: "Recognising standout contribution each month, voted by nomination.",
-      points: 500,
+      points: 2000,
       cadence: "monthly",
       requiresApproval: true,
     },
@@ -138,7 +139,7 @@ async function main() {
   await prisma.awardProgram.create({
     data: {
       name: "Spot Award",
-      description: "An ad-hoc shout-out for going the extra mile, any time.",
+      description: "An instant award for going the extra mile, paid from your points to give.",
       points: 150,
       cadence: null,
       requiresApproval: false,
@@ -148,16 +149,7 @@ async function main() {
   // ---------- Rewards ----------
   console.log("Creating rewards…");
   await prisma.reward.createMany({
-    data: [
-      { name: "Guest Day Pass", description: "A free day pass for a friend or family member.", category: "Passes", pointsCost: 150, stock: null },
-      { name: "PT / Induction Session", description: "A one-to-one session with a personal trainer.", category: "Wellbeing", pointsCost: 300, stock: null },
-      { name: "Café Voucher (€5)", description: "€5 to spend at the on-site café.", category: "Food & Drink", pointsCost: 120, stock: null },
-      { name: "Retail Voucher (€10)", description: "€10 voucher for the pro shop.", category: "Food & Drink", pointsCost: 220, stock: 25 },
-      { name: "Branded Hoodie", description: "A cosy branded hoodie in your size.", category: "Merch", pointsCost: 500, stock: 10 },
-      { name: "Branded Water Bottle", description: "Stay hydrated in style.", category: "Merch", pointsCost: 180, stock: null },
-      { name: "Extra Half-Day Off", description: "Knock off early — an extra half-day of leave.", category: "Time Off", pointsCost: 800, stock: null },
-      { name: "Priority Shift Pick", description: "First pick of shifts for the next rota.", category: "Perks", pointsCost: 250, stock: null },
-    ],
+    data: SUGGESTED_REWARDS.map((r, i) => ({ ...r, sortOrder: i + 1 })),
   });
 
   // ---------- Users ----------
@@ -281,7 +273,7 @@ async function main() {
     "Made the whole team laugh on a tough Monday — exactly what we needed.",
   ];
 
-  const recognitionPointsPool = [10, 15, 20, 20, 25, 30, 40, 50];
+  const recognitionPointsPool = [25, 25, 50, 50, 50, 75, 100, 100];
   const recognitions: { id: string; senderId: string }[] = [];
 
   for (let i = 0; i < 34; i++) {
@@ -295,6 +287,7 @@ async function main() {
 
     const rec = await prisma.recognition.create({
       data: {
+        imageUrls: [],
         senderId: sender.id,
         valueId: value.id,
         message: pick(messages),
@@ -370,6 +363,7 @@ async function main() {
   });
   const awardPost = await prisma.recognition.create({
     data: {
+      imageUrls: [],
       senderId: admin.id,
       message: `🏆 ${userByName.has("Saoirse Lynch") ? "Saoirse Lynch" : "A colleague"} won ${eotm.name}!`,
       system: true,
@@ -415,30 +409,30 @@ async function main() {
   // ---------- Redemptions (a couple, ledger-aware) ----------
   console.log("Creating redemptions…");
   const rewards = await prisma.reward.findMany();
-  const cafe = rewards.find((r) => r.name.startsWith("Café"))!;
-  const bottle = rewards.find((r) => r.name.startsWith("Branded Water"))!;
+  const cafe = rewards.find((r) => r.name === "Coffee")!;
+  const pass = rewards.find((r) => r.name === "Guest day pass")!;
 
   const affordable = (cost: number) => allUsers.filter((u) => (balances.get(u.id) ?? 0) >= cost);
 
   const cafeBuyer = pick(affordable(cafe.pointsCost));
   if (cafeBuyer) {
     await prisma.redemption.create({
-      data: { userId: cafeBuyer.id, rewardId: cafe.id, pointsCost: cafe.pointsCost, status: "requested", createdAt: subDays(now, 3) },
+      data: { userId: cafeBuyer.id, rewardId: cafe.id, pointsCost: cafe.pointsCost, euroCostCents: cafe.euroCostCents, status: "requested", createdAt: subDays(now, 3) },
     });
     await prisma.rewardLedger.create({
       data: { userId: cafeBuyer.id, amount: -cafe.pointsCost, type: "REDEMPTION", sourceType: "redemption", note: `Redeemed ${cafe.name}`, createdAt: subDays(now, 3) },
     });
     credit(cafeBuyer.id, -cafe.pointsCost);
   }
-  const bottleBuyer = pick(affordable(bottle.pointsCost).filter((u) => u.id !== cafeBuyer?.id));
-  if (bottleBuyer) {
+  const passBuyer = pick(affordable(pass.pointsCost).filter((u) => u.id !== cafeBuyer?.id));
+  if (passBuyer) {
     await prisma.redemption.create({
-      data: { userId: bottleBuyer.id, rewardId: bottle.id, pointsCost: bottle.pointsCost, status: "fulfilled", fulfilledById: admin.id, fulfilledAt: subDays(now, 1), createdAt: subDays(now, 4) },
+      data: { userId: passBuyer.id, rewardId: pass.id, pointsCost: pass.pointsCost, euroCostCents: pass.euroCostCents, status: "fulfilled", fulfilledById: admin.id, fulfilledAt: subDays(now, 1), createdAt: subDays(now, 4) },
     });
     await prisma.rewardLedger.create({
-      data: { userId: bottleBuyer.id, amount: -bottle.pointsCost, type: "REDEMPTION", sourceType: "redemption", note: `Redeemed ${bottle.name}`, createdAt: subDays(now, 4) },
+      data: { userId: passBuyer.id, amount: -pass.pointsCost, type: "REDEMPTION", sourceType: "redemption", note: `Redeemed ${pass.name}`, createdAt: subDays(now, 4) },
     });
-    credit(bottleBuyer.id, -bottle.pointsCost);
+    credit(passBuyer.id, -pass.pointsCost);
   }
 
   // ---------- Recompute cached wallet balances from the ledger ----------

@@ -49,18 +49,23 @@ export function VolumeLineChart({ data }: { data: { label: string; count: number
 export function CategoryBarChart({
   data,
   color = "#0e7c86",
+  name = "Recognitions",
+  yWidth = 32,
 }: {
   data: { label: string; count: number }[];
   color?: string;
+  name?: string;
+  /** Room for the y-axis labels; widen for values in the hundreds or more. */
+  yWidth?: number;
 }) {
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: yWidth > 32 ? 0 : -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8ee" vertical={false} />
         <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} />
-        <YAxis tick={AXIS} allowDecimals={false} tickLine={false} axisLine={false} width={32} />
+        <YAxis tick={AXIS} allowDecimals={false} tickLine={false} axisLine={false} width={yWidth} />
         <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "rgba(79,70,229,0.06)" }} />
-        <Bar dataKey="count" name="Recognitions" fill={color} radius={[6, 6, 0, 0]} />
+        <Bar dataKey="count" name={name} fill={color} radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

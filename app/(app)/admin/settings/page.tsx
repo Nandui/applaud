@@ -19,8 +19,6 @@ export default async function AdminSettingsPage() {
       <SettingsForm
         settings={{
           appName: settings.appName,
-          monthlyAllowanceStaff: settings.monthlyAllowanceStaff,
-          monthlyAllowanceManager: settings.monthlyAllowanceManager,
           pointsExpiryMonths: settings.pointsExpiryMonths,
           allowSelfRecognition: settings.allowSelfRecognition,
         }}

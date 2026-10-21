@@ -98,7 +98,7 @@ export default async function MePage() {
             <span className="text-muted text-sm">/ {formatNumber(allowance.total)} pts</span>
           </p>
           <p className="text-muted mt-1 text-xs leading-snug">
-            Resets on the 1st and doesn&apos;t roll over, so use it!
+            Use it or lose it: unused points don&apos;t roll over, and it {allowance.resetsIn}.
           </p>
         </div>
       </section>
