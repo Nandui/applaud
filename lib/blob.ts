@@ -7,7 +7,8 @@
  * since every store shares the `*.public.blob.vercel-storage.com` suffix and all
  * public blobs are world-readable). The store's public host is
  * `<storeId>.public.blob.vercel-storage.com`, and the storeId is the segment of
- * BLOB_READ_WRITE_TOKEN (`vercel_blob_rw_<storeId>_<secret>`). When no token is
+ * BLOB_READ_WRITE_TOKEN (`vercel_blob_rw_<storeId>_<secret>`), or BLOB_STORE_ID
+ * (`store_<storeId>`) for OIDC-connected stores. When neither is
  * configured (local dev without Blob), fall back to accepting any Vercel Blob
  * public host.
  */
@@ -16,7 +17,7 @@ const BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 function expectedBlobHost(): string | null {
   const storeId =
     process.env.BLOB_READ_WRITE_TOKEN?.match(/^vercel_blob_rw_([a-z0-9]+)_/i)?.[1] ??
-    process.env.BLOB_STORE_ID;
+    process.env.BLOB_STORE_ID?.replace(/^store_/, "");
   return storeId ? `${storeId.toLowerCase()}${BLOB_HOST_SUFFIX}` : null;
 }
 
