@@ -1,4 +1,4 @@
-import { valueIcon } from "@/lib/value-icons";
+import { ValueIcon } from "@/components/value-icon";
 import { cn } from "@/lib/utils";
 
 export type ValueChipData = {
@@ -8,7 +8,7 @@ export type ValueChipData = {
 };
 
 /** Convert a #rrggbb hex to an rgba() tint for subtle chip backgrounds. */
-function tint(hex?: string | null, alpha = 0.12): string | undefined {
+export function tint(hex?: string | null, alpha = 0.12): string | undefined {
   if (!hex) return undefined;
   const h = hex.replace("#", "");
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return undefined;
@@ -25,7 +25,6 @@ export function ValueChip({
   value: ValueChipData;
   className?: string;
 }) {
-  const Icon = valueIcon(value.icon);
   return (
     <span
       className={cn(
@@ -37,7 +36,7 @@ export function ValueChip({
         backgroundColor: tint(value.color) ?? "var(--color-secondary)",
       }}
     >
-      <Icon className="size-3.5 shrink-0" />
+      <ValueIcon icon={value.icon} className="size-3.5 shrink-0" />
       {value.name}
     </span>
   );

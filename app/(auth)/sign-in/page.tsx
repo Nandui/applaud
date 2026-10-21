@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { APP_NAME } from "@/lib/config";
-import { Brand } from "@/components/app-shell/brand";
+import { Sparkles } from "lucide-react";
 import { SignInForm } from "./sign-in-form";
 
 export const metadata = { title: "Sign in" };
@@ -33,15 +33,24 @@ export default async function SignInPage() {
       jobTitle: u.jobTitle,
     }));
 
+  // Phones: a full-bleed brand splash with the form in a bottom sheet (the
+  // Instagram / Snapchat welcome screen). Desktop: a centred card.
   return (
-    <div className="w-full max-w-md">
-      <div className="mb-8 flex flex-col items-center gap-3 text-center">
-        <Brand href="/sign-in" />
-        <p className="text-muted text-sm">
-          Sign in to {APP_NAME} to recognise great work.
-        </p>
+    <div className="flex w-full flex-1 flex-col md:max-w-md md:flex-none">
+      <div className="pt-safe flex flex-1 flex-col items-center justify-center gap-3 px-6 pt-10 pb-8 text-center text-white md:flex-none md:pb-8">
+        <span className="flex size-16 items-center justify-center rounded-[1.3rem] bg-white/20 shadow-xl ring-1 ring-white/30 backdrop-blur">
+          <Sparkles className="size-8" strokeWidth={2} />
+        </span>
+        <div className="space-y-1.5">
+          <h1 className="font-display text-4xl font-bold tracking-tight">{APP_NAME}</h1>
+          <p className="text-base text-white/85">
+            Celebrate great work, together. 👏
+          </p>
+        </div>
       </div>
-      <SignInForm samples={samples} />
+      <div className="bg-surface pb-safe rounded-t-[2rem] shadow-[0_-12px_40px_rgb(0_0_0/0.15)] md:rounded-3xl md:pb-0">
+        <SignInForm samples={samples} />
+      </div>
     </div>
   );
 }

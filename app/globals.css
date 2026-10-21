@@ -2,13 +2,15 @@
 @import "tw-animate-css";
 
 /*
- * Applaud design system — light-first, card-based, calm.
+ * Applaud design system — light-first and mobile-native: iOS-style grouped
+ * surfaces, full-bleed feed posts, a vivid brand gradient for "create" and
+ * celebratory moments, and safe-area aware chrome (see the utilities below).
  * Spec tokens are canonical; shadcn/ui aliases are mapped onto them below.
  * Fonts are loaded via next/font (layout.tsx) and exposed as the
  * --font-* variables referenced here.
  */
 @theme {
-  --color-background: #f3f6f8;
+  --color-background: #f2f3f7;
   --color-surface: #ffffff;
   --color-border: #e2e8ee;
   --color-foreground: #0f172a;
@@ -19,6 +21,12 @@
   --color-accent: #0e7c86; /* teal */
   --color-accent-fg: #ffffff;
 
+  /* Brand gradient (create button, story rings, hero cards). */
+  --color-brand-1: #6d5efc;
+  --color-brand-2: #d946ef;
+  --color-brand-3: #fb7185;
+  --color-brand-4: #fbbf24;
+
   --color-success: #15803d;
   --color-warning: #b45309;
   --color-danger: #be123c;
@@ -27,7 +35,7 @@
   --font-sans: var(--font-ibm-plex-sans), "IBM Plex Sans", ui-sans-serif, sans-serif;
   --font-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
 
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 
   /* ---- shadcn/ui aliases (mapped onto the canonical tokens above) ---- */
   --color-card: var(--color-surface);
@@ -56,6 +64,26 @@
   }
   html {
     -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    color-scheme: light;
+  }
+  /* Kill the 300ms double-tap-zoom delay so taps feel instant. */
+  a,
+  button,
+  [role="button"],
+  label,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+  /* iOS zooms into inputs under 16px; keep form text at 16px on phones. */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
   body {
     background-color: var(--color-background);
@@ -78,4 +106,58 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }
+}
+
+/* ---- Mobile-native utilities ---- */
+
+/* The brand gradient as a fill (create button, hero cards). */
+@utility bg-brand {
+  background-image: linear-gradient(
+    135deg,
+    var(--color-brand-1) 0%,
+    var(--color-brand-2) 55%,
+    var(--color-brand-3) 80%,
+    var(--color-brand-4) 100%
+  );
+}
+
+/* Story-style ring around an avatar. */
+@utility ring-brand {
+  background-image: conic-gradient(
+    from 210deg,
+    var(--color-brand-4),
+    var(--color-brand-3),
+    var(--color-brand-2),
+    var(--color-brand-1),
+    var(--color-brand-4)
+  );
+}
+
+/* Safe-area insets for notches and the home indicator. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Horizontal scrollers without visible scrollbars. */
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Translucent "frosted" chrome used by the app bar and tab bar. */
+@utility glass {
+  background-color: rgb(255 255 255 / 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Bottom space so content clears the tab bar (and the home indicator). */
+@utility pb-tabbar {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }

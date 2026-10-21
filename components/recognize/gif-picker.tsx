@@ -80,10 +80,10 @@ export function GifPicker({
         <button
           type="button"
           disabled={disabled}
-          className="border-border text-muted hover:bg-secondary flex size-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed transition-colors disabled:opacity-50"
+          className="bg-secondary text-foreground flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl transition-transform active:scale-95 disabled:opacity-50"
         >
           <Film className="size-5" />
-          <span className="text-[0.65rem]">GIF</span>
+          <span className="text-[0.7rem] font-semibold">GIF</span>
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">

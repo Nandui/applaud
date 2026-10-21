@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { Wallet } from "lucide-react";
+import { Wallet, Sparkles } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { RewardCard } from "@/components/rewards/reward-card";
 
 export const dynamic = "force-dynamic";
@@ -48,34 +46,45 @@ export default async function RewardsPage() {
   const categories = [...groups.keys()].sort();
 
   return (
-    <div>
-      <PageHeader
-        title="Rewards"
-        description="Spend your points on internal perks and rewards."
-        action={
-          <Button asChild variant="outline">
-            <Link href="/me">
-              <Wallet className="size-4" />
-              <span data-numeric>{formatNumber(user.walletBalance)}</span> pts
-            </Link>
-          </Button>
-        }
-      />
+    <div className="mx-auto max-w-3xl">
+      <PageHeader title="Rewards" description="Spend your points on internal perks and rewards." />
+
+      {/* Balance hero */}
+      <section className="bg-brand relative mb-6 overflow-hidden rounded-3xl p-5 text-white shadow-[0_12px_32px_-12px_rgb(217_70_239/0.6)]">
+        <Sparkles className="absolute -top-3 -right-3 size-28 opacity-15" aria-hidden />
+        <p className="text-sm font-medium text-white/80">Your balance</p>
+        <p data-numeric className="mt-1 text-4xl font-semibold tracking-tight">
+          {formatNumber(user.walletBalance)}
+          <span className="ml-1.5 text-lg font-normal text-white/80">pts</span>
+        </p>
+        <div className="mt-4 flex gap-2">
+          <Link
+            href="/me"
+            className="flex h-9 items-center gap-1.5 rounded-full bg-white/20 px-4 text-sm font-semibold backdrop-blur transition-transform active:scale-95"
+          >
+            <Wallet className="size-4" /> Wallet history
+          </Link>
+          <Link
+            href="/recognize"
+            className="text-foreground flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold transition-transform active:scale-95"
+          >
+            Earn more
+          </Link>
+        </div>
+      </section>
 
       {rewards.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="text-muted py-16 text-center text-sm">
-            No rewards available right now.
-          </CardContent>
-        </Card>
+        <div className="text-muted flex flex-col items-center gap-2 py-16 text-center">
+          <span className="text-4xl">🎁</span>
+          <p className="text-foreground font-display font-semibold">No rewards right now</p>
+          <p className="text-sm">Check back soon — new perks get added regularly.</p>
+        </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-7">
           {categories.map((category) => (
             <section key={category}>
-              <h2 className="text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
-                {category}
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <h2 className="font-display mb-3 text-lg font-semibold">{category}</h2>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3">
                 {groups.get(category)!.map((reward) => (
                   <RewardCard
                     key={reward.id}

@@ -15,7 +15,7 @@ export function Brand({
       href={href}
       className={cn("flex items-center gap-2.5 font-display", className)}
     >
-      <span className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg shadow-sm">
+      <span className="bg-brand flex size-8 items-center justify-center rounded-[0.6rem] text-white shadow-sm">
         <Sparkles className="size-4.5" strokeWidth={2.25} />
       </span>
       <span className="text-lg font-semibold tracking-tight">{APP_NAME}</span>

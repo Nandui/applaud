@@ -1,10 +1,23 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
-import { Check, Search, X, Sparkles, ImagePlus, Loader2 } from "lucide-react";
+import {
+  Check,
+  Search,
+  X,
+  ImagePlus,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Minus,
+  Plus,
+} from "lucide-react";
 import { createRecognition, type ActionResult } from "@/lib/recognition/actions";
 import type { AllowanceStatus } from "@/lib/points";
 import {
@@ -16,14 +29,10 @@ import { valueIcon } from "@/lib/value-icons";
 import type { GifResult } from "@/lib/recognition/gif";
 import { GifPicker } from "@/components/recognize/gif-picker";
 import { UserAvatar } from "@/components/user-avatar";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { tint } from "@/components/value-chip";
+import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { pts } from "@/lib/format";
+import { formatNumber, pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ValueOption = {
@@ -40,14 +49,26 @@ type RecipientOption = {
   siteCode: string;
 };
 
+/** Quick-pick point amounts, like a tip screen. */
+const POINT_PRESETS = [0, 10, 25, 50];
+
+/**
+ * Two-step, full-screen composer (the Instagram "new post" pattern):
+ * 1. pick who you're recognising, 2. write it up, attach media, add points.
+ * Both steps stay mounted inside one <form> so every field still posts to
+ * `createRecognition` exactly as before.
+ */
 export function RecognizeForm({
   values,
   recipients,
   allowance,
+  initialSelected = [],
 }: {
   values: ValueOption[];
   recipients: RecipientOption[];
   allowance: AllowanceStatus;
+  /** Recipients to preselect (from ?to=…); jumps straight to step 2. */
+  initialSelected?: string[];
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ActionResult | undefined, FormData>(
@@ -55,9 +76,16 @@ export function RecognizeForm({
     undefined,
   );
 
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(initialSelected);
+  const [step, setStepState] = useState<1 | 2>(initialSelected.length > 0 ? 2 : 1);
+  // Each step is its own "screen": start it at the top, like a pushed view.
+  function setStep(next: 1 | 2) {
+    setStepState(next);
+    window.scrollTo({ top: 0 });
+  }
+  const [message, setMessage] = useState("");
   const [valueId, setValueId] = useState<string>("");
-  const [points, setPoints] = useState<number>(0);
+  const [rawPoints, setPoints] = useState<number>(0);
   const [isPrivate, setIsPrivate] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -149,9 +177,7 @@ export function RecognizeForm({
       : allowance.remaining;
 
   // Keep points within what the allowance permits as the selection changes.
-  useEffect(() => {
-    if (points > maxPerRecipient) setPoints(Math.max(0, maxPerRecipient));
-  }, [maxPerRecipient, points]);
+  const points = Math.min(rawPoints, Math.max(0, maxPerRecipient));
 
   useEffect(() => {
     if (state?.ok) {
@@ -180,10 +206,25 @@ export function RecognizeForm({
   }
 
   const canSubmit =
-    selected.length > 0 && valueId !== "" && !pending && uploadingCount === 0;
+    selected.length > 0 &&
+    valueId !== "" &&
+    message.trim() !== "" &&
+    !pending &&
+    uploadingCount === 0;
+  const selectedPeople = selected
+    .map((id) => byId.get(id))
+    .filter((r): r is RecipientOption => Boolean(r));
+  const activeValue = values.find((v) => v.id === valueId) ?? null;
+  const usedPct =
+    allowance.total > 0
+      ? Math.min(100, Math.round(((allowance.total - remainingAfter) / allowance.total) * 100))
+      : 100;
+  // Desktop has the TopNav, so the composer bar shows there too, under it.
+  const barClass =
+    "md:sticky md:top-15 md:mx-0 md:mb-4 md:block md:rounded-2xl md:border";
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} className="mx-auto max-w-xl">
       {/* Hidden fields the server action reads */}
       {selected.map((id) => (
         <input key={id} type="hidden" name="recipientIds" value={id} />
@@ -195,136 +236,275 @@ export function RecognizeForm({
         <input key={img.url} type="hidden" name="imageUrls" value={img.url} />
       ))}
 
-      <Card>
-        <CardContent className="space-y-5">
-          {/* Recipients */}
-          <div className="space-y-2">
-            <Label>Recipients</Label>
-            {selected.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {selected.map((id) => {
-                  const r = byId.get(id);
-                  if (!r) return null;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => toggle(id)}
-                      className="bg-primary/10 text-primary hover:bg-primary/15 flex items-center gap-1.5 rounded-full py-1 pr-1.5 pl-2.5 text-sm font-medium transition-colors"
-                    >
-                      {r.name}
-                      <X className="size-3.5" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <div className="relative">
-              <Search className="text-muted absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search colleagues…"
-                className="pl-9"
-              />
-            </div>
-            <div className="border-border max-h-56 divide-y overflow-y-auto rounded-lg border">
-              {filtered.length === 0 ? (
-                <p className="text-muted p-4 text-center text-sm">No matches.</p>
-              ) : (
-                filtered.map((r) => {
-                  const active = selected.includes(r.id);
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => toggle(r.id)}
-                      className={cn(
-                        "flex w-full items-center gap-3 px-3 py-2 text-left transition-colors",
-                        active ? "bg-primary/5" : "hover:bg-secondary",
-                      )}
-                    >
-                      <UserAvatar
-                        name={r.name}
-                        avatarUrl={r.avatarUrl}
-                        className="size-8"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{r.name}</p>
-                        <p className="text-muted truncate text-xs">
-                          {r.jobTitle ?? "—"} · {r.siteCode}
-                        </p>
-                      </div>
-                      <span
-                        className={cn(
-                          "flex size-5 items-center justify-center rounded-full border",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border",
-                        )}
-                      >
-                        {active && <Check className="size-3.5" />}
+      {/* ---------------- Step 1: who ---------------- */}
+      <div className={cn(step !== 1 && "hidden")}>
+        <AppBar
+          className={barClass}
+          leading={
+            <Link href="/" aria-label="Close" className={appBarIconClass}>
+              <X className="size-6" />
+            </Link>
+          }
+          title={<span className="text-[1.1rem]">Who are you recognising?</span>}
+          trailing={
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              disabled={selected.length === 0}
+              className="text-primary disabled:text-muted/50 px-2 text-base font-semibold"
+            >
+              Next
+            </button>
+          }
+        >
+          <div className="relative">
+            <Search className="text-muted absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, role or site"
+              type="search"
+              className="bg-secondary placeholder:text-muted h-10 w-full rounded-xl pr-3 pl-10 text-sm outline-none"
+            />
+          </div>
+        </AppBar>
+
+        {/* Selected people, as removable avatars */}
+        <AnimatePresence initial={false}>
+          {selectedPeople.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pt-1 pb-3">
+                {selectedPeople.map((r) => (
+                  <motion.button
+                    key={r.id}
+                    type="button"
+                    layout
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    onClick={() => toggle(r.id)}
+                    className="flex w-16 shrink-0 flex-col items-center gap-1"
+                    aria-label={`Remove ${r.name}`}
+                  >
+                    <span className="relative">
+                      <UserAvatar name={r.name} avatarUrl={r.avatarUrl} className="size-14" />
+                      <span className="bg-foreground ring-background absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full text-white ring-2">
+                        <X className="size-3" strokeWidth={3} />
                       </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
+                    </span>
+                    <span className="w-full truncate text-center text-xs">
+                      {r.name.split(" ")[0]}
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="bg-surface -mx-4 md:mx-0 md:rounded-2xl md:border">
+          {filtered.length === 0 ? (
+            <p className="text-muted p-10 text-center text-sm">No matches.</p>
+          ) : (
+            filtered.map((r) => {
+              const active = selected.includes(r.id);
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => toggle(r.id)}
+                  aria-pressed={active}
+                  className="active:bg-secondary flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                >
+                  <UserAvatar name={r.name} avatarUrl={r.avatarUrl} className="size-11" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[0.95rem] font-semibold">{r.name}</p>
+                    <p className="text-muted truncate text-[0.8rem]">
+                      {r.jobTitle ?? "—"}
+                      {r.siteCode && ` · ${r.siteCode}`}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border",
+                    )}
+                  >
+                    {active && <Check className="size-3.5" strokeWidth={3} />}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Thumb-reachable continue button */}
+        <AnimatePresence>
+          {selected.length > 0 && (
+            <motion.div
+              initial={{ y: 80 }}
+              animate={{ y: 0 }}
+              exit={{ y: 80 }}
+              transition={{ type: "spring", stiffness: 400, damping: 32 }}
+              className="pb-safe fixed inset-x-0 bottom-0 z-30 px-4 pt-3 md:static md:px-0"
+            >
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="bg-foreground mx-auto mb-3 flex h-13 w-full max-w-xl items-center justify-center gap-2 rounded-full text-base font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
+              >
+                Continue with {selected.length}{" "}
+                {selected.length === 1 ? "person" : "people"}
+                <ChevronRight className="size-5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ---------------- Step 2: compose ---------------- */}
+      <div className={cn(step !== 2 && "hidden")}>
+        <AppBar
+          className={barClass}
+          leading={
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              aria-label="Back to recipients"
+              className={appBarIconClass}
+            >
+              <ChevronLeft className="size-6.5" strokeWidth={2.25} />
+            </button>
+          }
+          title={<span className="text-[1.1rem]">New recognition</span>}
+          trailing={
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className="text-primary disabled:text-muted/50 px-2 text-base font-semibold"
+            >
+              {pending ? "Posting…" : "Share"}
+            </button>
+          }
+        />
+
+        <div className="space-y-3">
+          {/* To: — tap to edit */}
+          <button
+            type="button"
+            onClick={() => setStep(1)}
+            className="bg-surface flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left"
+          >
+            <span className="text-muted text-sm font-medium">To</span>
+            <span className="flex -space-x-2">
+              {selectedPeople.slice(0, 4).map((r) => (
+                <UserAvatar
+                  key={r.id}
+                  name={r.name}
+                  avatarUrl={r.avatarUrl}
+                  className="ring-surface size-8 text-[0.6rem] ring-2"
+                />
+              ))}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {selectedPeople.map((r) => r.name.split(" ")[0]).join(", ")}
+            </span>
+            <ChevronRight className="text-muted size-4.5" />
+          </button>
+
+          {/* The message, on a card tinted by the chosen value */}
+          <div
+            className="bg-surface overflow-hidden rounded-2xl transition-colors"
+            style={
+              activeValue?.color
+                ? {
+                    backgroundImage: `linear-gradient(160deg, ${tint(activeValue.color, 0.16)}, transparent 70%)`,
+                  }
+                : undefined
+            }
+          >
+            <textarea
+              id="message"
+              name="message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="What did they do? Be specific — it means more."
+              rows={5}
+              maxLength={500}
+              required
+              className="font-display placeholder:text-muted/70 block w-full resize-none bg-transparent px-4 pt-4 pb-2 text-lg leading-snug font-medium outline-none"
+            />
+            <p data-numeric className="text-muted px-4 pb-3 text-right text-xs">
+              {message.length}/500
+            </p>
           </div>
 
           {/* Value */}
-          <div className="space-y-2">
-            <Label>Value</Label>
-            <div className="flex flex-wrap gap-2">
+          <section className="space-y-2">
+            <h2 className="text-muted px-1 text-xs font-semibold tracking-wide uppercase">
+              Which value did they live?
+            </h2>
+            <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
               {values.map((v) => {
                 const Icon = valueIcon(v.icon);
                 const active = valueId === v.id;
                 return (
-                  <button
+                  <motion.button
                     key={v.id}
                     type="button"
+                    whileTap={{ scale: 0.94 }}
                     onClick={() => setValueId(active ? "" : v.id)}
+                    aria-pressed={active}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                      active
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:bg-secondary",
+                      "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors",
+                      active ? "text-white shadow-md" : "bg-surface text-foreground",
                     )}
                     style={
-                      active && v.color
-                        ? { color: v.color, borderColor: v.color }
+                      active
+                        ? { backgroundColor: v.color ?? "var(--color-primary)" }
                         : undefined
                     }
                   >
-                    <Icon className="size-4" />
+                    <Icon
+                      className="size-4"
+                      style={!active && v.color ? { color: v.color } : undefined}
+                    />
                     {v.name}
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
-          </div>
-
-          {/* Message */}
-          <div className="space-y-2">
-            <Label htmlFor="message">Message</Label>
-            <Textarea
-              id="message"
-              name="message"
-              placeholder="What did they do? Be specific."
-              rows={3}
-              maxLength={500}
-              required
-            />
-          </div>
+          </section>
 
           {/* Photos / GIFs */}
-          <div className="space-y-2">
-            <Label>Photos / GIFs (optional)</Label>
-            <div className="flex flex-wrap gap-2">
+          <section className="space-y-2">
+            <h2 className="text-muted px-1 text-xs font-semibold tracking-wide uppercase">
+              Add a photo or GIF
+            </h2>
+            <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:px-0">
+              {images.length + uploadingCount < MAX_RECOGNITION_IMAGES && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-secondary flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl transition-transform active:scale-95"
+                  >
+                    <ImagePlus className="size-5" />
+                    <span className="text-[0.7rem] font-semibold">Photo</span>
+                  </button>
+                  <GifPicker onSelect={addGif} />
+                </>
+              )}
               {images.map((img) => (
                 <div
                   key={img.url}
-                  className="border-border relative size-20 overflow-hidden rounded-lg border"
+                  className="relative size-20 shrink-0 overflow-hidden rounded-2xl"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -336,33 +516,20 @@ export function RecognizeForm({
                     type="button"
                     onClick={() => removeImage(img.url)}
                     aria-label={`Remove ${img.name}`}
-                    className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                    className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur"
                   >
-                    <X className="size-3" />
+                    <X className="size-3.5" />
                   </button>
                 </div>
               ))}
               {Array.from({ length: uploadingCount }).map((_, i) => (
                 <div
                   key={`uploading-${i}`}
-                  className="border-border flex size-20 items-center justify-center rounded-lg border border-dashed"
+                  className="bg-secondary flex size-20 shrink-0 items-center justify-center rounded-2xl"
                 >
                   <Loader2 className="text-muted size-5 animate-spin" />
                 </div>
               ))}
-              {images.length + uploadingCount < MAX_RECOGNITION_IMAGES && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-border text-muted hover:bg-secondary flex size-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed transition-colors"
-                  >
-                    <ImagePlus className="size-5" />
-                    <span className="text-[0.65rem]">Add</span>
-                  </button>
-                  <GifPicker onSelect={addGif} />
-                </>
-              )}
             </div>
             <input
               ref={fileInputRef}
@@ -375,89 +542,130 @@ export function RecognizeForm({
                 e.target.value = "";
               }}
             />
-            <p className="text-muted text-xs">
+            <p className="text-muted px-1 text-xs">
               Up to {MAX_RECOGNITION_IMAGES} · PNG, JPG, GIF, or WebP · max 8MB each
             </p>
-          </div>
+          </section>
 
           {/* Points */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="points-input">Points each (optional)</Label>
+          <section className="bg-surface space-y-3 rounded-2xl p-4">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-sm font-semibold">
+                Add points <span className="text-muted font-normal">· each</span>
+              </h2>
               <span className="text-muted text-xs">
-                <span data-numeric>{allowance.remaining}</span> of{" "}
-                <span data-numeric>{allowance.total}</span> allowance left
+                <span data-numeric className="text-foreground font-semibold">
+                  {formatNumber(Math.max(0, remainingAfter))}
+                </span>{" "}
+                of <span data-numeric>{formatNumber(allowance.total)}</span> left
               </span>
             </div>
+            <div className="bg-secondary h-1.5 overflow-hidden rounded-full">
+              <motion.div
+                className="bg-brand h-full rounded-full"
+                animate={{ width: `${usedPct}%` }}
+                transition={{ type: "spring", stiffness: 200, damping: 30 }}
+              />
+            </div>
             <div className="flex items-center gap-2">
-              <Input
+              <button
+                type="button"
+                aria-label="Fewer points"
+                disabled={points <= 0}
+                onClick={() => setPoints(Math.max(0, points - 5))}
+                className="bg-secondary flex size-11 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 disabled:opacity-40"
+              >
+                <Minus className="size-4.5" />
+              </button>
+              <input
                 id="points-input"
                 type="number"
                 inputMode="numeric"
+                aria-label="Points each"
                 min={0}
                 max={maxPerRecipient}
                 value={points}
                 onChange={(e) =>
                   setPoints(
-                    Math.max(
-                      0,
-                      Math.min(maxPerRecipient, Number(e.target.value) || 0),
-                    ),
+                    Math.max(0, Math.min(maxPerRecipient, Number(e.target.value) || 0)),
                   )
                 }
-                className="font-mono w-28"
                 disabled={allowance.remaining === 0}
+                className="font-numeric min-w-0 flex-1 bg-transparent text-center text-3xl font-semibold outline-none"
               />
-              <div className="flex gap-1">
-                {[10, 25, 50].map((n) => (
-                  <Button
-                    key={n}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={n > maxPerRecipient}
-                    onClick={() => setPoints(n)}
-                  >
-                    {n}
-                  </Button>
-                ))}
-              </div>
+              <button
+                type="button"
+                aria-label="More points"
+                disabled={points + 5 > maxPerRecipient}
+                onClick={() => setPoints(Math.min(maxPerRecipient, points + 5))}
+                className="bg-secondary flex size-11 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 disabled:opacity-40"
+              >
+                <Plus className="size-4.5" />
+              </button>
             </div>
-            {selected.length > 0 && points > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {POINT_PRESETS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={n > maxPerRecipient}
+                  onClick={() => setPoints(n)}
+                  className={cn(
+                    "h-10 rounded-full text-sm font-semibold transition-colors disabled:opacity-40",
+                    points === n ? "bg-foreground text-white" : "bg-secondary",
+                  )}
+                >
+                  <span data-numeric>{n === 0 ? "None" : n}</span>
+                </button>
+              ))}
+            </div>
+            {selected.length > 1 && points > 0 && (
               <p className="text-muted text-xs">
-                {pts(points)} × {selected.length}{" "}
-                {selected.length === 1 ? "recipient" : "recipients"} ={" "}
-                <span data-numeric className="text-foreground font-medium">
-                  {totalPoints}
-                </span>{" "}
-                pts · <span data-numeric>{remainingAfter}</span> left after
+                {pts(points)} × {selected.length} people ={" "}
+                <span data-numeric className="text-foreground font-semibold">
+                  {pts(totalPoints)}
+                </span>
               </p>
             )}
-          </div>
+          </section>
 
           {/* Visibility */}
-          <div className="border-border flex items-center justify-between rounded-lg border p-3">
-            <div>
-              <p className="text-sm font-medium">Private recognition</p>
-              <p className="text-muted text-xs">
-                Only you and the recipient(s) will see it.
-              </p>
-            </div>
+          <label className="bg-surface flex items-center gap-3 rounded-2xl p-4">
+            <span className="bg-secondary flex size-9 shrink-0 items-center justify-center rounded-full">
+              <Lock className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">Private</span>
+              <span className="text-muted block text-xs">
+                Only you and {selected.length === 1 ? "them" : "the recipients"} will see it.
+              </span>
+            </span>
             <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
-          </div>
-        </CardContent>
-      </Card>
+          </label>
 
-      <div className="flex items-center justify-end gap-3">
-        {selected.length > 0 && (
-          <Badge variant="secondary">
-            {selected.length} selected
-          </Badge>
-        )}
-        <Button type="submit" size="lg" disabled={!canSubmit}>
-          <Sparkles className="size-4" />
-          {pending ? "Posting…" : "Post recognition"}
-        </Button>
+          {/* Primary action in the thumb zone */}
+          <div className="pb-safe sticky bottom-0 z-20 -mx-4 bg-gradient-to-t from-[var(--color-background)] from-60% to-transparent px-4 pt-4 md:static md:mx-0 md:bg-none md:px-0">
+            <motion.button
+              type="submit"
+              disabled={!canSubmit}
+              whileTap={{ scale: 0.98 }}
+              className="bg-brand mb-3 flex h-13 w-full items-center justify-center gap-2 rounded-full text-base font-semibold text-white shadow-[0_8px_24px_-6px_rgb(217_70_239/0.6)] disabled:opacity-40 disabled:shadow-none"
+            >
+              {pending ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <span aria-hidden className="text-lg">👏</span>
+              )}
+              {pending
+                ? "Posting…"
+                : !valueId
+                  ? "Pick a value to post"
+                  : !message.trim()
+                    ? "Write a message to post"
+                    : "Post recognition"}
+            </motion.button>
+          </div>
+        </div>
       </div>
     </form>
   );

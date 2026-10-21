@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Pencil, Plus } from "lucide-react";
 import { saveValue, setValueActive, type ActionResult } from "@/lib/admin/actions";
-import { VALUE_ICON_NAMES, valueIcon } from "@/lib/value-icons";
+import { VALUE_ICON_NAMES } from "@/lib/value-icons";
+import { ValueIcon } from "@/components/value-icon";
 import { DataTable } from "@/components/data-table";
 import { ValueChip } from "@/components/value-chip";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,6 @@ function ValueFormDialog({
   const [icon, setIcon] = useState(editing?.icon ?? "Award");
   const [color, setColor] = useState(editing?.color ?? "#4f46e5");
   const [active, setActive] = useState(editing?.active ?? true);
-  const Icon = valueIcon(icon);
 
   useEffect(() => {
     if (state?.ok) {
@@ -96,7 +96,7 @@ function ValueFormDialog({
                   className="flex size-9 shrink-0 items-center justify-center rounded-lg"
                   style={{ color, backgroundColor: `${color}1f` }}
                 >
-                  <Icon className="size-4.5" />
+                  <ValueIcon icon={icon} className="size-4.5" />
                 </span>
                 <Select value={icon} onValueChange={setIcon}>
                   <SelectTrigger>

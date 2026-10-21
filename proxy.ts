@@ -36,7 +36,8 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    // Run on everything except API routes, Next internals, and static assets.
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Run on everything except API routes, Next internals, static assets, and
+    // the PWA manifest + icons (fetched by the browser without a session).
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon/|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
