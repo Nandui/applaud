@@ -2,9 +2,9 @@ import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { ValueSeal } from "@/components/value-seal";
 import { CELEBRATION_EMOJI, CELEBRATION_LABELS, type ProfileData } from "@/lib/profile";
-import { formatNumber } from "@/lib/format";
+import { CountUp } from "@/components/fx/count-up";
 
-/** Instagram's three counts beside the avatar. */
+/** Instagram's three counts beside the avatar, easing up as the page opens. */
 export function Stats({ data }: { data: ProfileData }) {
   const items = [
     { label: "received", value: data.stats.receivedCount },
@@ -17,7 +17,7 @@ export function Stats({ data }: { data: ProfileData }) {
         <div key={s.label} className="flex flex-col-reverse">
           <dt className="text-sm">{s.label}</dt>
           <dd data-numeric className="text-lg leading-tight font-bold">
-            {formatNumber(s.value)}
+            <CountUp value={s.value} />
           </dd>
         </div>
       ))}

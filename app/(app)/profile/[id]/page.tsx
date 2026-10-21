@@ -5,13 +5,14 @@ import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
 import { getProfileData } from "@/lib/profile";
 import { getCardsByIds, getGivenCards, getReceivedCards } from "@/lib/recognition/queries";
-import { isLight } from "@/lib/profile-custom";
+import { isLight, wornItem } from "@/lib/profile-custom";
 import { FramedAvatar } from "@/components/user-avatar";
 import { RecognitionCard } from "@/components/feed/recognition-card";
 import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { BackButton } from "@/components/app-shell/back-button";
 import { AccountSheet } from "@/components/app-shell/account-sheet";
 import { Highlights, Managers, Stats } from "@/components/profile/profile-parts";
+import { ProfileBanner } from "@/components/profile/profile-banner";
 import { TabLinks } from "@/components/tab-links";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +33,11 @@ const secondaryButton =
   "bg-surface-2 flex h-9 flex-1 items-center justify-center rounded-lg text-sm font-semibold transition-opacity active:opacity-70";
 
 /**
- * Profile, laid out like Instagram: counts beside the avatar, name and bio,
- * two buttons, highlight circles, then tabs. The banner, avatar frame and
- * accent colour are the person's own picks from the profile shop.
+ * Profile, laid out like Instagram under a full-width banner: counts beside
+ * the avatar, name and bio, two buttons, highlight circles, then tabs. The banner, avatar frame and
+ * accent colour are the person's own picks from the profile shop. It moves a
+ * little: the banner drifts, rarer frames shimmer, the counts ease up and
+ * the header rises in (see "Profile motion" in globals.css).
  */
 export default async function ProfilePage({
   params,
@@ -55,6 +58,9 @@ export default async function ProfilePage({
   const firstName = user.name.split(" ")[0];
   const accent = look.theme;
   const onAccent = isLight(accent) ? "#0a0a0a" : "#ffffff";
+  const frameRarity = wornItem(custom, "frame", data.catalogue)?.rarity ?? null;
+  // Each block of the header rises in a beat after the one above it.
+  const rise = (i: number) => ({ "--rise": i }) as React.CSSProperties;
 
   const [cards, pinnedCards] = await Promise.all([
     tab === "given" ? getGivenCards(user.id, viewer.id) : getReceivedCards(user.id, viewer.id),
@@ -78,22 +84,25 @@ export default async function ProfilePage({
         trailing={isMe ? <AccountSheet admin={isAdmin(viewer)} triggerClassName={appBarIconClass} /> : null}
       />
 
-      <div className="h-24 rounded-xl" style={{ background: look.banner }} />
+      {/* The banner is shown whole (uploads are 3:1) and edge to edge on
+          phones: it's the biggest thing people buy in the shop. */}
+      <ProfileBanner background={look.banner} className="-mx-4 aspect-[3/1] md:mx-0 md:rounded-2xl" />
 
-      <div className="-mt-10 flex items-end gap-4 pl-2">
+      <div className="rise-in relative -mt-14 flex items-end gap-4 pl-2" style={rise(0)}>
         <FramedAvatar
           name={user.name}
           avatarUrl={user.avatarUrl}
           frame={look.frame}
-          className="size-20 text-xl"
+          className="size-24 text-2xl"
           large
+          shine={frameRarity}
         />
         <div className="flex flex-1 pb-1">
           <Stats data={data} />
         </div>
       </div>
 
-      <section className="mt-3 space-y-1">
+      <section className="rise-in mt-3 space-y-1" style={rise(1)}>
         <h1 className="text-[0.95rem] font-bold">
           {user.name}
           {custom.pronouns ? <span className="text-muted ml-1.5 font-normal">{custom.pronouns}</span> : null}
@@ -103,7 +112,7 @@ export default async function ProfilePage({
         <Managers data={data} />
       </section>
 
-      <div className="mt-4 flex gap-2">
+      <div className="rise-in mt-4 flex gap-2" style={rise(2)}>
         {isMe ? (
           <>
             <Link href="/profile/edit" className={secondaryButton}>
@@ -124,7 +133,7 @@ export default async function ProfilePage({
         )}
       </div>
 
-      <div className="mt-5">
+      <div className="rise-in mt-5" style={rise(3)}>
         <Highlights data={data} />
       </div>
 
