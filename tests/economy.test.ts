@@ -8,7 +8,7 @@ import {
   parseEurosToCents,
   resetDateLabel,
 } from "../lib/economy";
-import { COSMETICS } from "../lib/cosmetics";
+import { BUILTIN_COSMETICS } from "../lib/cosmetics";
 
 test("economy month follows Irish time, not UTC", () => {
   // 31 Oct 2026 23:30 UTC is still October in Dublin (GMT, +0, after DST ends).
@@ -54,7 +54,7 @@ test("claims stop at the monthly stock and at the budget", () => {
 });
 
 test("profile cosmetics stay pocket change", () => {
-  for (const c of COSMETICS) assert.ok(c.price <= 10, `${c.id} costs ${c.price}`);
+  for (const c of BUILTIN_COSMETICS) assert.ok(c.price <= 10, `${c.id} costs ${c.price}`);
 });
 
 test("suggested rewards are priced at or above face value", () => {

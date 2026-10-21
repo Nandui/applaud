@@ -1,5 +1,5 @@
 import { FramedAvatar } from "@/components/user-avatar";
-import { bannerStyle, themeColour } from "@/lib/cosmetics";
+import type { Look } from "@/lib/cosmetics";
 import { isLight } from "@/lib/profile-custom";
 import { cn } from "@/lib/utils";
 
@@ -10,25 +10,21 @@ import { cn } from "@/lib/utils";
 export function ProfilePreview({
   name,
   avatarUrl,
-  frame,
-  banner,
-  theme,
+  look,
   className,
 }: {
   name: string;
   avatarUrl?: string | null;
-  frame: string | null;
-  banner: string | null;
-  theme: string | null;
+  look: Look;
   className?: string;
 }) {
-  const accent = themeColour(theme);
+  const accent = look.theme;
   return (
     <div className={cn("bg-background border-border overflow-hidden rounded-2xl border", className)}>
-      <div className="h-20" style={{ background: bannerStyle(banner) }} />
+      <div className="h-20" style={{ background: look.banner }} />
       <div className="flex items-end gap-3 px-4 pb-4">
         <div className="-mt-9">
-          <FramedAvatar name={name} avatarUrl={avatarUrl} frame={frame} className="size-16 text-lg" />
+          <FramedAvatar name={name} avatarUrl={avatarUrl} frame={look.frame} className="size-16 text-lg" />
         </div>
         <div className="min-w-0 flex-1 pb-1">
           <p className="truncate font-bold">{name}</p>

@@ -3,13 +3,11 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getEconomyStatus, getMonthlyClaimCounts } from "@/lib/budget";
-import { centsToEuros, POINT_PRESETS, pointsToCents } from "@/lib/economy";
-import { parseCosmeticPrices } from "@/lib/cosmetics";
+import { centsToEuros, pointsToCents } from "@/lib/economy";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { BudgetCard } from "@/components/admin/budget-card";
 import { EconomyForm } from "@/components/admin/economy-form";
-import { StorePrices } from "@/components/admin/store-prices";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +16,8 @@ export const metadata = { title: "Economy" };
 
 /**
  * The points economy in one place: the euro conversion, budget, allowances and
- * limits (with live maths), how each reward fits the monthly budget, and the
- * profile Store prices.
+ * limits (with live maths) and how each reward fits the monthly budget.
+ * Profile Store prices live in Admin > Store.
  */
 export default async function AdminEconomyPage() {
   await requireAdmin();
@@ -169,11 +167,13 @@ export default async function AdminEconomyPage() {
         </CardContent>
       </Card>
 
-      <StorePrices
-        prices={parseCosmeticPrices(settings.cosmeticPrices)}
-        pointsPerEuro={rate}
-        typicalShoutout={POINT_PRESETS[0]}
-      />
+      <p className="text-muted text-sm">
+        Profile frames, banners and themes are priced in{" "}
+        <Link href="/admin/store" className="text-primary font-medium">
+          Admin &gt; Store
+        </Link>
+        .
+      </p>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { parseProfile } from "@/lib/profile-custom";
+import { parseProfile, resolveLook } from "@/lib/profile-custom";
+import { getCatalogue } from "@/lib/catalogue";
 
 export const CELEBRATION_LABELS: Record<string, string> = {
   work_anniversary: "Work anniversary",
@@ -103,10 +104,13 @@ export async function getProfileData(userId: string) {
 
   const pointsEarned = earn._sum.amount ?? 0;
   const custom = parseProfile(user.profile);
+  const catalogue = await getCatalogue();
 
   return {
     user,
     custom,
+    look: resolveLook(custom, catalogue),
+    catalogue,
     stats: {
       receivedCount,
       givenCount,

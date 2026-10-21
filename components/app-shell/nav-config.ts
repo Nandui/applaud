@@ -13,6 +13,7 @@ import {
   ScrollText,
   Coins,
   Gauge,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/config";
@@ -38,6 +39,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/awards", label: "Award programs", icon: Award, minRole: "admin" },
   { href: "/admin/nominations", label: "Nominations", icon: BadgeCheck, minRole: "admin" },
   { href: "/admin/rewards", label: "Rewards", icon: Gift, minRole: "admin" },
+  { href: "/admin/store", label: "Store", icon: Sparkles, minRole: "admin" },
   { href: "/admin/redemptions", label: "Redemptions", icon: PackageOpen, minRole: "admin" },
   { href: "/admin/milestones", label: "Milestones", icon: CalendarHeart, minRole: "admin" },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3, minRole: "admin" },

@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { isFrameImage, type FrameArt } from "@/lib/cosmetics";
 
 /**
  * Default-avatar palettes (Discord gives everyone a coloured default). Picked
@@ -47,8 +48,10 @@ export function UserAvatar({
 }
 
 /**
- * An avatar wearing its shop frame (see globals.css `.frame-*` and
- * lib/cosmetics.ts). Without a frame it's a plain avatar with the same gap,
+ * An avatar wearing its shop frame: a built-in CSS ring (globals.css
+ * `.frame-*`) or an uploaded overlay picture (see lib/cosmetics.ts). Picture
+ * frames are drawn 20% bigger than the avatar and centred on it, like Discord
+ * avatar decorations. Without a frame it's a plain avatar with the same gap,
  * so layouts don't jump when someone equips one.
  */
 export function FramedAvatar({
@@ -61,8 +64,8 @@ export function FramedAvatar({
 }: {
   name: string;
   avatarUrl?: string | null;
-  /** A frame item id, e.g. "frame-neon". */
-  frame?: string | null;
+  /** Frame art: a built-in class such as "frame-neon", or an uploaded image URL. */
+  frame?: FrameArt | null;
   className?: string;
   /** The gap between avatar and frame (matches what's behind it). */
   gapClassName?: string;
@@ -74,7 +77,18 @@ export function FramedAvatar({
       <span className={cn("bg-background rounded-full", large ? "p-[6px]" : "p-[3px]", gapClassName)}>
         <UserAvatar name={name} avatarUrl={avatarUrl} className={className} />
       </span>
-      {frame ? <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")} /> : null}
+      {frame && isFrameImage(frame) ? (
+        // eslint-disable-next-line @next/next/no-img-element -- uploaded Blob art, any size
+        <img
+          src={frame}
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="pointer-events-none absolute inset-[-10%] size-[120%] max-w-none object-contain select-none"
+        />
+      ) : frame ? (
+        <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")} />
+      ) : null}
     </span>
   );
 }

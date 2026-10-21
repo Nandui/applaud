@@ -244,6 +244,26 @@ model RewardLedger {
   @@index([userId])
 }
 
+/// Profile Store catalogue (Admin > Store). Built-in items keep fixed ids such
+/// as "frame-neon" because User.profile.owned stores ids; admin-added items
+/// get a cuid. Hide items instead of deleting them once anyone owns one.
+model Cosmetic {
+  id        String   @id @default(cuid())
+  kind      String // "frame" | "banner" | "theme"
+  name      String
+  price     Int      @default(1) // points; 0 = free starter everyone owns
+  rarity    String   @default("common") // common | rare | epic | legendary
+  /// Frame: built-in CSS class. Banner: CSS background. Theme: #rrggbb.
+  style     String?
+  /// Uploaded picture (Vercel Blob): a frame overlay or a banner image.
+  imageUrl  String?
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([kind, sortOrder])
+}
+
 // ---------- Milestones ----------
 
 model MilestoneRule {
@@ -298,7 +318,8 @@ model OrgSettings {
   monthlyAllowanceManager Int     @default(1200)
   /// How many points make one euro (the internal conversion; staff never see euros).
   pointsPerEuro               Int @default(100)
-  /// Admin price overrides for profile Store items: { "<cosmetic id>": points }.
+  /// Legacy: profile Store price overrides from before the Cosmetic table.
+  /// Copied into Cosmetic.price by migration 20261021230000; no longer read.
   cosmeticPrices              Json?
   /// Company-wide cash budget for real rewards per month, in euro cents.
   monthlyRewardBudgetCents    Int @default(50000)
