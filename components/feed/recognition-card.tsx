@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Sparkles,
   Lock,
+  Heart,
   MessageCircle,
   SmilePlus,
   Send,
@@ -59,8 +60,8 @@ type Viewer = {
   frame?: string | null;
 };
 
-/** The one-tap reaction — this is an applause app, after all. */
-const QUICK_EMOJI = REACTION_EMOJIS[0];
+/** The one-tap reaction: a plain Instagram-style like. */
+const QUICK_EMOJI = "❤️";
 /** Messages longer than this also appear in full as a caption under the quote card. */
 const QUOTE_MAX = 160;
 /** Hold the applaud button this long to open the reaction tray (iMessage tapback). */
@@ -304,7 +305,7 @@ export function RecognitionCard({
     pressTimer.current = null;
   }
 
-  /** Double-tap the post to applaud (never un-applauds, like Instagram). */
+  /** Double-tap the post to like it (never un-likes, like Instagram). */
   function onBodyTap() {
     const now = Date.now();
     if (now - lastTap.current < 300) {
@@ -564,7 +565,7 @@ export function RecognitionCard({
           onPointerLeave={endPress}
           onContextMenu={(e) => e.preventDefault()}
           whileTap={{ scale: 0.82 }}
-          aria-label={myReaction ? `Remove your ${myReaction}` : "Applaud (hold for more)"}
+          aria-label={myReaction ? `Remove your ${myReaction}` : "Like (hold for more reactions)"}
           aria-pressed={!!myReaction}
           className="flex size-11 items-center justify-center rounded-full"
         >
@@ -573,9 +574,15 @@ export function RecognitionCard({
             initial={{ scale: 0.5 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 600, damping: 14 }}
-            className={cn("text-[1.5rem] leading-none", !myReaction && "opacity-60 grayscale")}
+            className="text-[1.5rem] leading-none"
           >
-            {myReaction ?? QUICK_EMOJI}
+            {!myReaction ? (
+              <Heart className="size-6.5" strokeWidth={1.8} />
+            ) : myReaction === QUICK_EMOJI ? (
+              <Heart className="size-6.5 fill-[#ff3040] text-[#ff3040]" strokeWidth={1.8} />
+            ) : (
+              myReaction
+            )}
           </motion.span>
         </motion.button>
 
@@ -648,7 +655,7 @@ export function RecognitionCard({
         )}
       </div>
 
-      {/* "Applauded by Sorcha and 3 others" */}
+      {/* "Liked by Sorcha and 3 others" */}
       {totalReactions > 0 && leadReactor && (
         <button
           type="button"
@@ -658,7 +665,7 @@ export function RecognitionCard({
           {sortedReactions.slice(0, 3).map((r) => (
             <Fragment key={r.emoji}>{r.emoji}</Fragment>
           ))}{" "}
-          Applauded by <span className="font-semibold">{leadReactor.name}</span>
+          Liked by <span className="font-semibold">{leadReactor.name}</span>
           {totalReactions > 1 && (
             <>
               {" "}and{" "}
