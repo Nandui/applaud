@@ -395,7 +395,7 @@ function ActiveToggle({ row }: { row: UserRow }) {
 
 const ROLE_TONE: Record<string, string> = {
   admin: "bg-primary/15 text-primary",
-  manager: "bg-accent/15 text-accent",
+  manager: "bg-lime/15 text-lime-ink",
   staff: "bg-secondary text-muted",
   operations: "bg-success/15 text-success",
   ceo: "bg-warning/15 text-warning",

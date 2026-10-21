@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
-import { relativeTime, fullTimestamp } from "@/lib/datetime";
+import { shortTime, fullTimestamp } from "@/lib/datetime";
 
 export type ReactionUser = { id: string; name: string; avatarUrl: string | null };
 export type ReactionSummary = {
@@ -91,7 +91,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
     boostType: r.boostType,
     system: r.system,
     visibility: r.visibility,
-    createdAtLabel: relativeTime(r.createdAt),
+    createdAtLabel: shortTime(r.createdAt),
     createdAtFull: fullTimestamp(r.createdAt),
     sender: {
       id: r.sender.id,
@@ -118,7 +118,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
     comments: r.comments.map((c) => ({
       id: c.id,
       body: c.body,
-      createdAtLabel: relativeTime(c.createdAt),
+      createdAtLabel: shortTime(c.createdAt),
       user: { id: c.user.id, name: c.user.name, avatarUrl: c.user.avatarUrl },
     })),
   };
@@ -144,6 +144,53 @@ export async function getReceivedCards(
     include: feedInclude,
   });
   return rows.map((r) => toFeedCard(r, viewerId));
+}
+
+/** Recognitions a user has sent (non-system), respecting the viewer's visibility. */
+export async function getGivenCards(
+  userId: string,
+  viewerId: string,
+  take = 20,
+): Promise<FeedCard[]> {
+  const rows = await prisma.recognition.findMany({
+    where: {
+      senderId: userId,
+      system: false,
+      OR: [
+        { visibility: "public" },
+        { senderId: viewerId },
+        { recipients: { some: { userId: viewerId } } },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take,
+    include: feedInclude,
+  });
+  return rows.map((r) => toFeedCard(r, viewerId));
+}
+
+/**
+ * Specific recognitions by id (a profile's pinned shout-outs), in the given
+ * order, dropping any the viewer isn't allowed to see.
+ */
+export async function getCardsByIds(ids: string[], viewerId: string): Promise<FeedCard[]> {
+  if (ids.length === 0) return [];
+  const rows = await prisma.recognition.findMany({
+    where: {
+      id: { in: ids },
+      OR: [
+        { visibility: "public" },
+        { senderId: viewerId },
+        { recipients: { some: { userId: viewerId } } },
+      ],
+    },
+    include: feedInclude,
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((r): r is RawRecognition => Boolean(r))
+    .map((r) => toFeedCard(r, viewerId));
 }
 
 /** Feed visible to a viewer: public posts + their own sent/received private posts. */

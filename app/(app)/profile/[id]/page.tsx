@@ -1,19 +1,29 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
-import { PartyPopper, Wallet, Gift, Sparkles, MessageSquareHeart } from "lucide-react";
+import { Pencil, Pin, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
-import { getProfileData, CELEBRATION_LABELS } from "@/lib/profile";
-import { getReceivedCards } from "@/lib/recognition/queries";
-import { valueIcon } from "@/lib/value-icons";
-import { formatNumber } from "@/lib/format";
-import { UserAvatar } from "@/components/user-avatar";
-import { tint } from "@/components/value-chip";
+import { prisma } from "@/lib/prisma";
+import { getProfileData } from "@/lib/profile";
+import { getCardsByIds, getGivenCards, getReceivedCards } from "@/lib/recognition/queries";
+import { DecoratedAvatar } from "@/components/user-avatar";
 import { RecognitionCard } from "@/components/feed/recognition-card";
-import { AppBar } from "@/components/app-shell/app-bar";
 import { BackButton } from "@/components/app-shell/back-button";
 import { AccountSheet } from "@/components/app-shell/account-sheet";
+import {
+  AboutCard,
+  Banner,
+  BadgeRow,
+  EmptyShowcase,
+  LevelCard,
+  Stats,
+  StatusBubble,
+  TrophyCase,
+  bannerButtonClass,
+  onPrimary,
+  themeVars,
+} from "@/components/profile/profile-parts";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -27,184 +37,204 @@ export async function generateMetadata({
   return { title: data ? data.user.name : "Profile" };
 }
 
+type Tab = "received" | "given";
+
+/**
+ * Profile, Discord + Steam: themed banner and page tint, decorated avatar with
+ * a status bubble, badge strip, level card, About me, pinned shout-outs, a
+ * trophy case, then the person's shout-outs (Received / Given).
+ */
 export default async function ProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
+  const { tab: rawTab } = await searchParams;
+  const tab: Tab = rawTab === "given" ? "given" : "received";
   const viewer = await requireUser();
   const data = await getProfileData(id);
   if (!data) notFound();
 
-  const { user, stats, valueTags, celebrations } = data;
-  const received = await getReceivedCards(id, viewer.id);
-  const memberSince = user.hireDate ?? user.createdAt;
+  const { user, custom } = data;
   const isMe = viewer.id === user.id;
   const firstName = user.name.split(" ")[0];
 
+  const [cards, pinnedCards, allValues] = await Promise.all([
+    tab === "given" ? getGivenCards(user.id, viewer.id) : getReceivedCards(user.id, viewer.id),
+    getCardsByIds(custom.pinned, viewer.id),
+    prisma.value.findMany({
+      where: { active: true },
+      orderBy: { order: "asc" },
+      select: { id: true, name: true, icon: true, color: true },
+    }),
+  ]);
+  const pinnedSet = new Set(custom.pinned);
+  const viewerProps = {
+    id: viewer.id,
+    name: viewer.name,
+    avatarUrl: viewer.avatarUrl ?? null,
+    role: viewer.role,
+  };
+
   return (
-    <div className="mx-auto max-w-xl">
-      <AppBar
-        className="mb-0 border-b-0"
-        leading={isMe ? undefined : <BackButton />}
-        title={<span className="text-[1.15rem]">{isMe ? user.name : firstName}</span>}
-        trailing={isMe ? <AccountSheet admin={isAdmin(viewer)} /> : undefined}
+    <div
+      className="relative isolate mx-auto max-w-xl"
+      style={themeVars(custom)}
+    >
+      {/* The theme washes down the top of the page (Discord profile themes). */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 -top-0 -z-10 -mx-4 h-[34rem] opacity-30 md:-mx-8"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg, color-mix(in srgb, var(--p1) 70%, transparent), color-mix(in srgb, var(--p2) 25%, transparent) 55%, transparent)",
+        }}
       />
 
-      {/* Header: avatar + stats, then bio (Instagram profile layout) */}
-      <section className="bg-surface -mx-4 px-4 pt-3 pb-4 md:mx-0 md:rounded-2xl md:border md:p-6">
-        <div className="flex items-center gap-5">
-          <span className="ring-brand shrink-0 rounded-full p-[3px]">
-            <span className="bg-surface block rounded-full p-[3px]">
-              <UserAvatar
-                name={user.name}
-                avatarUrl={user.avatarUrl}
-                className="size-[5.25rem] text-xl"
-              />
-            </span>
-          </span>
-          <dl className="grid flex-1 grid-cols-3 text-center">
-            <Stat value={stats.receivedCount} label="received" />
-            <Stat value={stats.pointsEarned} label="points" />
-            <Stat value={stats.givenCount} label="given" />
-          </dl>
-        </div>
+      <Banner>
+        {isMe ? <span /> : <BackButton className={bannerButtonClass} />}
+        {isMe ? <AccountSheet admin={isAdmin(viewer)} triggerClassName={bannerButtonClass} /> : null}
+      </Banner>
 
-        <div className="mt-3 space-y-0.5">
-          <h1 className="font-display text-lg leading-tight font-semibold">
+      {/* Avatar overlapping the banner, status bubble beside it */}
+      <div className="-mt-16 flex items-start gap-1">
+        <DecoratedAvatar
+          name={user.name}
+          avatarUrl={user.avatarUrl}
+          decoration={custom.decoration}
+          className="size-26 text-2xl"
+          large
+        />
+        <div className="mt-16 min-w-0 pl-2">
+          <StatusBubble status={custom.status} />
+        </div>
+      </div>
+
+      {/* Identity */}
+      <section className="mt-2 space-y-3">
+        <div>
+          <h1 className="font-display text-[1.85rem] leading-tight font-extrabold tracking-tight">
             {user.name}
-            {user.role !== "staff" && (
-              <span className="bg-secondary text-muted ml-2 rounded-full px-2 py-0.5 align-middle text-[0.7rem] font-semibold capitalize">
-                {user.role}
-              </span>
-            )}
           </h1>
-          {user.jobTitle && <p className="text-sm">{user.jobTitle}</p>}
-          <p className="text-muted text-sm">
-            {user.site ? `${user.site.name} · ` : ""}Since{" "}
-            {format(memberSince, "MMM yyyy")}
+          <p className="text-muted mt-0.5 text-[0.95rem]">
+            {[user.jobTitle, custom.pronouns, user.site?.code].filter(Boolean).join(" · ")}
           </p>
         </div>
+        <BadgeRow data={data} />
+        <Stats data={data} />
 
-        <div className="mt-4 flex gap-2">
+        <div className="flex gap-2 pt-1">
           {isMe ? (
             <>
               <Link
-                href="/me"
-                className="bg-secondary flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-transform active:scale-[0.98]"
+                href="/profile/edit"
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl font-bold transition-transform active:scale-[0.98]"
+                style={{ backgroundColor: "var(--p1)", color: onPrimary(custom) }}
               >
-                <Wallet className="size-4" /> Wallet
+                <Pencil className="size-4" /> Edit profile
               </Link>
               <Link
-                href="/rewards"
-                className="bg-secondary flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-transform active:scale-[0.98]"
+                href="/me"
+                className="bg-surface-2 flex h-11 items-center justify-center gap-2 rounded-2xl px-5 font-bold transition-transform active:scale-[0.98]"
               >
-                <Gift className="size-4" /> Rewards
+                <Wallet className="size-4" /> Wallet
               </Link>
             </>
           ) : (
             <Link
               href={`/recognize?to=${user.id}`}
-              className="bg-brand flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
+              className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl font-bold transition-transform active:scale-[0.98]"
+              style={{ backgroundColor: "var(--p1)", color: onPrimary(custom) }}
             >
-              <Sparkles className="size-4" /> Recognise {firstName}
+              <span aria-hidden>👏</span> Send {firstName} a shout-out
             </Link>
           )}
         </div>
-
-        {/* Highlights: values they're recognised for + milestones */}
-        {(valueTags.length > 0 || celebrations.length > 0) && (
-          <div className="no-scrollbar -mx-4 mt-5 flex gap-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-            {valueTags.map((t) => {
-              const Icon = valueIcon(t.value.icon);
-              return (
-                <div key={t.value.id} className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5">
-                  <span className="border-border relative flex size-16 items-center justify-center rounded-full border p-[3px]">
-                    <span
-                      className="flex size-full items-center justify-center rounded-full"
-                      style={{
-                        backgroundColor: tint(t.value.color, 0.14) ?? "var(--color-secondary)",
-                        color: t.value.color ?? undefined,
-                      }}
-                    >
-                      <Icon className="size-6" />
-                    </span>
-                    <span
-                      data-numeric
-                      className="bg-foreground ring-surface absolute -right-1 -bottom-1 rounded-full px-1.5 text-[0.65rem] font-semibold text-white ring-2"
-                    >
-                      ×{t.count}
-                    </span>
-                  </span>
-                  <span className="w-full truncate text-center text-xs">{t.value.name}</span>
-                </div>
-              );
-            })}
-            {celebrations.map((c) => (
-              <div key={c.id} className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5">
-                <span className="border-border flex size-16 items-center justify-center rounded-full border p-[3px]">
-                  <span className="bg-brand flex size-full items-center justify-center rounded-full text-white">
-                    <PartyPopper className="size-6" />
-                  </span>
-                </span>
-                <span className="w-full truncate text-center text-xs">
-                  {CELEBRATION_LABELS[c.type] ?? c.type}
-                </span>
-                <span className="text-muted -mt-1 text-[0.65rem]">
-                  {format(c.occurredOn, "MMM yyyy")}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
 
-      {/* Tab strip */}
-      <div className="bg-surface -mx-4 flex border-t border-black/[0.06] md:mx-0 md:mt-4 md:rounded-t-2xl md:border">
-        <span className="border-foreground flex h-11 flex-1 items-center justify-center gap-1.5 border-b-2 text-sm font-semibold">
-          <MessageSquareHeart className="size-4.5" /> Recognition received
-        </span>
+      <div className="mt-5 space-y-3">
+        {(custom.bio || user.managers.length > 0 || user.site) && <AboutCard data={data} />}
+        <LevelCard data={data} isMe={isMe} />
+
+        {/* Pinned (the Steam showcase slot) */}
+        {pinnedCards.length > 0 ? (
+          <section className="bg-surface rounded-3xl px-4 pt-4">
+            <h2 className="font-display flex items-center gap-2 text-lg font-bold">
+              <Pin className="size-4.5 fill-current" style={{ color: "var(--p1)" }} /> Pinned
+            </h2>
+            {pinnedCards.map((card, i) => (
+              <RecognitionCard
+                key={card.id}
+                card={card}
+                index={i}
+                viewer={viewerProps}
+                pinned={isMe ? true : undefined}
+              />
+            ))}
+          </section>
+        ) : (
+          <EmptyShowcase isMe={isMe} />
+        )}
+
+        <TrophyCase data={data} allValues={allValues} />
       </div>
 
-      {received.length === 0 ? (
+      {/* Shout-outs: Received / Given */}
+      <nav className="glass sticky top-0 z-20 -mx-4 mt-6 flex px-4 md:mx-0" aria-label="Shout-outs">
+        {(
+          [
+            { key: "received", label: "Received" },
+            { key: "given", label: "Given" },
+          ] as const
+        ).map((t) => (
+          <Link
+            key={t.key}
+            href={t.key === "received" ? `/profile/${user.id}` : `/profile/${user.id}?tab=given`}
+            replace
+            scroll={false}
+            className={cn(
+              "relative flex h-12 flex-1 items-center justify-center text-[0.95rem] font-bold transition-colors",
+              tab === t.key ? "text-foreground" : "text-muted",
+            )}
+          >
+            {t.label}
+            {tab === t.key && (
+              <span className="absolute inset-x-6 bottom-0 h-[3px] rounded-full" style={{ backgroundColor: "var(--p1)" }} />
+            )}
+          </Link>
+        ))}
+      </nav>
+
+      {cards.length === 0 ? (
         <div className="text-muted flex flex-col items-center gap-2 px-6 py-16 text-center">
           <span className="text-4xl">🌱</span>
-          <p className="text-foreground font-display font-semibold">Nothing here yet</p>
+          <p className="text-foreground font-display font-bold">Nothing here yet</p>
           <p className="max-w-xs text-sm">
-            {isMe
-              ? "Recognition you receive will show up here."
-              : `Be the first to recognise ${firstName}.`}
+            {tab === "given"
+              ? isMe
+                ? "Shout-outs you send will show up here."
+                : `${firstName} hasn't sent any shout-outs yet.`
+              : isMe
+                ? "Shout-outs you receive will show up here."
+                : `Be the first to hype up ${firstName}.`}
           </p>
         </div>
       ) : (
-        <div className="space-y-2 pt-2 md:space-y-4 md:pt-4">
-          {received.map((card, i) => (
+        <div>
+          {cards.map((card, i) => (
             <RecognitionCard
               key={card.id}
               card={card}
               index={i}
-              viewer={{
-                id: viewer.id,
-                name: viewer.name,
-                avatarUrl: viewer.avatarUrl ?? null,
-                role: viewer.role,
-              }}
+              viewer={viewerProps}
+              pinned={isMe ? pinnedSet.has(card.id) : undefined}
             />
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex flex-col-reverse items-center">
-      <dt className="text-muted text-[0.8rem]">{label}</dt>
-      <dd data-numeric className="text-lg leading-tight font-semibold">
-        {formatNumber(value)}
-      </dd>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { getLeaderboard, PERIODS, type Period } from "@/lib/leaderboard";
+import { getLeaderboard, PERIODS, PERIOD_LABELS, type Period } from "@/lib/leaderboard";
+import { daysLeft } from "@/lib/periods";
 import { formatNumber, pts } from "@/lib/format";
 import { AppBar } from "@/components/app-shell/app-bar";
 import {
@@ -9,9 +10,10 @@ import {
   type Board,
 } from "@/components/leaderboard/filters";
 import { RankedList } from "@/components/leaderboard/ranked-list";
+import { RanksTabs } from "@/components/ranks/ranks-tabs";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Leaderboard" };
+export const metadata = { title: "Ranks" };
 
 export default async function LeaderboardPage({
   searchParams,
@@ -33,7 +35,8 @@ export default async function LeaderboardPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    getLeaderboard({ siteId, period }),
+    // Fetch deep enough to find the viewer's own rank, not just the top few.
+    getLeaderboard({ siteId, period, take: 200 }),
   ]);
 
   const rows =
@@ -42,7 +45,7 @@ export default async function LeaderboardPage({
           id: r.id,
           name: r.name,
           avatarUrl: r.avatarUrl,
-          subtitle: `${r.jobTitle ?? "—"} · ${r.siteCode}`,
+          subtitle: [r.jobTitle, r.siteCode].filter(Boolean).join(" · "),
           primary: pts(r.points),
           secondary: `${formatNumber(r.count)} received`,
         }))
@@ -50,26 +53,29 @@ export default async function LeaderboardPage({
           id: g.id,
           name: g.name,
           avatarUrl: g.avatarUrl,
-          subtitle: `${g.jobTitle ?? "—"} · ${g.siteCode}`,
-          primary: `${formatNumber(g.count)} given`,
-          secondary: `${pts(g.pointsGiven)} awarded`,
+          subtitle: [g.jobTitle, g.siteCode].filter(Boolean).join(" · "),
+          primary: `${formatNumber(g.count)} sent`,
+          secondary: `${pts(g.pointsGiven)} given`,
         }));
-
-  const filters = (
-    <LeaderboardFilters sites={sites} site={siteId ?? "all"} period={period} />
-  );
+  const left = daysLeft(period);
 
   return (
     <div className="mx-auto max-w-xl">
-      <AppBar title="Leaderboard">
-        <BoardSwitch board={board} />
+      <AppBar title="Ranks">
+        <RanksTabs active="leaderboard" />
       </AppBar>
-      <div className="hidden space-y-4 pb-2 md:block">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Leaderboard</h1>
-        <BoardSwitch board={board} />
+
+      <div className="space-y-4">
+        <div>
+          <BoardSwitch board={board} />
+          <p className="text-muted mt-0.5 text-xs font-semibold">
+            {PERIOD_LABELS[period]}
+            {left !== null && ` · ${left} ${left === 1 ? "day" : "days"} left`}
+          </p>
+        </div>
+        <LeaderboardFilters sites={sites} site={siteId ?? "all"} period={period} />
+        <RankedList rows={rows} viewerId={me.id} />
       </div>
-      {filters}
-      <RankedList rows={rows} viewerId={me.id} />
     </div>
   );
 }

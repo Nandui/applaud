@@ -5,7 +5,7 @@ import { getAllowanceStatus } from "@/lib/points";
 import { RecognizeForm } from "./recognize-form";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Give recognition" };
+export const metadata = { title: "Send a shout-out" };
 
 export default async function RecognizePage({
   searchParams,
@@ -16,7 +16,7 @@ export default async function RecognizePage({
   const { to } = await searchParams;
   const settings = await getOrgSettings();
 
-  const [values, users, allowance] = await Promise.all([
+  const [values, users, allowance, recent, mine] = await Promise.all([
     prisma.value.findMany({
       where: { active: true },
       orderBy: { order: "asc" },
@@ -37,6 +37,17 @@ export default async function RecognizePage({
       },
     }),
     getAllowanceStatus(me, settings),
+    // People I've recognised lately: the Snapchat "Recents" section.
+    prisma.recognitionRecipient.findMany({
+      where: { recognition: { senderId: me.id, system: false } },
+      orderBy: { recognition: { createdAt: "desc" } },
+      take: 30,
+      select: { userId: true },
+    }),
+    prisma.site.findFirst({
+      where: { id: me.siteId ?? "" },
+      select: { code: true },
+    }),
   ]);
 
   const recipients = users.map((u) => ({
@@ -47,6 +58,11 @@ export default async function RecognizePage({
     siteCode: u.site?.code ?? "",
   }));
 
+  const pickable = new Set(recipients.map((r) => r.id));
+  const recentIds = [...new Set(recent.map((r) => r.userId))]
+    .filter((id) => pickable.has(id))
+    .slice(0, 6);
+
   // "Recognise Aoife" from a profile preselects her (if she's pickable).
   const initialSelected = to && recipients.some((r) => r.id === to) ? [to] : [];
 
@@ -56,6 +72,9 @@ export default async function RecognizePage({
       recipients={recipients}
       allowance={allowance}
       initialSelected={initialSelected}
+      recentIds={recentIds}
+      mySiteCode={mine?.code ?? ""}
+      me={{ name: me.name, avatarUrl: me.avatarUrl ?? null }}
     />
   );
 }

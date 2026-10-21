@@ -22,7 +22,7 @@ function useHref() {
   };
 }
 
-/** iOS-style segmented control: who's being ranked. */
+/** Big text tabs (Duolingo league header): who is being ranked. */
 export function BoardSwitch({ board }: { board: Board }) {
   const href = useHref();
   const tabs: { key: Board; label: string }[] = [
@@ -30,7 +30,7 @@ export function BoardSwitch({ board }: { board: Board }) {
     { key: "given", label: "Top givers" },
   ];
   return (
-    <div className="bg-secondary grid grid-cols-2 rounded-xl p-1">
+    <div className="flex gap-5">
       {tabs.map((t) => (
         <Link
           key={t.key}
@@ -38,8 +38,8 @@ export function BoardSwitch({ board }: { board: Board }) {
           replace
           scroll={false}
           className={cn(
-            "flex h-8 items-center justify-center rounded-[0.6rem] text-sm font-semibold transition-all",
-            board === t.key ? "bg-surface shadow-sm" : "text-muted",
+            "font-display relative text-[1.35rem] font-extrabold tracking-tight whitespace-nowrap transition-colors",
+            board === t.key ? "text-foreground" : "text-muted/60",
           )}
         >
           {t.label}
@@ -75,7 +75,7 @@ export function LeaderboardFilters({
           scroll={false}
           className={cn(
             "flex h-8 shrink-0 items-center rounded-full px-3.5 text-sm font-semibold transition-colors",
-            period === p ? "bg-foreground text-white" : "bg-surface border",
+            period === p ? "bg-lime text-lime-fg" : "bg-surface-2",
           )}
         >
           {PERIOD_LABELS[p as Period]}
@@ -84,7 +84,7 @@ export function LeaderboardFilters({
       <label
         className={cn(
           "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full pr-3 pl-3 text-sm font-semibold",
-          site !== "all" ? "bg-foreground text-white" : "bg-surface border",
+          site !== "all" ? "bg-lime text-lime-fg" : "bg-surface-2",
         )}
       >
         <MapPin className="size-3.5" />

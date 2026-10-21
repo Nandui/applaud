@@ -1,9 +1,21 @@
 import { prisma } from "@/lib/prisma";
+import {
+  levelFor,
+  parseProfile,
+  unlockedDecorations,
+  xpFor,
+} from "@/lib/profile-custom";
 
 export const CELEBRATION_LABELS: Record<string, string> = {
   work_anniversary: "Work anniversary",
   birthday: "Birthday",
   onboarding: "Onboarding",
+};
+
+export const CELEBRATION_EMOJI: Record<string, string> = {
+  work_anniversary: "🎊",
+  birthday: "🎂",
+  onboarding: "🚀",
 };
 
 export async function getProfileData(userId: string) {
@@ -23,6 +35,7 @@ export async function getProfileData(userId: string) {
       hireDate: true,
       createdAt: true,
       active: true,
+      profile: true,
       site: { select: { name: true, code: true } },
       managers: {
         orderBy: { manager: { name: "asc" } },
@@ -34,7 +47,7 @@ export async function getProfileData(userId: string) {
 
   const id = user.id;
 
-  const [receivedCount, givenCount, earn, valueRows, celebrations] =
+  const [receivedCount, givenCount, earn, valueRows, celebrations, awards] =
     await Promise.all([
       prisma.recognitionRecipient.count({
         where: { userId: id, recognition: { system: false } },
@@ -64,6 +77,17 @@ export async function getProfileData(userId: string) {
         orderBy: { occurredOn: "desc" },
         take: 10,
       }),
+      prisma.nomination.findMany({
+        where: { nomineeId: id, status: "approved" },
+        orderBy: { reviewedAt: "desc" },
+        select: {
+          id: true,
+          reviewedAt: true,
+          createdAt: true,
+          pointsAwarded: true,
+          program: { select: { name: true, cadence: true } },
+        },
+      }),
     ]);
 
   const tagMap = new Map<
@@ -82,14 +106,46 @@ export async function getProfileData(userId: string) {
   }
   const valueTags = [...tagMap.values()].sort((a, b) => b.count - a.count);
 
+  const pointsEarned = earn._sum.amount ?? 0;
+  const level = levelFor(
+    xpFor({ pointsEarned, given: givenCount, received: receivedCount }),
+  );
+  const unlocked = unlockedDecorations({
+    received: receivedCount,
+    given: givenCount,
+    awardsWon: awards.length,
+    milestones: celebrations.length,
+    level: level.level,
+  });
+  const custom = parseProfile(user.profile);
+  // A decoration that was unlocked once but no longer qualifies (e.g. data
+  // was corrected) simply stops showing.
+  if (custom.decoration && !unlocked.has(custom.decoration)) custom.decoration = null;
+
+  const since = user.hireDate ?? user.createdAt;
+  const tenureYears = Math.floor((Date.now() - since.getTime()) / (365.25 * 86_400_000));
+
   return {
     user,
+    custom,
+    tenureYears,
     stats: {
       receivedCount,
       givenCount,
-      pointsEarned: earn._sum.amount ?? 0,
+      pointsEarned,
     },
+    level,
+    unlocked,
     valueTags,
     celebrations,
+    awards: awards.map((a) => ({
+      id: a.id,
+      name: a.program.name,
+      cadence: a.program.cadence,
+      points: a.pointsAwarded,
+      wonAt: a.reviewedAt ?? a.createdAt,
+    })),
   };
 }
+
+export type ProfileData = NonNullable<Awaited<ReturnType<typeof getProfileData>>>;

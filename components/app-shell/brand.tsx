@@ -1,7 +1,20 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { APP_NAME } from "@/lib/config";
+
+/** The "applaud" wordmark with a lime spark, Bricolage at its heaviest. */
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "font-display inline-flex items-baseline text-[1.65rem] leading-none font-extrabold tracking-[-0.04em]",
+        className,
+      )}
+    >
+      applaud
+      <span aria-hidden className="bg-lime ml-0.5 inline-block size-[0.32em] rounded-full" />
+    </span>
+  );
+}
 
 export function Brand({
   className,
@@ -11,14 +24,8 @@ export function Brand({
   href?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={cn("flex items-center gap-2.5 font-display", className)}
-    >
-      <span className="bg-brand flex size-8 items-center justify-center rounded-[0.6rem] text-white shadow-sm">
-        <Sparkles className="size-4.5" strokeWidth={2.25} />
-      </span>
-      <span className="text-lg font-semibold tracking-tight">{APP_NAME}</span>
+    <Link href={href} aria-label="Home" className={cn("flex items-center", className)}>
+      <Wordmark />
     </Link>
   );
 }

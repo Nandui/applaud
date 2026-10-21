@@ -1,26 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
 import { APP_NAME, APP_TAGLINE } from "@/lib/config";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+});
+
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
   display: "swap",
 });
 
-const ibmPlexSans = IBM_Plex_Sans({
-  variable: "--font-ibm-plex-sans",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-ibm-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: APP_NAME,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
   formatDetection: { telephone: false },
 };
@@ -45,7 +45,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Draw under the notch / home indicator; the shell pads with safe-area insets.
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f5f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b10" },
+  ],
 };
 
 export default function RootLayout({
@@ -56,11 +59,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${bricolage.variable} ${geist.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="bg-background text-foreground min-h-full">
-        {children}
-        <Toaster position="top-center" richColors />
+        <ThemeProvider>
+          {children}
+          <Toaster position="top-center" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );

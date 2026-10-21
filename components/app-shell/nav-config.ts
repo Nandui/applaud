@@ -1,9 +1,7 @@
 import {
   LayoutGrid,
-  Trophy,
   Award,
   Gift,
-  Wallet,
   Users,
   Building2,
   Heart,
@@ -26,15 +24,6 @@ export type NavItem = {
   /** Match the route exactly (for "/") instead of by prefix. */
   exact?: boolean;
 };
-
-/** Primary top-nav links for the main app. */
-export const PRIMARY_NAV: NavItem[] = [
-  { href: "/", label: "Feed", icon: LayoutGrid, exact: true },
-  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { href: "/awards", label: "Awards", icon: Award },
-  { href: "/rewards", label: "Rewards", icon: Gift },
-  { href: "/me", label: "My wallet", icon: Wallet },
-];
 
 /** Admin sidebar links — all require the admin role. */
 export const ADMIN_NAV: NavItem[] = [
