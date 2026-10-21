@@ -9,8 +9,6 @@ import { Loader2, Pencil, Plus, Upload } from "lucide-react";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { ValueSeal } from "@/components/value-seal";
 import { saveValue, setValueActive, type ActionResult } from "@/lib/admin/actions";
-import { VALUE_ICON_NAMES } from "@/lib/value-icons";
-import { ValueIcon } from "@/components/value-icon";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -24,13 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export type ValueRow = {
   id: string;
@@ -56,8 +47,6 @@ function ValueFormDialog({
     ActionResult | undefined,
     FormData
   >(saveValue, undefined);
-  const [icon, setIcon] = useState(editing?.icon ?? "Award");
-  const [color, setColor] = useState(editing?.color ?? "#4f46e5");
   const [active, setActive] = useState(editing?.active ?? true);
   const [imageUrl, setImageUrl] = useState(editing?.imageUrl ?? "");
   const [uploading, setUploading] = useState(false);
@@ -103,21 +92,19 @@ function ValueFormDialog({
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           {editing && <input type="hidden" name="id" value={editing.id} />}
-          <input type="hidden" name="icon" value={icon} />
-          <input type="hidden" name="color" value={color} />
           <input type="hidden" name="active" value={String(active)} />
           <input type="hidden" name="imageUrl" value={imageUrl} />
 
           <div className="bg-surface-2 flex items-center gap-4 rounded-xl p-4">
             <ValueSeal
-              value={{ name: name || "Value", icon, color, imageUrl: imageUrl || null }}
+              value={{ name: name || "Value", icon: editing?.icon ?? null, color: editing?.color ?? null, imageUrl: imageUrl || null }}
               size="lg"
             />
             <div className="min-w-0 space-y-1.5">
               <p className="text-sm font-semibold">Badge picture</p>
               <p className="text-muted text-xs">
-                Shown on every shout-out for this value. A square picture works best; without one, the icon
-                and colour below are used.
+                The picture is the badge: it shows on every shout-out for this value. A square picture works
+                best.
               </p>
               <input
                 ref={imageInputRef}
@@ -171,57 +158,15 @@ function ValueFormDialog({
               defaultValue={editing?.description ?? ""}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Icon</Label>
-              <div className="flex items-center gap-2">
-                <span
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg"
-                  style={{ color, backgroundColor: `${color}1f` }}
-                >
-                  <ValueIcon icon={icon} className="size-4.5" />
-                </span>
-                <Select value={icon} onValueChange={setIcon}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {VALUE_ICON_NAMES.map((n) => (
-                      <SelectItem key={n} value={n}>
-                        {n}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="order">Order</Label>
-              <Input
-                id="order"
-                name="order"
-                type="number"
-                defaultValue={editing?.order ?? 0}
-                className="font-mono"
-              />
-            </div>
-          </div>
           <div className="space-y-1.5">
-            <Label htmlFor="color-input">Colour</Label>
-            <div className="flex items-center gap-2">
-              <input
-                id="color-input"
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="border-border size-9 rounded-md border"
-              />
-              <Input
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="font-mono"
-              />
-            </div>
+            <Label htmlFor="order">Order</Label>
+            <Input
+              id="order"
+              name="order"
+              type="number"
+              defaultValue={editing?.order ?? 0}
+              className="font-mono"
+            />
           </div>
           <div className="border-border flex items-center justify-between rounded-lg border p-3">
             <Label htmlFor="active-switch">Active</Label>

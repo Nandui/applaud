@@ -49,8 +49,6 @@ export async function saveValue(
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const icon = String(formData.get("icon") ?? "").trim();
-  const color = String(formData.get("color") ?? "").trim();
   const imageUrl = String(formData.get("imageUrl") ?? "").trim();
   const order = Math.floor(Number(formData.get("order") ?? 0));
   const active = String(formData.get("active") ?? "true") === "true";
@@ -60,8 +58,8 @@ export async function saveValue(
   const data = {
     name,
     description: description || null,
-    icon: icon || null,
-    color: color || null,
+    // The badge picture defines the look; icon/colour are no longer edited
+    // and stay as stored (they only show for values without a picture).
     imageUrl: imageUrl || null,
     order: Number.isFinite(order) ? order : 0,
     active,
