@@ -42,7 +42,7 @@ export type FeedCard = {
     jobTitle: string | null;
     look: Look;
   };
-  value: { name: string; icon: string | null; color: string | null } | null;
+  value: { name: string; icon: string | null; color: string | null; imageUrl: string | null } | null;
   recipients: {
     id: string;
     name: string;
@@ -57,7 +57,7 @@ export type FeedCard = {
 
 const feedInclude = {
   sender: { select: { id: true, name: true, avatarUrl: true, jobTitle: true, profile: true } },
-  value: { select: { name: true, icon: true, color: true } },
+  value: { select: { name: true, icon: true, color: true, imageUrl: true } },
   recipients: {
     include: { user: { select: { id: true, name: true, avatarUrl: true, profile: true } } },
   },
@@ -112,7 +112,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       look: lookOf(r.sender.profile),
     },
     value: r.value
-      ? { name: r.value.name, icon: r.value.icon, color: r.value.color }
+      ? { name: r.value.name, icon: r.value.icon, color: r.value.color, imageUrl: r.value.imageUrl }
       : null,
     recipients: r.recipients.map((rr) => ({
       id: rr.user.id,

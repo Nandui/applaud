@@ -34,6 +34,7 @@ import { FramedAvatar, UserAvatar } from "@/components/user-avatar";
 import { bannerStyle, themeColour } from "@/lib/cosmetics";
 import { isLight } from "@/lib/profile-custom";
 import { ValueSeal } from "@/components/value-seal";
+import { tint } from "@/components/value-chip";
 import {
   Popover,
   PopoverContent,
@@ -58,6 +59,8 @@ type Viewer = {
 
 /** The one-tap reaction — this is an applause app, after all. */
 const QUICK_EMOJI = REACTION_EMOJIS[0];
+/** Messages longer than this also appear in full as a caption under the quote card. */
+const QUOTE_MAX = 160;
 /** Hold the applaud button this long to open the reaction tray (iMessage tapback). */
 const LONG_PRESS_MS = 380;
 
@@ -109,9 +112,10 @@ function switchReaction(
 }
 
 /**
- * A shout-out without a photo becomes a picture of the person it's for: their
- * own banner from the profile shop, their framed avatar large in the middle,
- * and their name. So what people buy shows up every time they're recognised.
+ * A shout-out without a photo becomes a card for the person it's for: their
+ * own banner from the profile shop, their framed avatar large, and the
+ * message as a quote. So what people buy shows up every time they're
+ * recognised.
  */
 function BannerHero({ card }: { card: FeedCard }) {
   const people = card.recipients.slice(0, 3);
@@ -145,10 +149,16 @@ function BannerHero({ card }: { card: FeedCard }) {
           ))}
         </div>
       )}
-      <p className="relative max-w-sm text-2xl leading-tight font-extrabold tracking-tight [text-shadow:0_2px_12px_rgb(0_0_0/0.35)]">
-        {card.system
-          ? card.message
-          : people.map((r) => r.name.split(" ")[0]).join(", ") + (extra > 0 ? ` +${extra}` : "")}
+      {extra > 0 && (
+        <span className="relative -mt-1 rounded-full bg-black/40 px-2.5 py-0.5 text-xs font-bold">+{extra} more</span>
+      )}
+      <p
+        className={cn(
+          "relative line-clamp-5 max-w-sm leading-snug font-bold tracking-tight [text-shadow:0_2px_12px_rgb(0_0_0/0.35)]",
+          card.message.length > 90 ? "text-lg" : "text-2xl",
+        )}
+      >
+        {card.system ? card.message : `“${card.message}”`}
       </p>
     </div>
   );
@@ -382,8 +392,8 @@ export function RecognitionCard({
   const canPin =
     pinned !== undefined && !card.system && card.recipients.some((r) => r.id === viewer.id);
 
-  const firstRecipient = card.recipients[0];
-  const accent = themeColour(firstRecipient?.look.theme);
+  const people = card.recipients.slice(0, 3);
+  const accent = themeColour(card.recipients[0]?.look.theme);
   const hasMedia = card.imageUrls.length > 0;
 
   return (
@@ -393,51 +403,54 @@ export function RecognitionCard({
       transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.18) }}
       className="pt-3 pb-6"
     >
-      {/* Header: who sent it, and to whom (Instagram's name + location line) */}
-      <header className="flex items-center gap-2.5">
-        {card.system ? (
-          <span className="bg-brand flex size-10 shrink-0 items-center justify-center rounded-full text-white">
+      {/* Header: who it's for, big; who sent it underneath. */}
+      <header className="flex items-center gap-3">
+        {people.length > 0 ? (
+          <div className="flex shrink-0 items-center">
+            {people.map((r, i) => (
+              <Link
+                key={r.id}
+                href={`/profile/${r.id}`}
+                className={cn(i > 0 && "-ml-4")}
+                style={{ zIndex: people.length - i }}
+              >
+                <FramedAvatar
+                  name={r.name}
+                  avatarUrl={r.avatarUrl}
+                  frame={r.look.frame}
+                  className="size-11 text-sm"
+                />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <span className="bg-brand flex size-11 shrink-0 items-center justify-center rounded-full text-white">
             <Sparkles className="size-5" />
           </span>
-        ) : (
-          <Link href={`/profile/${card.sender.id}`} className="shrink-0">
-            <FramedAvatar
-              name={card.sender.name}
-              avatarUrl={card.sender.avatarUrl}
-              frame={card.sender.look.frame}
-              className="size-9 text-xs"
-            />
-          </Link>
         )}
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="flex items-center gap-1.5 text-[0.9rem]">
-            {card.system ? (
-              <span className="truncate font-semibold">{card.sender.name}</span>
-            ) : (
-              <Link href={`/profile/${card.sender.id}`} className="truncate font-semibold">
-                {card.sender.name}
-              </Link>
-            )}
-            <time className="text-muted shrink-0" title={card.createdAtFull}>
-              · {card.createdAtLabel}
-            </time>
-            {card.visibility === "private" && (
-              <Lock className="text-muted size-3.5 shrink-0" aria-label="Private" />
-            )}
+          <p className="truncate text-[1.05rem] font-bold tracking-tight">
+            {card.recipients.map((r, i) => (
+              <Fragment key={r.id}>
+                {i > 0 && (i === card.recipients.length - 1 ? " & " : ", ")}
+                <Link href={`/profile/${r.id}`}>{r.name}</Link>
+              </Fragment>
+            ))}
           </p>
-          {card.recipients.length > 0 && !card.system && (
-            <p className="text-muted truncate text-[0.8rem]">
-              to{" "}
-              {card.recipients.map((r, i) => (
-                <Fragment key={r.id}>
-                  {i > 0 && (i === card.recipients.length - 1 ? " and " : ", ")}
-                  <Link href={`/profile/${r.id}`} className="text-foreground font-medium">
-                    {r.name}
-                  </Link>
-                </Fragment>
-              ))}
-            </p>
-          )}
+          <p className="text-muted mt-0.5 flex items-center gap-1 truncate text-[0.82rem]">
+            {card.system ? (
+              <span>{card.sender.name}</span>
+            ) : (
+              <>
+                recognised by
+                <Link href={`/profile/${card.sender.id}`} className="text-foreground font-semibold">
+                  {card.sender.name}
+                </Link>
+              </>
+            )}
+            <time title={card.createdAtFull}>· {card.createdAtLabel}</time>
+            {card.visibility === "private" && <Lock className="size-3.5 shrink-0" aria-label="Private" />}
+          </p>
         </div>
         {canPin && (
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -468,50 +481,10 @@ export function RecognitionCard({
       {/* The picture: their photo/GIF, or the recipient's own banner and frame.
           Double-tap applauds. */}
       <div
-        className="relative -mx-4 mt-2.5 overflow-hidden select-none md:mx-0 md:rounded-2xl"
+        className="relative -mx-4 mt-3 overflow-hidden select-none md:mx-0 md:rounded-t-2xl"
         onClick={onBodyTap}
       >
-        {hasMedia ? (
-          <MediaHero urls={card.imageUrls} />
-        ) : (
-          <BannerHero card={card} />
-        )}
-
-        {card.value && (
-          <ValueSeal
-            value={card.value}
-            size="md"
-            className="absolute top-3 right-3 rotate-[8deg]"
-          />
-        )}
-        {hasMedia && firstRecipient && (
-          <Link
-            href={`/profile/${firstRecipient.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/55 py-1 pr-3 pl-1 text-sm font-semibold text-white backdrop-blur"
-          >
-            <UserAvatar name={firstRecipient.name} avatarUrl={firstRecipient.avatarUrl} className="size-6 text-[0.5rem]" />
-            {firstRecipient.name}
-            {card.recipients.length > 1 && <span className="text-white/75">+{card.recipients.length - 1}</span>}
-          </Link>
-        )}
-        {card.pointsEach > 0 && (
-          <span
-            data-numeric
-            className={cn(
-              "absolute flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shadow-md",
-              hasMedia ? "right-3 bottom-3" : "bottom-3 left-3",
-            )}
-            style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#fff" }}
-          >
-            +{pts(effectivePoints)}
-            {activeBoost && (
-              <span aria-label={`${activeBoost.label} boost`}>
-                · {activeBoost.emoji} {activeBoost.multiplier}×
-              </span>
-            )}
-          </span>
-        )}
+        {hasMedia ? <MediaHero urls={card.imageUrls} /> : <BannerHero card={card} />}
 
         {/* Applause burst on double-tap / clap */}
         <AnimatePresence>
@@ -533,6 +506,45 @@ export function RecognitionCard({
           )}
         </AnimatePresence>
       </div>
+
+      {/* What it's for: the value's medal and name, with the points earned. */}
+      {(card.value || card.pointsEach > 0) && (
+        <div
+          className="-mx-4 flex items-center gap-3 px-4 py-2.5 md:mx-0 md:rounded-b-2xl"
+          style={{ backgroundColor: tint(card.value?.color ?? accent, 0.14) ?? "var(--surface)" }}
+        >
+          {card.value ? (
+            <>
+              <ValueSeal value={card.value} size="sm" ribbon={false} />
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="text-muted text-[0.7rem] font-semibold tracking-wider uppercase">Recognised for</p>
+                <p
+                  className="truncate text-[1.05rem] font-extrabold"
+                  style={{ color: card.value.color ?? undefined }}
+                >
+                  {card.value.name}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {card.pointsEach > 0 && (
+            <span
+              data-numeric
+              className="flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold"
+              style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#fff" }}
+            >
+              +{pts(effectivePoints)}
+              {activeBoost && (
+                <span aria-label={`${activeBoost.label} boost`}>
+                  · {activeBoost.emoji} {activeBoost.multiplier}×
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Action row */}
       <div className="-ml-2.5 mt-1 flex items-center">
@@ -651,8 +663,8 @@ export function RecognitionCard({
         </button>
       )}
 
-      {/* Caption */}
-      {!card.system && (
+      {/* Caption: the message, unless the picture already shows it in full. */}
+      {!card.system && (hasMedia || card.message.length > QUOTE_MAX) && (
         <p className="mt-1 text-[0.95rem] leading-snug break-words whitespace-pre-line">
           <Link href={`/profile/${card.sender.id}`} className="mr-1.5 font-semibold">
             {card.sender.name}

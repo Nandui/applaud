@@ -6,7 +6,7 @@ import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 export const dynamic = "force-dynamic";
 
 /**
- * Admin-only client-upload token endpoint for reward images. The browser uploads
+ * Admin-only client-upload token endpoint for reward and value images. The browser uploads
  * the picture directly to Vercel Blob (see the reward form) rather than POSTing
  * bytes through a server action; this route only mints a short-lived,
  * content-type/size-restricted token for admins. It never receives the bytes.

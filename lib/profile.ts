@@ -61,7 +61,7 @@ export async function getProfileData(userId: string) {
           recognition: {
             select: {
               value: {
-                select: { id: true, name: true, icon: true, color: true },
+                select: { id: true, name: true, icon: true, color: true, imageUrl: true },
               },
             },
           },
@@ -88,7 +88,7 @@ export async function getProfileData(userId: string) {
   const tagMap = new Map<
     string,
     {
-      value: { id: string; name: string; icon: string | null; color: string | null };
+      value: { id: string; name: string; icon: string | null; color: string | null; imageUrl: string | null };
       count: number;
     }
   >();

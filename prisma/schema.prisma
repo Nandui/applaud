@@ -91,6 +91,9 @@ model Value {
   description  String?
   icon         String? // lucide icon name
   color        String? // hex or token
+  /// Optional badge artwork uploaded by an admin (Vercel Blob URL); shown in
+  /// place of the icon wherever the value appears.
+  imageUrl     String?
   order        Int           @default(0)
   active       Boolean       @default(true)
   recognitions Recognition[]

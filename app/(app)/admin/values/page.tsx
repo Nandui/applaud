@@ -17,6 +17,7 @@ export default async function AdminValuesPage() {
     description: v.description,
     icon: v.icon,
     color: v.color,
+    imageUrl: v.imageUrl,
     order: v.order,
     active: v.active,
   }));

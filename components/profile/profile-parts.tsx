@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
-import { ValueIcon } from "@/components/value-icon";
-import { tint } from "@/components/value-chip";
+import { ValueSeal } from "@/components/value-seal";
 import { CELEBRATION_EMOJI, CELEBRATION_LABELS, type ProfileData } from "@/lib/profile";
 import { formatNumber } from "@/lib/format";
 
@@ -49,14 +48,8 @@ export function Highlights({ data }: { data: ProfileData }) {
     ...data.valueTags.map((t) => ({
       key: `value-${t.value.id}`,
       label: t.value.name,
-      circle: (
-        <ValueIcon
-          icon={t.value.icon}
-          className="size-6"
-          style={{ color: t.value.color ?? "var(--primary)" }}
-        />
-      ),
-      background: tint(t.value.color, 0.16) ?? "var(--surface-2)",
+      circle: <ValueSeal value={t.value} size="sm" ribbon={false} className="size-full [&>span]:size-full [&>span]:ring-0" />,
+      background: "transparent",
       count: t.count,
     })),
     ...data.celebrations.map((c) => ({

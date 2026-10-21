@@ -1,14 +1,16 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Pencil, Plus } from "lucide-react";
+import { Loader2, Pencil, Plus, Upload } from "lucide-react";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
+import { ValueSeal } from "@/components/value-seal";
 import { saveValue, setValueActive, type ActionResult } from "@/lib/admin/actions";
 import { VALUE_ICON_NAMES } from "@/lib/value-icons";
 import { ValueIcon } from "@/components/value-icon";
 import { DataTable } from "@/components/data-table";
-import { ValueChip } from "@/components/value-chip";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -35,6 +37,7 @@ export type ValueRow = {
   description: string | null;
   icon: string | null;
   color: string | null;
+  imageUrl: string | null;
   order: number;
   active: boolean;
 };
@@ -55,6 +58,34 @@ function ValueFormDialog({
   const [icon, setIcon] = useState(editing?.icon ?? "Award");
   const [color, setColor] = useState(editing?.color ?? "#4f46e5");
   const [active, setActive] = useState(editing?.active ?? true);
+  const [imageUrl, setImageUrl] = useState(editing?.imageUrl ?? "");
+  const [uploading, setUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState(editing?.name ?? "");
+
+  async function handleImageFile(file: File) {
+    if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+      toast.error("Use a PNG, JPG, GIF, or WebP.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("Picture must be 8MB or smaller.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const blob = await upload(`values/${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/admin/reward/upload",
+        contentType: file.type,
+      });
+      setImageUrl(blob.url);
+    } catch {
+      toast.error("Picture upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   useEffect(() => {
     if (state?.ok) {
@@ -65,7 +96,7 @@ function ValueFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit value" : "New value"}</DialogTitle>
         </DialogHeader>
@@ -74,10 +105,61 @@ function ValueFormDialog({
           <input type="hidden" name="icon" value={icon} />
           <input type="hidden" name="color" value={color} />
           <input type="hidden" name="active" value={String(active)} />
+          <input type="hidden" name="imageUrl" value={imageUrl} />
+
+          <div className="bg-surface-2 flex items-center gap-4 rounded-xl p-4">
+            <ValueSeal
+              value={{ name: name || "Value", icon, color, imageUrl: imageUrl || null }}
+              size="lg"
+            />
+            <div className="min-w-0 space-y-1.5">
+              <p className="text-sm font-semibold">Badge picture</p>
+              <p className="text-muted text-xs">
+                Shown on every shout-out for this value. A square picture works best; without one, the icon
+                and colour below are used.
+              </p>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept={ALLOWED_IMAGE_TYPES.join(",")}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleImageFile(file);
+                  e.target.value = "";
+                }}
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploading}
+                  onClick={() => imageInputRef.current?.click()}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="size-4" />
+                      {imageUrl ? "Change picture" : "Upload picture"}
+                    </>
+                  )}
+                </Button>
+                {imageUrl && !uploading && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setImageUrl("")}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" defaultValue={editing?.name ?? ""} required />
+            <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="description">Description</Label>
@@ -148,7 +230,7 @@ function ValueFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || uploading}>
               {pending ? "Saving…" : editing ? "Save" : "Create"}
             </Button>
           </DialogFooter>
@@ -186,13 +268,10 @@ export function ValuesManager({ rows }: { rows: ValueRow[] }) {
       id: "preview",
       header: "Value",
       cell: ({ row }) => (
-        <ValueChip
-          value={{
-            name: row.original.name,
-            icon: row.original.icon,
-            color: row.original.color,
-          }}
-        />
+        <span className="flex items-center gap-3">
+          <ValueSeal value={row.original} size="xs" />
+          <span className="font-medium">{row.original.name}</span>
+        </span>
       ),
     },
     {

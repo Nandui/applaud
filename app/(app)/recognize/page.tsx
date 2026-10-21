@@ -20,7 +20,7 @@ export default async function RecognizePage({
     prisma.value.findMany({
       where: { active: true },
       orderBy: { order: "asc" },
-      select: { id: true, name: true, icon: true, color: true },
+      select: { id: true, name: true, icon: true, color: true, imageUrl: true },
     }),
     prisma.user.findMany({
       where: {
