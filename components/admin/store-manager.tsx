@@ -5,7 +5,7 @@ import Link from "next/link";
 import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Images, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, FolderPlus, Images, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import {
   COSMETIC_KINDS,
@@ -19,11 +19,15 @@ import {
   type Cosmetic,
   type CosmeticKind,
   type Rarity,
+  type StoreCategory,
 } from "@/lib/cosmetics";
 import {
   addCosmeticsInBulk,
+  deleteCategory,
   deleteCosmetic,
+  moveCategory,
   moveCosmetic,
+  saveCategory,
   saveCosmetic,
   setCosmeticActive,
   type ActionResult,
@@ -47,6 +51,40 @@ export type StoreRow = Cosmetic & {
 };
 
 type Sample = { name: string; avatarUrl: string | null };
+
+const NO_CATEGORY = "none";
+
+/** Pick a Store category (or none) for an item. */
+function CategorySelect({
+  categories,
+  value,
+  onChange,
+  disabled,
+}: {
+  categories: StoreCategory[];
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const label = (v: string) =>
+    v === NO_CATEGORY ? "No category" : (categories.find((c) => c.id === v)?.name ?? "No category");
+  return (
+    <Select value={value} onValueChange={(v) => onChange(String(v))} disabled={disabled}>
+      <SelectTrigger>
+        <SelectValue>{(v: string) => label(v)}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NO_CATEGORY}>No category</SelectItem>
+        {categories.map((c) => (
+          <SelectItem key={c.id} value={c.id}>
+            {c.name}
+            {c.active ? "" : " (hidden)"}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 /** What each kind's picture should look like, shown next to the upload button. */
 const PICTURE_HINTS: Record<Exclude<CosmeticKind, "theme">, string> = {
@@ -104,6 +142,8 @@ function ItemDialog({
   onOpenChange,
   editing,
   initialKind,
+  initialCategory,
+  categories,
   sample,
   pointsPerEuro,
 }: {
@@ -111,6 +151,8 @@ function ItemDialog({
   onOpenChange: (o: boolean) => void;
   editing: StoreRow | null;
   initialKind: CosmeticKind;
+  initialCategory: string | null;
+  categories: StoreCategory[];
   sample: Sample;
   pointsPerEuro: number;
 }) {
@@ -122,6 +164,7 @@ function ItemDialog({
   const [imageUrl, setImageUrl] = useState(editing?.imageUrl ?? "");
   const [colour, setColour] = useState(editing?.kind === "theme" && editing.style ? editing.style : "#6a4dff");
   const [active, setActive] = useState(editing?.active ?? true);
+  const [categoryId, setCategoryId] = useState((editing ? editing.categoryId : initialCategory) ?? NO_CATEGORY);
   const [uploading, setUploading] = useState(false);
   const [deleting, startDelete] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -172,6 +215,7 @@ function ItemDialog({
           <input type="hidden" name="imageUrl" value={kind === "theme" ? "" : imageUrl} />
           <input type="hidden" name="colour" value={colour} />
           <input type="hidden" name="active" value={String(active)} />
+          <input type="hidden" name="categoryId" value={categoryId === NO_CATEGORY ? "" : categoryId} />
 
           {!editing && (
             <div className="space-y-1.5">
@@ -286,6 +330,13 @@ function ItemDialog({
               </Select>
             </div>
           </div>
+          {categories.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+              <p className="text-muted text-xs">Items in a category are grouped together and can be bought as a bundle.</p>
+            </div>
+          )}
           <div className="border-border flex items-center justify-between gap-3 rounded-lg border p-3">
             <div>
               <Label htmlFor="item-active">In the Store</Label>
@@ -333,8 +384,17 @@ function ItemDialog({
 }
 
 /** Pick many pictures at once; each becomes a new frame or banner named after its file. */
-function BulkDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+function BulkDialog({
+  open,
+  onOpenChange,
+  categories,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  categories: StoreCategory[];
+}) {
   const [kind, setKind] = useState<"frame" | "banner">("frame");
+  const [categoryId, setCategoryId] = useState(NO_CATEGORY);
   const [price, setPrice] = useState("1");
   const [active, setActive] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
@@ -356,7 +416,13 @@ function BulkDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: b
       setProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
     }
     if (items.length > 0) {
-      const res = await addCosmeticsInBulk({ kind, price: points, active, items });
+      const res = await addCosmeticsInBulk({
+        kind,
+        price: points,
+        active,
+        categoryId: categoryId === NO_CATEGORY ? null : categoryId,
+        items,
+      });
       if (res.ok) {
         toast.success(res.message ?? "Added.");
         setFiles([]);
@@ -402,6 +468,12 @@ function BulkDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: b
               />
             </div>
           </div>
+          {categories.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} disabled={busy} />
+            </div>
+          )}
           <p className="text-muted text-xs">{PICTURE_HINTS[kind]}</p>
           <input
             ref={fileRef}
@@ -460,10 +532,12 @@ function ItemTile({
   first,
   last,
   onEdit,
+  categoryName,
 }: {
   row: StoreRow;
   sample: Sample;
   euros: (points: number) => string;
+  categoryName: string | null;
   first: boolean;
   last: boolean;
   onEdit: () => void;
@@ -496,6 +570,7 @@ function ItemTile({
         <span className="text-muted block text-xs" data-numeric>
           {row.buyers === 0 ? "Not bought yet" : `Bought by ${formatNumber(row.buyers)}`}
         </span>
+        {categoryName && <span className="text-muted block truncate text-xs">In {categoryName}</span>}
       </button>
       <div className="mt-2 flex items-center gap-1">
         <Button size="xs" variant="outline" onClick={onEdit} aria-label={`Edit ${row.name}`}>
@@ -520,6 +595,157 @@ function ItemTile({
   );
 }
 
+/** Add or rename a category, and show or hide it in the shop. */
+function CategoryDialog({
+  open,
+  onOpenChange,
+  editing,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  editing: StoreCategory | null;
+}) {
+  const [name, setName] = useState(editing?.name ?? "");
+  const [active, setActive] = useState(editing?.active ?? true);
+  const [pending, start] = useTransition();
+
+  const save = () =>
+    start(async () => {
+      const res = await saveCategory({ id: editing?.id, name, active });
+      if (res.ok) {
+        toast.success(res.message ?? "Saved.");
+        onOpenChange(false);
+      } else toast.error(res.error);
+    });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{editing ? `Edit ${editing.name}` : "New category"}</DialogTitle>
+        </DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save();
+          }}
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="category-name">Name</Label>
+            <Input
+              id="category-name"
+              value={name}
+              maxLength={30}
+              placeholder="Flags"
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <p className="text-muted text-xs">
+              Frames, banners and themes in a category show together in the shop, with a button to buy them all
+              at the same total as buying each one.
+            </p>
+          </div>
+          <div className="border-border flex items-center justify-between gap-3 rounded-lg border p-3">
+            <div>
+              <Label htmlFor="category-active">Show in the Store</Label>
+              <p className="text-muted text-xs">When hidden, its items are listed by kind and there&apos;s no bundle.</p>
+            </div>
+            <Switch id="category-active" checked={active} onCheckedChange={setActive} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving…" : editing ? "Save" : "Add category"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** One category: its items, bundle price in points and euros, and controls. */
+function CategoryRow({
+  category,
+  items,
+  euros,
+  first,
+  last,
+  onEdit,
+  onAddItem,
+}: {
+  category: StoreCategory;
+  items: StoreRow[];
+  euros: (points: number) => string;
+  first: boolean;
+  last: boolean;
+  onEdit: () => void;
+  onAddItem: () => void;
+}) {
+  const [pending, start] = useTransition();
+  const run = (fn: () => Promise<ActionResult>) =>
+    start(async () => {
+      const res = await fn();
+      if (res.ok && res.message) toast.success(res.message);
+      else if (!res.ok) toast.error(res.error);
+    });
+  const forSale = items.filter((r) => r.active);
+  const bundle = forSale.reduce((sum, r) => sum + r.price, 0);
+  const hidden = items.length - forSale.length;
+
+  return (
+    <li className={cn("border-border flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5", !category.active && "opacity-60")}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">
+          {category.name}
+          {!category.active && <span className="text-muted font-medium"> · hidden</span>}
+        </p>
+        <p className="text-muted text-xs" data-numeric>
+          {forSale.length === 0
+            ? "No items for sale yet"
+            : `${forSale.length} ${forSale.length === 1 ? "item" : "items"} · bundle ${pts(bundle)} · ${euros(bundle)}`}
+          {hidden > 0 ? ` · ${hidden} hidden` : ""}
+        </p>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button size="xs" variant="outline" onClick={onAddItem} aria-label={`Add an item to ${category.name}`}>
+          <Plus className="size-3.5" />
+        </Button>
+        <Button size="xs" variant="outline" onClick={onEdit} aria-label={`Edit ${category.name}`}>
+          <Pencil className="size-3.5" />
+        </Button>
+        <Button size="xs" variant="outline" disabled={pending || first} onClick={() => run(() => moveCategory(category.id, "up"))} aria-label="Move earlier">
+          <ArrowUp className="size-3.5" />
+        </Button>
+        <Button size="xs" variant="outline" disabled={pending || last} onClick={() => run(() => moveCategory(category.id, "down"))} aria-label="Move later">
+          <ArrowDown className="size-3.5" />
+        </Button>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={pending}
+          aria-label={`Delete ${category.name}`}
+          onClick={() => {
+            if (!window.confirm(`Delete the ${category.name} category? Its items stay in the Store, listed by kind.`)) return;
+            run(() => deleteCategory(category.id));
+          }}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+        <Switch
+          checked={category.active}
+          disabled={pending}
+          aria-label={category.active ? "In the Store" : "Hidden from the Store"}
+          onCheckedChange={(checked) => run(() => saveCategory({ id: category.id, name: category.name, active: checked }))}
+        />
+      </div>
+    </li>
+  );
+}
+
 /**
  * Admin > Store: every frame, banner and theme staff can buy, with uploads for
  * your own pictures, prices in points (and their euro face value), rarity,
@@ -527,11 +753,13 @@ function ItemTile({
  */
 export function StoreManager({
   rows,
+  categories,
   sample,
   pointsPerEuro,
   typicalShoutout,
 }: {
   rows: StoreRow[];
+  categories: StoreCategory[];
   sample: Sample;
   pointsPerEuro: number;
   /** A typical shout-out, for "one shout-out buys N items". */
@@ -542,15 +770,33 @@ export function StoreManager({
   const [itemOpen, setItemOpen] = useState(false);
   const [dialogKey, setDialogKey] = useState(0);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState<string | null>(null);
+  const [editingCategory, setEditingCategory] = useState<StoreCategory | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categoryKey, setCategoryKey] = useState(0);
+  /** "all", NO_CATEGORY, or a category id. */
+  const [filter, setFilter] = useState("all");
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
+  const filtered =
+    filter === "all"
+      ? rows
+      : rows.filter((r) => (filter === NO_CATEGORY ? !r.categoryId : r.categoryId === filter));
 
   const euros = (points: number) => centsToEuros(pointsToCents(points, pointsPerEuro));
   const forSale = rows.filter((r) => r.active && r.price > 0);
   const collection = forSale.reduce((sum, r) => sum + r.price, 0);
   const cheapest = forSale.length ? Math.min(...forSale.map((r) => r.price)) : 0;
 
-  const openItem = (row: StoreRow | null, kind: CosmeticKind = "frame") => {
+  const openCategory = (category: StoreCategory | null) => {
+    setEditingCategory(category);
+    setCategoryKey((k) => k + 1);
+    setCategoryOpen(true);
+  };
+
+  const openItem = (row: StoreRow | null, kind: CosmeticKind = "frame", category: string | null = null) => {
     setEditing(row);
     setNewKind(kind);
+    setNewCategory(category ?? (filter !== "all" && filter !== NO_CATEGORY ? filter : null));
     setDialogKey((k) => k + 1);
     setItemOpen(true);
   };
@@ -588,9 +834,68 @@ export function StoreManager({
         </CardContent>
       </Card>
 
+      <Card className="mb-6">
+        <CardContent className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Categories</h2>
+              <p className="text-muted text-sm">
+                Group items of any kind (for example Flags or Pride). Staff see each category together with a
+                button to buy everything in it they don&apos;t own yet, for the plain total (no discount).
+              </p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => openCategory(null)}>
+              <FolderPlus className="size-4" /> Add category
+            </Button>
+          </div>
+          {categories.length === 0 ? (
+            <p className="text-muted text-sm">No categories yet. Everything is listed by kind.</p>
+          ) : (
+            <ul className="divide-border divide-y">
+              {categories.map((category, i) => (
+                <CategoryRow
+                  key={category.id}
+                  category={category}
+                  items={rows.filter((r) => r.categoryId === category.id)}
+                  euros={euros}
+                  first={i === 0}
+                  last={i === categories.length - 1}
+                  onEdit={() => openCategory(category)}
+                  onAddItem={() => openItem(null, "banner", category.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {categories.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {[
+            { id: "all", name: "All items" },
+            ...categories,
+            { id: NO_CATEGORY, name: "No category" },
+          ].map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setFilter(c.id)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-sm font-medium",
+                filter === c.id ? "bg-foreground text-background border-foreground" : "border-border text-muted",
+              )}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-8">
         {COSMETIC_KINDS.map((kind) => {
-          const list = rows.filter((r) => r.kind === kind);
+          const list = filtered.filter((r) => r.kind === kind);
+          // Reordering swaps with the neighbour in the full list, so only offer it unfiltered.
+          const canMove = filter === "all";
           return (
             <section key={kind}>
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -615,8 +920,9 @@ export function StoreManager({
                       row={row}
                       sample={sample}
                       euros={euros}
-                      first={i === 0}
-                      last={i === list.length - 1}
+                      categoryName={row.categoryId ? (categoryName.get(row.categoryId) ?? null) : null}
+                      first={!canMove || i === 0}
+                      last={!canMove || i === list.length - 1}
                       onEdit={() => openItem(row)}
                     />
                   ))}
@@ -633,10 +939,13 @@ export function StoreManager({
         onOpenChange={setItemOpen}
         editing={editing}
         initialKind={newKind}
+        initialCategory={newCategory}
+        categories={categories}
         sample={sample}
         pointsPerEuro={pointsPerEuro}
       />
-      <BulkDialog open={bulkOpen} onOpenChange={setBulkOpen} />
+      <BulkDialog open={bulkOpen} onOpenChange={setBulkOpen} categories={categories} />
+      <CategoryDialog key={`category-${categoryKey}`} open={categoryOpen} onOpenChange={setCategoryOpen} editing={editingCategory} />
     </>
   );
 }

@@ -6,13 +6,15 @@ import { requireUser } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { KIND_LABELS, itemById, type CosmeticKind } from "@/lib/cosmetics";
-import { getCatalogue } from "@/lib/catalogue";
+import { getCatalogue, getCategories } from "@/lib/catalogue";
 import {
   MAX_PINNED,
+  bundleFor,
   ownsItem,
   parseProfile,
   profileInputSchema,
   withEquipped,
+  withOwned,
   withPurchase,
   type ProfileCustom,
 } from "@/lib/profile-custom";
@@ -156,6 +158,73 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
   revalidateProfile(me.id);
   revalidatePath("/me");
   return { ok: true, message: `${item.name} is yours! It's on your profile now.` };
+}
+
+/**
+ * Buy every item in a Store category that you don't own yet, at the plain sum
+ * of their prices (no discount). Each item gets its own SHOP entry in the
+ * wallet ledger, exactly as if bought one by one, so wallet history, buyer
+ * counts and the Points analytics stay the same. Nothing is equipped.
+ * `expectedPrice` is what the buyer was shown; if prices or ownership changed
+ * since, the purchase stops instead of charging a different amount.
+ */
+export async function buyBundle(categoryId: string, expectedPrice: number): Promise<ProfileActionResult> {
+  const me = await requireUser();
+  const [catalogue, categories] = await Promise.all([getCatalogue(), getCategories()]);
+  const category = categories.find((c) => c.id === categoryId);
+  if (!category || !category.active) return { ok: false, error: "That bundle isn't in the shop." };
+
+  let bought: ReturnType<typeof bundleFor> = { items: [], price: 0 };
+  try {
+    await prisma.$transaction(async (tx) => {
+      const row = await tx.user.findUniqueOrThrow({ where: { id: me.id }, select: { profile: true } });
+      const custom = parseProfile(row.profile);
+      bought = bundleFor(custom, catalogue, category.id);
+      if (bought.items.length === 0) throw new ShopError("You already own everything in this bundle.");
+      if (bought.price !== expectedPrice) {
+        throw new ShopError("This bundle changed since you opened it. Have another look and try again.");
+      }
+
+      if (bought.price > 0) {
+        const agg = await tx.rewardLedger.aggregate({ _sum: { amount: true }, where: { userId: me.id } });
+        if ((agg._sum.amount ?? 0) < bought.price) throw new ShopError("You don't have enough points yet.");
+        await tx.rewardLedger.createMany({
+          data: bought.items
+            .filter((item) => item.price > 0)
+            .map((item) => ({
+              userId: me.id,
+              amount: -item.price,
+              type: "SHOP",
+              sourceType: "cosmetic",
+              sourceId: item.id,
+              note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()} (${category.name} bundle)`,
+            })),
+        });
+        await tx.user.update({ where: { id: me.id }, data: { walletBalance: { decrement: bought.price } } });
+      }
+      await tx.user.update({ where: { id: me.id }, data: { profile: withOwned(custom, bought.items) } });
+    });
+  } catch (error) {
+    if (error instanceof ShopError) return { ok: false, error: error.message };
+    throw error;
+  }
+
+  const { items, price } = bought;
+  await writeAudit({
+    actor: me,
+    action: "shop.purchased",
+    entityType: "user",
+    entityId: me.id,
+    summary: `Bought the ${category.name} bundle (${items.length} items, ${price} pts)`,
+    metadata: { categoryId: category.id, itemIds: items.map((i) => i.id), price },
+    siteId: me.siteId,
+  });
+  revalidateProfile(me.id);
+  revalidatePath("/me");
+  return {
+    ok: true,
+    message: `All of ${category.name} is yours! Tap any item to wear it.`,
+  };
 }
 
 /** Wear an item you own, or take off whatever is in a slot (`itemId` null). */

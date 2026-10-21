@@ -119,6 +119,28 @@ export function withPurchase(custom: ProfileCustom, item: Pick<Cosmetic, "id" | 
   return { ...custom, owned, [item.kind]: item.id };
 }
 
+/** Add bought items to what someone owns without changing what they wear. */
+export function withOwned(custom: ProfileCustom, items: Pick<Cosmetic, "id">[]): ProfileCustom {
+  return { ...custom, owned: [...new Set([...custom.owned, ...items.map((i) => i.id)])] };
+}
+
+export type Bundle = {
+  /** The items "Buy all" would buy: for sale in the category and not owned yet. */
+  items: Cosmetic[];
+  /** Their plain sum in points (bundles have no discount). */
+  price: number;
+};
+
+/** What buying a whole category costs this person right now. */
+export function bundleFor(
+  custom: Pick<ProfileCustom, "owned">,
+  catalogue: Cosmetic[],
+  categoryId: string,
+): Bundle {
+  const items = catalogue.filter((c) => c.categoryId === categoryId && c.active && !ownsItem(custom, c));
+  return { items, price: items.reduce((sum, c) => sum + c.price, 0) };
+}
+
 /** Wear an owned item, or take off whatever is in that slot (`item` null). */
 export function withEquipped(custom: ProfileCustom, kind: CosmeticKind, item: Cosmetic | null): ProfileCustom {
   if (item === null) return { ...custom, [kind]: null };

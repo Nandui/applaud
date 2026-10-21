@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
-import { builtinCatalogue, isKind, isRarity, type Cosmetic } from "@/lib/cosmetics";
+import { builtinCatalogue, isKind, isRarity, type Cosmetic, type StoreCategory } from "@/lib/cosmetics";
 
 /**
  * The profile Store catalogue from the `Cosmetic` table, in display order,
@@ -24,5 +24,14 @@ export const getCatalogue = cache(async (): Promise<Cosmetic[]> => {
       style: r.style,
       imageUrl: r.imageUrl,
       active: r.active,
+      categoryId: r.categoryId,
     }));
+});
+
+/** Store categories in display order, hidden ones included. Memoised per request. */
+export const getCategories = cache(async (): Promise<StoreCategory[]> => {
+  return prisma.cosmeticCategory.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { id: true, name: true, active: true },
+  });
 });

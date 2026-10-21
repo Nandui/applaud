@@ -34,6 +34,19 @@ export type Cosmetic = {
   imageUrl: string | null;
   /** Hidden items can't be bought, but people who own one keep wearing it. */
   active: boolean;
+  /** The Store category it's grouped under (e.g. "Flags"), if any. */
+  categoryId: string | null;
+};
+
+/**
+ * A group of items of any kind, shown together in the profile shop with a
+ * "Buy all" bundle priced at the plain sum of what the buyer doesn't own yet.
+ */
+export type StoreCategory = {
+  id: string;
+  name: string;
+  /** Hidden categories don't show or sell as a bundle; their items show by kind. */
+  active: boolean;
 };
 
 /** A built-in item as written below; the database fills in the rest. */
@@ -162,7 +175,7 @@ const FALLBACK_THEME = BUILTIN_COSMETICS.find((c) => c.id === DEFAULT_THEME)!.st
 
 /** The built-in items as full catalogue rows (used when the table is empty). */
 export function builtinCatalogue(): Cosmetic[] {
-  return BUILTIN_COSMETICS.map((c) => ({ ...c, imageUrl: null, active: true }));
+  return BUILTIN_COSMETICS.map((c) => ({ ...c, imageUrl: null, active: true, categoryId: null }));
 }
 
 export function isKind(value: unknown): value is CosmeticKind {

@@ -4,11 +4,13 @@ import { readFileSync } from "node:fs";
 import {
   MAX_PINNED,
   isLight,
+  bundleFor,
   ownsItem,
   parseProfile,
   profileInputSchema,
   resolveLook,
   withEquipped,
+  withOwned,
   withPurchase,
   wornItem,
 } from "../lib/profile-custom";
@@ -129,6 +131,7 @@ test("uploaded frames and banners draw their picture", () => {
     style: null,
     imageUrl: UPLOAD,
     active: false, // hidden from the shop, but owners keep wearing it
+    categoryId: null,
   };
   const wide: Cosmetic = { ...halo, id: "c2", kind: "banner", name: "Beach" };
   const withUploads = [...catalogue, halo, wide];
@@ -159,4 +162,35 @@ test("daysLeft counts down to the end of the period", () => {
   const ref = new Date(2026, 9, 21, 12);
   assert.equal(daysLeft("month", ref), 11);
   assert.equal(daysLeft("all", ref), null);
+});
+
+test("a category bundle is the plain sum of what you don't own yet", () => {
+  const flags = (id: string, price: number, extra: Partial<Cosmetic> = {}): Cosmetic => ({
+    ...item("banner-sunset"),
+    id,
+    price,
+    categoryId: "flags",
+    ...extra,
+  });
+  const withFlags = [
+    ...catalogue,
+    flags("f-ie", 2),
+    flags("f-pride", 3, { kind: "frame" }),
+    flags("f-trans", 4),
+    flags("f-free", 0),
+    flags("f-hidden", 5, { active: false }),
+  ];
+  const all = bundleFor(parseProfile({}), withFlags, "flags");
+  // Free items are already everyone's; hidden ones aren't for sale.
+  assert.deepEqual(all.items.map((i) => i.id), ["f-ie", "f-pride", "f-trans"]);
+  assert.equal(all.price, 9);
+
+  const some = bundleFor(parseProfile({ owned: ["f-pride"] }), withFlags, "flags");
+  assert.equal(some.price, 6);
+  assert.equal(bundleFor(parseProfile({}), withFlags, "nope").items.length, 0);
+
+  const after = withOwned(parseProfile({ owned: ["f-pride"], banner: "banner-ocean" }), some.items);
+  assert.deepEqual(after.owned, ["f-pride", "f-ie", "f-trans"]);
+  assert.equal(after.banner, "banner-ocean"); // buying a bundle doesn't change what you wear
+  assert.equal(bundleFor(after, withFlags, "flags").items.length, 0);
 });
