@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { periodRange, type Period } from "@/lib/periods";
-import { parseProfile } from "@/lib/profile-custom";
+import { lookOf } from "@/lib/profile-custom";
+import { getCatalogue } from "@/lib/catalogue";
+import type { FrameArt } from "@/lib/cosmetics";
 
 export { PERIODS, PERIOD_LABELS, type Period } from "@/lib/periods";
 
@@ -9,7 +11,7 @@ type LeaderUser = {
   name: string;
   avatarUrl: string | null;
   /** Equipped avatar frame from the profile shop. */
-  frame: string | null;
+  frame: FrameArt | null;
   jobTitle: string | null;
   siteCode: string;
 };
@@ -89,6 +91,7 @@ export async function getLeaderboard({
     ...countByReceiver.keys(),
     ...giverStats.keys(),
   ]);
+  const catalogue = await getCatalogue();
   const users = await prisma.user.findMany({
     where: { id: { in: [...involved] } },
     select: {
@@ -107,7 +110,7 @@ export async function getLeaderboard({
         id: u.id,
         name: u.name,
         avatarUrl: u.avatarUrl,
-        frame: parseProfile(u.profile).frame,
+        frame: lookOf(u.profile, catalogue).frame,
         jobTitle: u.jobTitle,
         siteCode: u.site?.code ?? "",
       },

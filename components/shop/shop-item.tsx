@@ -4,7 +4,17 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
 import { buyItem, equipItem } from "@/lib/profile-actions";
-import { KIND_LABELS, RARITY, type Cosmetic } from "@/lib/cosmetics";
+import {
+  DEFAULT_BANNER,
+  DEFAULT_THEME,
+  KIND_LABELS,
+  RARITY,
+  bannerCss,
+  frameArt,
+  type Cosmetic,
+  type CosmeticKind,
+  type Look,
+} from "@/lib/cosmetics";
 import { formatNumber, pts } from "@/lib/format";
 import {
   Sheet,
@@ -20,26 +30,36 @@ import { ProfilePreview } from "@/components/shop/profile-preview";
 export type Wearer = {
   name: string;
   avatarUrl: string | null;
-  frame: string | null;
-  banner: string | null;
-  theme: string | null;
+  /** What they look like now, ready to draw. */
+  look: Look;
+  /** The item ids they wear in each slot (null = nothing, or the default). */
+  worn: Record<CosmeticKind, string | null>;
 };
+
+/** Their look with this item swapped in, for the try-it-on preview. */
+export function lookWith(look: Look, item: Cosmetic): Look {
+  if (item.kind === "frame") return { ...look, frame: frameArt(item) };
+  if (item.kind === "banner") return { ...look, banner: bannerCss(item) };
+  return { ...look, theme: item.style ?? look.theme };
+}
+
+const DEFAULTS: Partial<Record<CosmeticKind, string>> = { banner: DEFAULT_BANNER, theme: DEFAULT_THEME };
 
 /** The item itself, drawn small: a framed avatar, a banner strip or a colour. */
 function ItemArt({ item, me }: { item: Cosmetic; me: Wearer }) {
   if (item.kind === "frame") {
     return (
       <span className="flex h-full items-center justify-center">
-        <FramedAvatar name={me.name} avatarUrl={me.avatarUrl} frame={item.id} className="size-14" gapClassName="bg-surface" />
+        <FramedAvatar name={me.name} avatarUrl={me.avatarUrl} frame={frameArt(item)} className="size-14" gapClassName="bg-surface" />
       </span>
     );
   }
   if (item.kind === "banner") {
-    return <span className="block h-full w-full" style={{ background: item.style }} />;
+    return <span className="block h-full w-full" style={{ background: bannerCss(item) }} />;
   }
   return (
     <span className="flex h-full items-center justify-center">
-      <span className="size-12 rounded-full" style={{ backgroundColor: item.style }} />
+      <span className="size-12 rounded-full" style={{ backgroundColor: item.style ?? undefined }} />
     </span>
   );
 }
@@ -61,7 +81,8 @@ export function ShopItem({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
-  const wearing = me[item.kind] === item.id || (!me[item.kind] && item.price === 0 && item.kind !== "frame");
+  const worn = me.worn[item.kind];
+  const wearing = worn === item.id || (!worn && DEFAULTS[item.kind] === item.id);
   const short = item.price - balance;
   const rarity = RARITY[item.rarity];
 
@@ -76,7 +97,7 @@ export function ShopItem({
       }
     });
 
-  const preview = { ...me, [item.kind]: item.id };
+  const preview = lookWith(me.look, item);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -110,7 +131,7 @@ export function ShopItem({
           <SheetDescription>This is how it looks on your profile.</SheetDescription>
         </SheetHeader>
         <div className="px-4">
-          <ProfilePreview {...preview} />
+          <ProfilePreview name={me.name} avatarUrl={me.avatarUrl} look={preview} />
         </div>
         <div className="pb-safe mt-4 space-y-2 px-4 pb-4">
           {!owned ? (

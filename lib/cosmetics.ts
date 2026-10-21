@@ -1,23 +1,43 @@
 /**
- * The profile shop catalogue (Steam Points Shop style): avatar frames, profile
- * banners and accent themes people buy with their applaud points. Defined in
- * code rather than the database so the styles live next to the CSS that draws
- * them (frames are the `.frame-*` classes in globals.css). Pure data, safe to
- * import on the client.
+ * The profile Store catalogue (Steam Points Shop style): avatar frames,
+ * profile banners and accent themes people buy with their applaud points.
+ *
+ * The live catalogue is the `Cosmetic` table, managed in Admin > Store, where
+ * admins add their own items with uploaded pictures. The built-in items below
+ * are what the table starts with (the migration and seed insert them). Their
+ * ids are what people's `User.profile.owned` lists hold, so never rename one.
+ *
+ * Everything here is pure (no Prisma) so the server, the client and the unit
+ * tests can share it. The server loads the table with `getCatalogue()` in
+ * lib/catalogue.ts and hands the rows to these helpers.
  */
 
 export type CosmeticKind = "frame" | "banner" | "theme";
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 
+export const COSMETIC_KINDS: CosmeticKind[] = ["frame", "banner", "theme"];
+export const RARITIES: Rarity[] = ["common", "rare", "epic", "legendary"];
+
 export type Cosmetic = {
   id: string;
   kind: CosmeticKind;
   name: string;
+  /** Points. 0 means a free starter that everyone owns. */
   price: number;
   rarity: Rarity;
-  /** Banner: a CSS background. Theme: a #rrggbb accent. Frame: unused (CSS class). */
-  style?: string;
+  /**
+   * Frame: a built-in `.frame-*` CSS class (globals.css). Banner: a CSS
+   * background. Theme: a #rrggbb accent. Null when the item is a picture.
+   */
+  style: string | null;
+  /** An uploaded picture: a frame overlay or a banner image. */
+  imageUrl: string | null;
+  /** Hidden items can't be bought, but people who own one keep wearing it. */
+  active: boolean;
 };
+
+/** A built-in item as written below; the database fills in the rest. */
+export type CosmeticSeed = Pick<Cosmetic, "id" | "kind" | "name" | "price" | "rarity"> & { style: string };
 
 export const KIND_LABELS: Record<CosmeticKind, { one: string; many: string }> = {
   frame: { one: "Avatar frame", many: "Avatar frames" },
@@ -32,15 +52,15 @@ export const RARITY: Record<Rarity, { label: string; color: string }> = {
   legendary: { label: "Legendary", color: "#f59e0b" },
 };
 
-export const COSMETICS: Cosmetic[] = [
+export const BUILTIN_COSMETICS: CosmeticSeed[] = [
   // ---- Avatar frames ----
-  { id: "frame-spark", kind: "frame", name: "Spark", price: 1, rarity: "common" },
-  { id: "frame-wave", kind: "frame", name: "Wave", price: 1, rarity: "common" },
-  { id: "frame-party", kind: "frame", name: "Confetti", price: 2, rarity: "rare" },
-  { id: "frame-neon", kind: "frame", name: "Neon", price: 2, rarity: "rare" },
-  { id: "frame-gold", kind: "frame", name: "Gold", price: 4, rarity: "epic" },
-  { id: "frame-aurora", kind: "frame", name: "Aurora", price: 5, rarity: "epic" },
-  { id: "frame-prism", kind: "frame", name: "Prism", price: 10, rarity: "legendary" },
+  { id: "frame-spark", kind: "frame", name: "Spark", price: 1, rarity: "common", style: "frame-spark" },
+  { id: "frame-wave", kind: "frame", name: "Wave", price: 1, rarity: "common", style: "frame-wave" },
+  { id: "frame-party", kind: "frame", name: "Confetti", price: 2, rarity: "rare", style: "frame-party" },
+  { id: "frame-neon", kind: "frame", name: "Neon", price: 2, rarity: "rare", style: "frame-neon" },
+  { id: "frame-gold", kind: "frame", name: "Gold", price: 4, rarity: "epic", style: "frame-gold" },
+  { id: "frame-aurora", kind: "frame", name: "Aurora", price: 5, rarity: "epic", style: "frame-aurora" },
+  { id: "frame-prism", kind: "frame", name: "Prism", price: 10, rarity: "legendary", style: "frame-prism" },
 
   // ---- Banners ----
   {
@@ -132,60 +152,65 @@ export const COSMETICS: Cosmetic[] = [
   { id: "theme-gold", kind: "theme", name: "Gold", price: 2, rarity: "rare", style: "#c58b00" },
 ];
 
+/** Highest points price an admin can set on a Store item. */
+export const MAX_ITEM_PRICE = 100_000;
+
 export const DEFAULT_BANNER = "banner-violet";
 export const DEFAULT_THEME = "theme-violet";
+const FALLBACK_BANNER = BUILTIN_COSMETICS.find((c) => c.id === DEFAULT_BANNER)!.style;
+const FALLBACK_THEME = BUILTIN_COSMETICS.find((c) => c.id === DEFAULT_THEME)!.style;
 
-export function cosmeticById(id: string | null | undefined): Cosmetic | null {
-  return COSMETICS.find((c) => c.id === id) ?? null;
+/** The built-in items as full catalogue rows (used when the table is empty). */
+export function builtinCatalogue(): Cosmetic[] {
+  return BUILTIN_COSMETICS.map((c) => ({ ...c, imageUrl: null, active: true }));
 }
 
-/** Admin price overrides, { "<cosmetic id>": points }, from OrgSettings.cosmeticPrices. */
-export type CosmeticPrices = Record<string, number>;
+export function isKind(value: unknown): value is CosmeticKind {
+  return typeof value === "string" && (COSMETIC_KINDS as string[]).includes(value);
+}
 
-/** Read the stored overrides, dropping anything malformed or unknown. */
-export function parseCosmeticPrices(raw: unknown): CosmeticPrices {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const out: CosmeticPrices = {};
-  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (cosmeticById(id) && typeof value === "number" && Number.isInteger(value) && value >= 0) {
-      out[id] = value;
-    }
-  }
-  return out;
+export function isRarity(value: unknown): value is Rarity {
+  return typeof value === "string" && (RARITIES as string[]).includes(value);
+}
+
+export function itemById(catalogue: Cosmetic[], id: string | null | undefined): Cosmetic | null {
+  if (!id) return null;
+  return catalogue.find((c) => c.id === id) ?? null;
 }
 
 /**
- * The price staff actually pay: the admin override when set, else the
- * catalogue price. Starter items (catalogue price 0) are always free, since
- * everyone owns them from day one.
+ * How an avatar frame is drawn: a built-in CSS class such as "frame-neon", or
+ * the https URL of an uploaded overlay picture. FramedAvatar tells them apart.
  */
-export function effectivePrice(item: Cosmetic, prices: CosmeticPrices): number {
-  if (item.price === 0) return 0;
-  return prices[item.id] ?? item.price;
+export type FrameArt = string;
+
+export function isFrameImage(art: FrameArt): boolean {
+  return art.startsWith("https://") || art.startsWith("http://");
 }
 
-/** The catalogue with admin prices applied. */
-export function pricedCosmetics(prices: CosmeticPrices): Cosmetic[] {
-  return COSMETICS.map((c) => ({ ...c, price: effectivePrice(c, prices) }));
+/** A frame item's art, or null if it has none. */
+export function frameArt(item: Cosmetic): FrameArt | null {
+  return item.imageUrl ?? item.style ?? null;
 }
 
-/** Free items everyone owns from day one. */
-export function isFree(id: string): boolean {
-  return (cosmeticById(id)?.price ?? 1) === 0;
+/** A banner item as a CSS background (its picture, cover-cropped, or its gradient). */
+export function bannerCss(item: Pick<Cosmetic, "style" | "imageUrl">): string {
+  if (item.imageUrl) return `center / cover no-repeat url("${encodeURI(item.imageUrl)}")`;
+  return item.style ?? FALLBACK_BANNER;
 }
 
-/** The CSS class that draws a frame, e.g. "frame-neon". */
-export function frameClass(id: string | null | undefined): string | null {
-  const item = cosmeticById(id);
-  return item?.kind === "frame" ? item.id : null;
-}
+/** Someone's resolved look, ready to draw: what the feed, profiles and lists receive. */
+export type Look = { frame: FrameArt | null; banner: string; theme: string };
 
-export function bannerStyle(id: string | null | undefined): string {
-  const item = cosmeticById(id);
-  return (item?.kind === "banner" ? item.style : undefined) ?? cosmeticById(DEFAULT_BANNER)!.style!;
-}
+export const DEFAULT_LOOK: Look = { frame: null, banner: FALLBACK_BANNER, theme: FALLBACK_THEME };
 
-export function themeColour(id: string | null | undefined): string {
-  const item = cosmeticById(id);
-  return (item?.kind === "theme" ? item.style : undefined) ?? cosmeticById(DEFAULT_THEME)!.style!;
+/** The look of the default banner and theme in this catalogue. */
+export function defaultLook(catalogue: Cosmetic[]): Look {
+  const banner = itemById(catalogue, DEFAULT_BANNER);
+  const theme = itemById(catalogue, DEFAULT_THEME);
+  return {
+    frame: null,
+    banner: banner?.kind === "banner" ? bannerCss(banner) : FALLBACK_BANNER,
+    theme: theme?.kind === "theme" && theme.style ? theme.style : FALLBACK_THEME,
+  };
 }

@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 import { parseEurosToCents } from "@/lib/economy";
-import { COSMETICS, type CosmeticPrices } from "@/lib/cosmetics";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -77,43 +76,4 @@ export async function updateEconomySettings(
   });
   revalidateEconomy();
   return { ok: true, message: "Economy saved." };
-}
-
-/**
- * Save profile Store prices. Each `price:<id>` field is an item's points
- * price; a value equal to the catalogue default is stored as "no override".
- * Starter (free) items can't be priced.
- */
-export async function updateCosmeticPrices(
-  _prev: ActionResult | undefined,
-  formData: FormData,
-): Promise<ActionResult> {
-  const admin = await requireAdmin();
-  const prices: CosmeticPrices = {};
-  for (const item of COSMETICS) {
-    if (item.price === 0) continue;
-    const raw = String(formData.get(`price:${item.id}`) ?? "").trim();
-    if (raw === "") continue;
-    const n = Number(raw);
-    if (!Number.isInteger(n) || n < 0) {
-      return { ok: false, error: `Enter a whole number of points for ${item.name}.` };
-    }
-    if (n !== item.price) prices[item.id] = n;
-  }
-
-  await prisma.orgSettings.upsert({
-    where: { id: "singleton" },
-    create: { id: "singleton", cosmeticPrices: prices },
-    update: { cosmeticPrices: prices },
-  });
-  await writeAudit({
-    actor: admin,
-    action: "settings.updated",
-    entityType: "org_settings",
-    entityId: "singleton",
-    summary: "Updated profile Store prices",
-    metadata: { cosmeticPrices: prices },
-  });
-  revalidateEconomy();
-  return { ok: true, message: "Store prices saved." };
 }

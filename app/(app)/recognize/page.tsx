@@ -2,7 +2,8 @@ import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getAllowanceStatus } from "@/lib/points";
-import { parseProfile } from "@/lib/profile-custom";
+import { lookOf } from "@/lib/profile-custom";
+import { getCatalogue } from "@/lib/catalogue";
 import { RecognizeForm } from "./recognize-form";
 
 export const dynamic = "force-dynamic";
@@ -52,12 +53,13 @@ export default async function RecognizePage({
     }),
   ]);
 
+  const catalogue = await getCatalogue();
   const recipients = users.map((u) => ({
     id: u.id,
     name: u.name,
     jobTitle: u.jobTitle,
     avatarUrl: u.avatarUrl,
-    frame: parseProfile(u.profile).frame,
+    frame: lookOf(u.profile, catalogue).frame,
     siteCode: u.site?.code ?? "",
   }));
 

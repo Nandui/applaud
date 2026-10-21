@@ -3,7 +3,8 @@ import { ImagePlus, Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getFeedCards } from "@/lib/recognition/queries";
-import { parseProfile } from "@/lib/profile-custom";
+import { lookOf, parseProfile } from "@/lib/profile-custom";
+import { getCatalogue } from "@/lib/catalogue";
 import { formatNumber } from "@/lib/format";
 import { AppBar } from "@/components/app-shell/app-bar";
 import { Wordmark } from "@/components/app-shell/brand";
@@ -14,19 +15,21 @@ export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const me = await requireUser();
-  const [cards, wallet] = await Promise.all([
+  const [cards, wallet, catalogue] = await Promise.all([
     getFeedCards(me.id),
     prisma.user.findUnique({
       where: { id: me.id },
       select: { walletBalance: true, profile: true },
     }),
+    getCatalogue(),
   ]);
+  const myFrame = lookOf(wallet?.profile, catalogue).frame;
   const viewer = {
     id: me.id,
     name: me.name,
     avatarUrl: me.avatarUrl ?? null,
     role: me.role,
-    frame: parseProfile(wallet?.profile).frame,
+    frame: myFrame,
   };
   const myPins = new Set(parseProfile(wallet?.profile).pinned);
 
@@ -57,7 +60,7 @@ export default async function FeedPage() {
         <FramedAvatar
           name={me.name}
           avatarUrl={me.avatarUrl}
-          frame={parseProfile(wallet?.profile).frame}
+          frame={myFrame}
           className="size-10"
         />
         <span className="min-w-0 flex-1">

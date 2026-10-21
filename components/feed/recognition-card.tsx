@@ -32,7 +32,7 @@ import {
 } from "@/lib/config";
 import type { FeedCard } from "@/lib/recognition/queries";
 import { FramedAvatar } from "@/components/user-avatar";
-import { bannerStyle, themeColour } from "@/lib/cosmetics";
+import { DEFAULT_LOOK } from "@/lib/cosmetics";
 import { isLight } from "@/lib/profile-custom";
 import { ValueSeal } from "@/components/value-seal";
 import { tint } from "@/components/value-chip";
@@ -132,7 +132,7 @@ function BannerHero({ card }: { card: FeedCard }) {
   return (
     <div
       className="relative flex aspect-[5/4] flex-col items-center justify-center gap-3 px-6 text-center text-white"
-      style={{ background: bannerStyle(lead?.look.banner) }}
+      style={{ background: lead?.look.banner ?? DEFAULT_LOOK.banner }}
     >
       <div aria-hidden className="absolute inset-0 bg-black/10" />
       {people.length > 0 && (
@@ -402,7 +402,7 @@ export function RecognitionCard({
     pinned !== undefined && !card.system && card.recipients.some((r) => r.id === viewer.id);
 
   const people = card.recipients.slice(0, 3);
-  const accent = themeColour(card.recipients[0]?.look.theme);
+  const accent = card.recipients[0]?.look.theme ?? DEFAULT_LOOK.theme;
   const hasMedia = card.imageUrls.length > 0;
 
   return (

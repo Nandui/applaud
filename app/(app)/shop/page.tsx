@@ -1,9 +1,9 @@
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
-import { KIND_LABELS, parseCosmeticPrices, pricedCosmetics, type CosmeticKind } from "@/lib/cosmetics";
-import { getOrgSettings } from "@/lib/org-settings";
-import { ownsItem, parseProfile } from "@/lib/profile-custom";
+import { COSMETIC_KINDS, KIND_LABELS } from "@/lib/cosmetics";
+import { getCatalogue } from "@/lib/catalogue";
+import { ownsItem, parseProfile, resolveLook, wornItem } from "@/lib/profile-custom";
 import { AppBar } from "@/components/app-shell/app-bar";
 import { StoreTabs } from "@/components/shop/store-tabs";
 import { ProfilePreview } from "@/components/shop/profile-preview";
@@ -11,8 +11,6 @@ import { ShopItem } from "@/components/shop/shop-item";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Profile shop" };
-
-const KINDS: CosmeticKind[] = ["frame", "banner", "theme"];
 
 /**
  * Profile shop (Steam Points Shop): spend points on avatar frames, banners
@@ -26,13 +24,18 @@ export default async function ShopPage() {
     select: { name: true, avatarUrl: true, walletBalance: true, profile: true },
   });
   const custom = parseProfile(me.profile);
-  const catalogue = pricedCosmetics(parseCosmeticPrices((await getOrgSettings()).cosmeticPrices));
+  const catalogue = await getCatalogue();
+  // Hidden items leave the shop, but anyone who owns one still sees it here.
+  const shown = catalogue.filter((c) => c.active || ownsItem(custom, c));
   const wearer = {
     name: me.name,
     avatarUrl: me.avatarUrl,
-    frame: custom.frame,
-    banner: custom.banner,
-    theme: custom.theme,
+    look: resolveLook(custom, catalogue),
+    worn: {
+      frame: wornItem(custom, "frame", catalogue)?.id ?? null,
+      banner: wornItem(custom, "banner", catalogue)?.id ?? null,
+      theme: wornItem(custom, "theme", catalogue)?.id ?? null,
+    },
   };
 
   return (
@@ -45,19 +48,19 @@ export default async function ShopPage() {
           {formatNumber(me.walletBalance)} pts to spend
         </p>
       </div>
-      <ProfilePreview {...wearer} className="mt-2" />
+      <ProfilePreview name={wearer.name} avatarUrl={wearer.avatarUrl} look={wearer.look} className="mt-2" />
 
       <div className="mt-6 space-y-7">
-        {KINDS.map((kind) => (
+        {COSMETIC_KINDS.filter((kind) => shown.some((c) => c.kind === kind)).map((kind) => (
           <section key={kind}>
             <h2 className="mb-3 text-lg font-bold">{KIND_LABELS[kind].many}</h2>
             <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4">
-              {catalogue.filter((c) => c.kind === kind).map((item) => (
+              {shown.filter((c) => c.kind === kind).map((item) => (
                 <ShopItem
                   key={item.id}
                   item={item}
                   me={wearer}
-                  owned={ownsItem(custom, item.id)}
+                  owned={ownsItem(custom, item)}
                   balance={me.walletBalance}
                 />
               ))}
