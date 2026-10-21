@@ -38,15 +38,17 @@ function PopoverTrigger({
 function PopoverContent({
   className,
   align = "center",
+  side = "bottom",
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Popup> & {
   align?: React.ComponentProps<typeof PopoverPrimitive.Positioner>["align"]
+  side?: React.ComponentProps<typeof PopoverPrimitive.Positioner>["side"]
   sideOffset?: React.ComponentProps<typeof PopoverPrimitive.Positioner>["sideOffset"]
 }) {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Positioner align={align} sideOffset={sideOffset}>
+      <PopoverPrimitive.Positioner className="z-50" align={align} side={side} sideOffset={sideOffset}>
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(

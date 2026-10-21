@@ -27,9 +27,12 @@ type SearchResponse = {
 export function GifPicker({
   onSelect,
   disabled,
+  triggerClassName,
 }: {
   onSelect: (gif: GifResult) => void;
   disabled?: boolean;
+  /** Replaces the default tile styling (the composer uses a toolbar icon). */
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -80,10 +83,22 @@ export function GifPicker({
         <button
           type="button"
           disabled={disabled}
-          className="bg-secondary text-foreground flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl transition-transform active:scale-95 disabled:opacity-50"
+          aria-label="Add a GIF"
+          className={
+            triggerClassName ??
+            "bg-secondary text-foreground flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl transition-transform active:scale-95 disabled:opacity-50"
+          }
         >
-          <Film className="size-5" />
-          <span className="text-[0.7rem] font-semibold">GIF</span>
+          {triggerClassName ? (
+            <span className="rounded-md border-2 border-current px-1 text-[0.6rem] leading-tight font-black">
+              GIF
+            </span>
+          ) : (
+            <>
+              <Film className="size-5" />
+              <span className="text-[0.7rem] font-semibold">GIF</span>
+            </>
+          )}
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">

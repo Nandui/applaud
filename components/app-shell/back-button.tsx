@@ -5,13 +5,19 @@ import { ChevronLeft } from "lucide-react";
 import { appBarIconClass } from "./app-bar";
 
 /** iOS-style back chevron: pops history, or falls back to a parent route. */
-export function BackButton({ fallback = "/" }: { fallback?: string }) {
+export function BackButton({
+  fallback = "/",
+  className = appBarIconClass,
+}: {
+  fallback?: string;
+  className?: string;
+}) {
   const router = useRouter();
   return (
     <button
       type="button"
       aria-label="Back"
-      className={appBarIconClass}
+      className={className}
       onClick={() => {
         if (window.history.length > 1) router.back();
         else router.push(fallback);

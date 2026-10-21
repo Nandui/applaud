@@ -1,59 +1,106 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* `dark:` follows the .dark class next-themes puts on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
- * Applaud design system — light-first and mobile-native: iOS-style grouped
- * surfaces, full-bleed feed posts, a vivid brand gradient for "create" and
- * celebratory moments, and safe-area aware chrome (see the utilities below).
- * Spec tokens are canonical; shadcn/ui aliases are mapped onto them below.
- * Fonts are loaded via next/font (layout.tsx) and exposed as the
- * --font-* variables referenced here.
+ * Applaud design system: plain and familiar, like Instagram. Neutral white /
+ * black surfaces that follow the phone's theme, one violet accent, Geist
+ * throughout. Every colour is a runtime CSS variable so the two
+ * themes swap without rebuilding utilities; shadcn/ui aliases map onto them.
+ * Fonts come from next/font (layout.tsx) as --font-* variables.
  */
-@theme {
-  --color-background: #f2f3f7;
-  --color-surface: #ffffff;
-  --color-border: #e2e8ee;
-  --color-foreground: #0f172a;
-  --color-muted: #64748b;
+:root {
+  --background: #ffffff;
+  --surface: #f5f5f7;
+  --surface-2: #ebebef;
+  --surface-3: #dedee4;
+  --border: rgb(0 0 0 / 0.1);
+  --foreground: #0a0a0a;
+  --muted: #737373;
 
-  --color-primary: #4f46e5; /* indigo */
-  --color-primary-fg: #ffffff;
-  --color-accent: #0e7c86; /* teal */
-  --color-accent-fg: #ffffff;
+  --primary: #6a4dff;
+  --primary-fg: #ffffff;
 
-  /* Brand gradient (create button, story rings, hero cards). */
-  --color-brand-1: #6d5efc;
-  --color-brand-2: #d946ef;
-  --color-brand-3: #fb7185;
-  --color-brand-4: #fbbf24;
+  --success: #12a150;
+  --warning: #c27a00;
+  --danger: #e5294f;
 
-  --color-success: #15803d;
-  --color-warning: #b45309;
-  --color-danger: #be123c;
+  --glass: rgb(255 255 255 / 0.9);
+  --tabbar: rgb(255 255 255 / 0.96);
+  --shadow-color: 240 10% 20%;
+}
 
-  --font-display: var(--font-space-grotesk), "Space Grotesk", ui-sans-serif, sans-serif;
-  --font-sans: var(--font-ibm-plex-sans), "IBM Plex Sans", ui-sans-serif, sans-serif;
-  --font-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+.dark {
+  --background: #000000;
+  --surface: #121212;
+  --surface-2: #262626;
+  --surface-3: #363636;
+  --border: rgb(255 255 255 / 0.12);
+  --foreground: #f5f5f5;
+  --muted: #a8a8a8;
 
-  --radius: 0.875rem;
+  --primary: #8b70ff;
+  --primary-fg: #ffffff;
 
-  /* ---- shadcn/ui aliases (mapped onto the canonical tokens above) ---- */
-  --color-card: var(--color-surface);
-  --color-card-foreground: var(--color-foreground);
-  --color-popover: var(--color-surface);
-  --color-popover-foreground: var(--color-foreground);
-  --color-primary-foreground: var(--color-primary-fg);
-  --color-secondary: #eef2f6;
-  --color-secondary-foreground: var(--color-foreground);
-  --color-accent-foreground: var(--color-accent-fg);
-  --color-muted-foreground: var(--color-muted);
-  --color-input: var(--color-border);
-  --color-ring: var(--color-primary);
-  --color-destructive: var(--color-danger);
+  --success: #3ddc84;
+  --warning: #ffb020;
+  --danger: #ff4d6a;
+
+  --glass: rgb(0 0 0 / 0.86);
+  --tabbar: rgb(0 0 0 / 0.96);
+  --shadow-color: 0 0% 0%;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  /* shadcn's "accent" is the neutral hover/highlight fill in menus. */
+  --color-accent: var(--surface-2);
+  --color-accent-fg: var(--foreground);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  /* Brand gradient: violet → magenta → hot pink (create button, hero cards). */
+  --color-brand-1: #7c5cff;
+  --color-brand-2: #d14dff;
+  --color-brand-3: #ff4f9a;
+  --color-brand-4: #ff9f43;
+
+  --font-display: var(--font-geist), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+
+  --radius: 1rem;
+
+  /* ---- shadcn/ui aliases ---- */
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--foreground);
+  --color-primary-foreground: var(--primary-fg);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--foreground);
+  --color-accent-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted);
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+  --color-destructive: var(--danger);
   --color-destructive-foreground: #ffffff;
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
@@ -67,6 +114,9 @@
     -webkit-tap-highlight-color: transparent;
     color-scheme: light;
   }
+  html.dark {
+    color-scheme: dark;
+  }
   /* Kill the 300ms double-tap-zoom delay so taps feel instant. */
   a,
   button,
@@ -79,58 +129,68 @@
   }
   /* iOS zooms into inputs under 16px; keep form text at 16px on phones. */
   @media (max-width: 767px) {
-    input:not([type="checkbox"]):not([type="radio"]),
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
     select,
     textarea {
       font-size: 16px;
     }
   }
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--background);
+    color: var(--foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "cv05", "ss01";
+    font-feature-settings: "ss01", "cv11";
   }
   h1,
   h2,
   h3,
   h4,
   h5 {
-    font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
-  /* Points and numeric values render in mono, per the design rules. */
+  /* Points and numeric values use tabular figures. */
   .font-numeric,
   [data-numeric] {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }
 }
 
-/* ---- Mobile-native utilities ---- */
+/* ---- Utilities ---- */
 
-/* The brand gradient as a fill (create button, hero cards). */
+/* The brand gradient as a fill (Send button, hero cards). */
 @utility bg-brand {
   background-image: linear-gradient(
     135deg,
     var(--color-brand-1) 0%,
-    var(--color-brand-2) 55%,
-    var(--color-brand-3) 80%,
-    var(--color-brand-4) 100%
+    var(--color-brand-2) 50%,
+    var(--color-brand-3) 100%
   );
 }
 
-/* Story-style ring around an avatar. */
+/* Gradient ring around an avatar. */
 @utility ring-brand {
   background-image: conic-gradient(
     from 210deg,
-    var(--color-brand-4),
-    var(--color-brand-3),
-    var(--color-brand-2),
     var(--color-brand-1),
-    var(--color-brand-4)
+    var(--color-brand-2),
+    var(--color-brand-3),
+    var(--color-brand-4),
+    var(--color-brand-1)
   );
+}
+
+/* Text filled with the brand gradient (wordmark, big numbers). */
+@utility text-brand {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-brand-1),
+    var(--color-brand-2) 55%,
+    var(--color-brand-3)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Safe-area insets for notches and the home indicator. */
@@ -150,14 +210,88 @@
   }
 }
 
-/* Translucent "frosted" chrome used by the app bar and tab bar. */
+/* Translucent "frosted" chrome used by the app bar. */
 @utility glass {
-  background-color: rgb(255 255 255 / 0.82);
+  background-color: var(--glass);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
 }
 
-/* Bottom space so content clears the tab bar (and the home indicator). */
+/* Bottom space so content clears the floating tab bar (and home indicator). */
 @utility pb-tabbar {
   padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+}
+
+/* Soft elevation that reads in both themes. */
+@utility shadow-float {
+  box-shadow:
+    0 1px 2px hsl(var(--shadow-color) / 0.12),
+    0 12px 32px -8px hsl(var(--shadow-color) / 0.35);
+}
+
+/* ---- Avatar frames (shop items, see lib/cosmetics.ts) ---- */
+
+@keyframes deco-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes deco-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.frame-ring {
+  --deco-w: 4px;
+  position: absolute;
+  inset: calc(var(--deco-w) * -0.5);
+  border-radius: 9999px;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--deco-w) - 0.5px), #000 calc(100% - var(--deco-w)));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--deco-w) - 0.5px), #000 calc(100% - var(--deco-w)));
+}
+/* Bigger avatars wear a chunkier ring. */
+.frame-ring-lg {
+  --deco-w: 6px;
+}
+.frame-spark {
+  background: conic-gradient(from 0deg, #7c5cff, #c6f432, #7c5cff);
+}
+.frame-wave {
+  background: conic-gradient(from 90deg, #22d3ee, #3b82f6, #a78bfa, #22d3ee);
+}
+.frame-neon {
+  background: conic-gradient(#ff4f9a, #7c5cff, #22d3ee, #c6f432, #ff4f9a);
+  filter: drop-shadow(0 0 6px rgb(124 92 255 / 0.7));
+}
+.frame-aurora {
+  background: conic-gradient(#34d399, #22d3ee, #a78bfa, #f472b6, #34d399);
+  animation: deco-spin 6s linear infinite;
+  filter: drop-shadow(0 0 8px rgb(52 211 153 / 0.5));
+}
+.frame-gold {
+  background: conic-gradient(#fde68a, #f59e0b, #fff7d6, #d97706, #fde68a);
+  filter: drop-shadow(0 0 6px rgb(245 158 11 / 0.55));
+}
+.frame-party {
+  background: repeating-conic-gradient(#ff4f9a 0 20deg, #ffb020 20deg 40deg, #7c5cff 40deg 60deg, #22d3ee 60deg 80deg);
+  animation: deco-spin 14s linear infinite;
+}
+.frame-prism {
+  background: conic-gradient(from 180deg, #c6f432, #fde047, #ff9f43, #ff4f9a, #7c5cff, #c6f432);
+  animation: deco-pulse 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgb(198 244 50 / 0.5));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame-ring {
+    animation: none !important;
+  }
 }

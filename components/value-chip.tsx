@@ -28,15 +28,16 @@ export function ValueChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+        "text-foreground inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold",
         className,
       )}
-      style={{
-        color: value.color ?? undefined,
-        backgroundColor: tint(value.color) ?? "var(--color-secondary)",
-      }}
+      style={{ backgroundColor: tint(value.color, 0.18) ?? "var(--surface-2)" }}
     >
-      <ValueIcon icon={value.icon} className="size-3.5 shrink-0" />
+      <ValueIcon
+        icon={value.icon}
+        className="size-3.5 shrink-0"
+        style={value.color ? { color: value.color } : undefined}
+      />
       {value.name}
     </span>
   );

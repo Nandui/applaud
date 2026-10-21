@@ -14,7 +14,7 @@ export default async function AdminLayout({
   // phones, since this layout already owns the sticky app bar.
   return (
     <div data-admin className="flex flex-col md:flex-row md:gap-8">
-      <AppBar title="Admin" leading={<BackButton fallback="/profile" />}>
+      <AppBar title="Admin" className="md:hidden" leading={<BackButton fallback="/profile" />}>
         <AdminSidebar />
       </AppBar>
       <aside className="hidden md:block md:w-56 md:shrink-0">

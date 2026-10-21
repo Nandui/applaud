@@ -23,6 +23,7 @@ export const LEDGER_TYPES = [
   "EXPIRY",
   "ADJUSTMENT",
   "BOOST",
+  "SHOP",
 ] as const;
 export type LedgerType = (typeof LEDGER_TYPES)[number];
 

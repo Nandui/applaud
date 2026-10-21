@@ -100,7 +100,7 @@ export function ManagerPicker({
                 role="checkbox"
                 aria-checked={checked}
                 onClick={() => toggle(m.id)}
-                className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none focus-visible:ring-2"
+                className="hover:bg-surface-2 focus-visible:ring-ring/50 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none focus-visible:ring-2"
               >
                 <span
                   aria-hidden

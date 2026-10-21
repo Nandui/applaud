@@ -27,7 +27,7 @@ export function AdminSidebar() {
             className={cn(
               "flex h-8 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors md:h-auto md:gap-2.5 md:rounded-md md:py-2 md:font-medium",
               active
-                ? "bg-foreground md:bg-primary/10 md:text-primary text-white"
+                ? "bg-foreground text-background md:bg-primary/10 md:text-primary"
                 : "bg-secondary md:text-muted md:hover:text-foreground md:hover:bg-secondary md:bg-transparent",
             )}
           >

@@ -42,6 +42,10 @@ model User {
   reports   UserManager[] @relation("ManagerUser")
   hireDate  DateTime?
   birthday  DateTime? // store full date; celebrate on month/day
+  // Self-service profile customization (bio, status, pronouns, theme colours,
+  // earned avatar decoration, pinned recognitions). Free-form JSON validated
+  // by lib/profile-custom.ts; null means "all defaults".
+  profile   Json?
   active    Boolean       @default(true)
   createdAt DateTime      @default(now())
 
@@ -87,6 +91,9 @@ model Value {
   description  String?
   icon         String? // lucide icon name
   color        String? // hex or token
+  /// Optional badge artwork uploaded by an admin (Vercel Blob URL); shown in
+  /// place of the icon wherever the value appears.
+  imageUrl     String?
   order        Int           @default(0)
   active       Boolean       @default(true)
   recognitions Recognition[]

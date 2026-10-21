@@ -1,9 +1,16 @@
 import { prisma } from "@/lib/prisma";
+import { parseProfile } from "@/lib/profile-custom";
 
 export const CELEBRATION_LABELS: Record<string, string> = {
   work_anniversary: "Work anniversary",
   birthday: "Birthday",
   onboarding: "Onboarding",
+};
+
+export const CELEBRATION_EMOJI: Record<string, string> = {
+  work_anniversary: "🎊",
+  birthday: "🎂",
+  onboarding: "🚀",
 };
 
 export async function getProfileData(userId: string) {
@@ -23,6 +30,7 @@ export async function getProfileData(userId: string) {
       hireDate: true,
       createdAt: true,
       active: true,
+      profile: true,
       site: { select: { name: true, code: true } },
       managers: {
         orderBy: { manager: { name: "asc" } },
@@ -34,7 +42,7 @@ export async function getProfileData(userId: string) {
 
   const id = user.id;
 
-  const [receivedCount, givenCount, earn, valueRows, celebrations] =
+  const [receivedCount, givenCount, earn, valueRows, celebrations, awards] =
     await Promise.all([
       prisma.recognitionRecipient.count({
         where: { userId: id, recognition: { system: false } },
@@ -53,7 +61,7 @@ export async function getProfileData(userId: string) {
           recognition: {
             select: {
               value: {
-                select: { id: true, name: true, icon: true, color: true },
+                select: { id: true, name: true, icon: true, color: true, imageUrl: true },
               },
             },
           },
@@ -64,12 +72,23 @@ export async function getProfileData(userId: string) {
         orderBy: { occurredOn: "desc" },
         take: 10,
       }),
+      prisma.nomination.findMany({
+        where: { nomineeId: id, status: "approved" },
+        orderBy: { reviewedAt: "desc" },
+        select: {
+          id: true,
+          reviewedAt: true,
+          createdAt: true,
+          pointsAwarded: true,
+          program: { select: { name: true, cadence: true } },
+        },
+      }),
     ]);
 
   const tagMap = new Map<
     string,
     {
-      value: { id: string; name: string; icon: string | null; color: string | null };
+      value: { id: string; name: string; icon: string | null; color: string | null; imageUrl: string | null };
       count: number;
     }
   >();
@@ -82,14 +101,27 @@ export async function getProfileData(userId: string) {
   }
   const valueTags = [...tagMap.values()].sort((a, b) => b.count - a.count);
 
+  const pointsEarned = earn._sum.amount ?? 0;
+  const custom = parseProfile(user.profile);
+
   return {
     user,
+    custom,
     stats: {
       receivedCount,
       givenCount,
-      pointsEarned: earn._sum.amount ?? 0,
+      pointsEarned,
     },
     valueTags,
     celebrations,
+    awards: awards.map((a) => ({
+      id: a.id,
+      name: a.program.name,
+      cadence: a.program.cadence,
+      points: a.pointsAwarded,
+      wonAt: a.reviewedAt ?? a.createdAt,
+    })),
   };
 }
+
+export type ProfileData = NonNullable<Awaited<ReturnType<typeof getProfileData>>>;

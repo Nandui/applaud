@@ -2,28 +2,31 @@
 
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
-import { Award } from "lucide-react";
+import { Check, Search, Trophy } from "lucide-react";
 import { nominate, type ActionResult } from "@/lib/awards/actions";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { UserAvatar } from "@/components/user-avatar";
+import { cn } from "@/lib/utils";
 
 type Colleague = {
   id: string;
   name: string;
   jobTitle: string | null;
   siteCode: string;
+  avatarUrl?: string | null;
 };
 
+/**
+ * Nominate as a bottom sheet: pick one person from a searchable list (the same
+ * picker as Send), then say why. Replaces the old native <select>.
+ */
 export function NominateDialog({
   program,
   colleagues,
@@ -33,6 +36,7 @@ export function NominateDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [nomineeId, setNomineeId] = useState("");
+  const [q, setQ] = useState("");
   // Toast + close from inside the action (not an effect watching its state).
   const [, formAction, pending] = useActionState<
     ActionResult | undefined,
@@ -42,76 +46,115 @@ export function NominateDialog({
     if (res.ok) {
       toast.success(res.message ?? "Nomination submitted.");
       setOpen(false);
+      setNomineeId("");
     } else {
       toast.error(res.error);
     }
     return res;
   }, undefined);
 
+  const query = q.trim().toLowerCase();
+  const list = colleagues.filter(
+    (c) =>
+      !query ||
+      c.name.toLowerCase().includes(query) ||
+      (c.jobTitle ?? "").toLowerCase().includes(query) ||
+      c.siteCode.toLowerCase().includes(query),
+  );
+  const chosen = colleagues.find((c) => c.id === nomineeId);
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="h-10 w-full rounded-full">
-          <Award className="size-4" /> Nominate someone
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Nominate for {program.name}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          className="bg-primary text-primary-fg flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold active:opacity-80"
+        >
+          <Trophy className="size-4" /> Nominate someone
+        </button>
+      </SheetTrigger>
+      <SheetContent side="bottom" showCloseButton={false} className="gap-0 px-0">
+        <SheetHeader className="pt-2">
+          <SheetTitle className="text-base">Nominate for {program.name}</SheetTitle>
+          <SheetDescription>
             {program.requiresApproval
-              ? "Your nomination goes to a manager or admin for approval."
-              : "This award is granted immediately."}
-          </DialogDescription>
-        </DialogHeader>
-        <form action={formAction} className="space-y-4">
+              ? "Your nomination goes to their manager or an admin to approve."
+              : "This award is granted straight away."}
+          </SheetDescription>
+        </SheetHeader>
+        <form action={formAction} className="flex min-h-0 flex-1 flex-col px-4">
           <input type="hidden" name="programId" value={program.id} />
           <input type="hidden" name="nomineeId" value={nomineeId} />
 
-          <div className="space-y-1.5">
-            <Label htmlFor="nominee">Colleague</Label>
-            {/* Native select: phones open their own picker wheel/list. */}
-            <select
-              id="nominee"
-              value={nomineeId}
-              onChange={(e) => setNomineeId(e.target.value)}
-              className="border-input bg-surface h-11 w-full rounded-xl border px-3 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          {chosen ? (
+            <button
+              type="button"
+              onClick={() => setNomineeId("")}
+              className="bg-surface-2 flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left"
             >
-              <option value="" disabled>
-                Choose a colleague
-              </option>
-              {colleagues.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} — {c.jobTitle ?? "—"}
-                  {c.siteCode ? ` · ${c.siteCode}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+              <UserAvatar name={chosen.name} avatarUrl={chosen.avatarUrl} className="size-10" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{chosen.name}</span>
+                <span className="text-muted block text-xs">Tap to change</span>
+              </span>
+              <Check className="text-primary size-5" />
+            </button>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="text-muted absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2" />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  type="search"
+                  placeholder="Who deserves it?"
+                  className="bg-surface-2 placeholder:text-muted h-11 w-full rounded-full pr-4 pl-10 outline-none"
+                />
+              </div>
+              <ul className="mt-2 max-h-[38svh] overflow-y-auto">
+                {list.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => setNomineeId(c.id)}
+                      className="active:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left"
+                    >
+                      <UserAvatar name={c.name} avatarUrl={c.avatarUrl} className="size-9" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">{c.name}</span>
+                        <span className="text-muted block truncate text-xs">
+                          {[c.jobTitle, c.siteCode].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="justification">Justification</Label>
-            <Textarea
-              id="justification"
-              name="justification"
-              rows={4}
-              maxLength={800}
-              placeholder="Why do they deserve this award?"
-              className="rounded-xl"
-              required
-            />
-          </div>
+          <textarea
+            id="justification"
+            name="justification"
+            rows={4}
+            maxLength={800}
+            placeholder="Why do they deserve this?"
+            required
+            className={cn(
+              "bg-surface-2 placeholder:text-muted mt-3 w-full resize-none rounded-2xl px-4 py-3 outline-none",
+              !chosen && "hidden",
+            )}
+          />
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" className="rounded-full" disabled={pending || !nomineeId}>
-              {pending ? "Submitting…" : "Submit nomination"}
-            </Button>
-          </DialogFooter>
+          <button
+            type="submit"
+            disabled={pending || !nomineeId}
+            className="bg-primary mt-3 mb-4 h-12 rounded-full font-bold text-white disabled:opacity-40"
+          >
+            {pending ? "Submitting…" : "Submit nomination"}
+          </button>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

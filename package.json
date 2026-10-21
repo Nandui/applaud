@@ -15,7 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "verify": "tsx scripts/verify.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
