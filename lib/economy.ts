@@ -22,6 +22,28 @@ export function pointsToCents(points: number, pointsPerEuro: number = DEFAULT_PO
   return pointsPerEuro > 0 ? Math.round((points * 100) / pointsPerEuro) : 0;
 }
 
+/**
+ * The advised points price for a reward that costs us `cents`: its face value
+ * at the current conversion, rounded UP to a tidy number (10s under 1,000,
+ * 50s under 5,000, then 100s) so a reward never sells for less than it costs.
+ * Null when it costs us nothing: perks are priced by feel and held by stock.
+ */
+export function suggestPointsPrice(cents: number, pointsPerEuro: number = DEFAULT_POINTS_PER_EURO): number | null {
+  if (cents <= 0) return null;
+  const face = Math.ceil((cents * pointsPerEuro) / 100);
+  const step = face < 1000 ? 10 : face < 5000 ? 50 : 100;
+  return Math.ceil(face / step) * step;
+}
+
+/**
+ * The most a month of one reward that keeps it to a quarter of the monthly
+ * budget, so no single item can use up everyone's rewards. Null for perks.
+ */
+export function suggestMonthlyStock(cents: number, budgetCents: number): number | null {
+  if (cents <= 0 || budgetCents <= 0) return null;
+  return Math.max(1, Math.floor(budgetCents / 4 / cents));
+}
+
 /** Points that are worth `cents` at `pointsPerEuro`. */
 export function centsToPoints(cents: number, pointsPerEuro: number = DEFAULT_POINTS_PER_EURO): number {
   return Math.round((cents * pointsPerEuro) / 100);
