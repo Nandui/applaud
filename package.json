@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "verify": "tsx scripts/verify.ts",
+    "import:staff": "tsx scripts/import-staff.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
