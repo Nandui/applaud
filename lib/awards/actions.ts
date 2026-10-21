@@ -7,12 +7,17 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { requireUser, requireManager, requireAdmin } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
 import { writeAudit } from "@/lib/audit";
+import { getOrgSettings } from "@/lib/org-settings";
+import { allowanceForRole, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
+import { lockPool } from "@/lib/locks";
 
 export type ActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
 type Tx = Prisma.TransactionClient;
+
+class PoolError extends Error {}
 
 /**
  * Apply an award: post a system recognition to the feed, credit the nominee
@@ -115,20 +120,36 @@ export async function nominate(
     return { ok: true, message: "Nomination submitted for approval." };
   }
 
-  // Auto-approve programs award immediately.
+  // Auto-approve programs award immediately, paid from the nominator's own
+  // giving allowance (otherwise anyone could hand out unlimited points).
+  const settings = await getOrgSettings();
   let nomId: string | undefined;
-  await prisma.$transaction(async (tx) => {
-    const nom = await tx.nomination.create({
-      data: { programId, nominatorId: me.id, nomineeId, justification, status: "pending" },
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (program.points > 0) {
+        const used = await getMonthlyAllowanceUsage(me.id, new Date(), tx);
+        const allowance = allowanceForRole(me.role, settings);
+        if (used + program.points > allowance) {
+          throw new PoolError(
+            `${program.name} costs ${program.points} of your points to give, and you have ${Math.max(0, allowance - used)} left this month.`,
+          );
+        }
+      }
+      const nom = await tx.nomination.create({
+        data: { programId, nominatorId: me.id, nomineeId, justification, status: "pending" },
+      });
+      nomId = nom.id;
+      await applyAward(
+        tx,
+        { id: nom.id, nomineeId, nomineeName: nominee.name },
+        { name: program.name, points: program.points },
+        me.id,
+      );
     });
-    nomId = nom.id;
-    await applyAward(
-      tx,
-      { id: nom.id, nomineeId, nomineeName: nominee.name },
-      { name: program.name, points: program.points },
-      me.id,
-    );
-  });
+  } catch (error) {
+    if (error instanceof PoolError) return { ok: false, error: error.message };
+    throw error;
+  }
   await writeAudit({
     actor: me,
     action: "nomination.created",
@@ -181,18 +202,35 @@ export async function approveNomination(formData: FormData): Promise<ActionResul
     return { ok: false, error: "You can only review your own reports." };
   }
 
-  await prisma.$transaction(async (tx) => {
-    await applyAward(
-      tx,
-      {
-        id: nomination.id,
-        nomineeId: nomination.nomineeId,
-        nomineeName: nomination.nominee.name,
-      },
-      { name: nomination.program.name, points: nomination.program.points },
-      reviewer.id,
-    );
-  });
+  // Approved awards come out of the company's monthly bonus pool.
+  const settings = await getOrgSettings();
+  try {
+    await prisma.$transaction(async (tx) => {
+      const points = nomination.program.points;
+      if (points > 0) {
+        await lockPool(tx, "bonusPool");
+        const used = await getMonthlyBonusUsage(new Date(), tx);
+        if (used + points > settings.monthlyBonusPool) {
+          throw new PoolError(
+            `This month's bonus pool has ${Math.max(0, settings.monthlyBonusPool - used)} points left, not enough for ${nomination.program.name} (${points}). Raise the pool in Admin settings or approve it next month.`,
+          );
+        }
+      }
+      await applyAward(
+        tx,
+        {
+          id: nomination.id,
+          nomineeId: nomination.nomineeId,
+          nomineeName: nomination.nominee.name,
+        },
+        { name: nomination.program.name, points: nomination.program.points },
+        reviewer.id,
+      );
+    });
+  } catch (error) {
+    if (error instanceof PoolError) return { ok: false, error: error.message };
+    throw error;
+  }
   await writeAudit({
     actor: reviewer,
     action: "nomination.reviewed",

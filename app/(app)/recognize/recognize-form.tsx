@@ -201,10 +201,12 @@ export function RecognizeForm({
     [recipients],
   );
 
-  const maxPerRecipient =
+  const byAllowance =
     selected.length > 0
       ? Math.floor(allowance.remaining / selected.length)
       : allowance.remaining;
+  const maxPerRecipient =
+    allowance.perShoutoutMax > 0 ? Math.min(byAllowance, allowance.perShoutoutMax) : byAllowance;
 
   // Keep points within what the allowance permits as the selection changes.
   const points = Math.min(rawPoints, Math.max(0, maxPerRecipient));
@@ -650,6 +652,7 @@ export function RecognizeForm({
         people={Math.max(1, selected.length)}
         remaining={allowance.remaining}
         total={allowance.total}
+        resetsIn={allowance.resetsIn}
       />
     </form>
   );

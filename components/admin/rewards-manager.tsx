@@ -10,6 +10,7 @@ import {
   saveReward,
   setRewardActive,
   reorderReward,
+  loadSuggestedRewards,
   type ActionResult,
 } from "@/lib/rewards/actions";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
@@ -35,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
+import { centsToEuros, centsToPoints, parseEurosToCents, pointsToCents } from "@/lib/economy";
 
 export type RewardRow = {
   id: string;
@@ -44,6 +46,10 @@ export type RewardRow = {
   category: string | null;
   pointsCost: number;
   stock: number | null;
+  euroCostCents: number;
+  monthlyStock: number | null;
+  /** Live (not cancelled) claims this month. */
+  claimedThisMonth: number;
   siteId: string | null;
   active: boolean;
   fulfilment: string;
@@ -53,6 +59,9 @@ export type RewardRow = {
 
 type SiteOption = { id: string; name: string };
 
+/** The economy numbers the reward form needs for its euro maths. */
+export type EconomyContext = { pointsPerEuro: number; monthlyRewardBudgetCents: number };
+
 const ALL_SITES = "__all__";
 
 function RewardFormDialog({
@@ -60,11 +69,13 @@ function RewardFormDialog({
   onOpenChange,
   editing,
   sites,
+  economy,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   editing: RewardRow | null;
   sites: SiteOption[];
+  economy: EconomyContext;
 }) {
   const [state, formAction, pending] = useActionState<
     ActionResult | undefined,
@@ -75,6 +86,14 @@ function RewardFormDialog({
   const [active, setActive] = useState(editing?.active ?? true);
   const [imageUrl, setImageUrl] = useState(editing?.imageUrl ?? "");
   const [uploading, setUploading] = useState(false);
+  const [pointsCost, setPointsCost] = useState(String(editing?.pointsCost ?? 0));
+  const [euroCost, setEuroCost] = useState(editing ? String(editing.euroCostCents / 100) : "");
+  const [monthlyStock, setMonthlyStock] = useState(
+    editing?.monthlyStock === null || editing?.monthlyStock === undefined ? "" : String(editing.monthlyStock),
+  );
+  const cashCents = parseEurosToCents(euroCost) ?? 0;
+  const faceCents = pointsToCents(Math.max(0, Number(pointsCost) || 0), economy.pointsPerEuro);
+  const perMonth = monthlyStock.trim() === "" ? null : Math.max(0, Math.floor(Number(monthlyStock)) || 0);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   async function handleImageFile(file: File) {
@@ -210,11 +229,73 @@ function RewardFormDialog({
                 name="pointsCost"
                 type="number"
                 min={0}
-                defaultValue={editing?.pointsCost ?? 0}
+                value={pointsCost}
+                onChange={(e) => setPointsCost(e.target.value)}
                 className="font-mono"
                 required
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="euroCost">Cash cost (€)</Label>
+              <Input
+                id="euroCost"
+                name="euroCost"
+                inputMode="decimal"
+                value={euroCost}
+                onChange={(e) => setEuroCost(e.target.value)}
+                placeholder="0 for in-house perks"
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="monthlyStock">Per month</Label>
+              <Input
+                id="monthlyStock"
+                name="monthlyStock"
+                type="number"
+                min={0}
+                value={monthlyStock}
+                onChange={(e) => setMonthlyStock(e.target.value)}
+                placeholder="No monthly limit"
+                className="font-mono"
+              />
+            </div>
+          </div>
+          <div className="bg-secondary space-y-1 rounded-lg p-3 text-xs" data-numeric>
+            <p>
+              <span className="text-muted">Points face value: </span>
+              <b>{centsToEuros(faceCents)}</b>
+              <span className="text-muted"> at {economy.pointsPerEuro} pts per €1</span>
+              {cashCents > 0 ? (
+                <>
+                  <span className="text-muted"> · face value of the cash cost: </span>
+                  <b>{centsToPoints(cashCents, economy.pointsPerEuro)} pts</b>
+                </>
+              ) : null}
+            </p>
+            {cashCents > faceCents ? (
+              <p className="text-warning">Costs more cash than its points are worth. Staff get a bargain, the budget pays.</p>
+            ) : null}
+            <p>
+              <span className="text-muted">Most per month: </span>
+              {cashCents === 0 ? (
+                <b>€0 (perk, held in check by stock)</b>
+              ) : perMonth === null ? (
+                <b>no limit, only the {centsToEuros(economy.monthlyRewardBudgetCents)} budget</b>
+              ) : (
+                <>
+                  <b>{centsToEuros(perMonth * cashCents)}</b>
+                  <span className="text-muted">
+                    {" "}
+                    = {Math.round(((perMonth * cashCents) / Math.max(1, economy.monthlyRewardBudgetCents)) * 100)}% of
+                    the {centsToEuros(economy.monthlyRewardBudgetCents)} budget
+                  </span>
+                </>
+              )}
+            </p>
+            <p className="text-muted">Cash cost counts against the monthly budget. Per month refills on the 1st.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -335,12 +416,34 @@ function ReorderButtons({ row }: { row: RewardRow }) {
   );
 }
 
+function LoadSuggestedButton() {
+  const [pending, start] = useTransition();
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const res = await loadSuggestedRewards();
+          if (res.ok) toast.success(res.message);
+          else toast.error(res.error);
+        })
+      }
+    >
+      {pending ? <Loader2 className="size-4 animate-spin" /> : null} Load suggested rewards
+    </Button>
+  );
+}
+
 export function RewardsManager({
   rows,
   sites,
+  economy,
 }: {
   rows: RewardRow[];
   sites: SiteOption[];
+  economy: EconomyContext;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RewardRow | null>(null);
@@ -377,6 +480,29 @@ export function RewardsManager({
       header: "Cost",
       cell: ({ row }) => (
         <span data-numeric>{formatNumber(row.original.pointsCost)}</span>
+      ),
+    },
+    {
+      accessorKey: "euroCostCents",
+      header: "Cash",
+      cell: ({ row }) =>
+        row.original.euroCostCents === 0 ? (
+          <span className="text-muted">€0</span>
+        ) : (
+          <span data-numeric>{centsToEuros(row.original.euroCostCents)}</span>
+        ),
+    },
+    {
+      id: "month",
+      header: "This month",
+      cell: ({ row }) => (
+        <span data-numeric>
+          {formatNumber(row.original.claimedThisMonth)}
+          <span className="text-muted">
+            {" / "}
+            {row.original.monthlyStock === null ? "∞" : formatNumber(row.original.monthlyStock)}
+          </span>
+        </span>
       ),
     },
     {
@@ -434,15 +560,18 @@ export function RewardsManager({
         data={rows}
         searchPlaceholder="Search offerings…"
         toolbar={
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> New offering
-          </Button>
+          <div className="flex gap-2">
+            <LoadSuggestedButton />
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> New offering
+            </Button>
+          </div>
         }
       />
       <RewardFormDialog
@@ -451,6 +580,7 @@ export function RewardsManager({
         onOpenChange={setOpen}
         editing={editing}
         sites={sites}
+        economy={economy}
       />
     </>
   );

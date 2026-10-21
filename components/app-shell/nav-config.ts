@@ -11,6 +11,8 @@ import {
   BarChart3,
   Settings,
   ScrollText,
+  Coins,
+  Gauge,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/config";
@@ -28,6 +30,8 @@ export type NavItem = {
 /** Admin sidebar links — all require the admin role. */
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, minRole: "admin", exact: true },
+  { href: "/admin/economy", label: "Economy", icon: Coins, minRole: "admin" },
+  { href: "/admin/points", label: "Points this month", icon: Gauge, minRole: "admin" },
   { href: "/admin/users", label: "Users", icon: Users, minRole: "admin" },
   { href: "/admin/sites", label: "Sites", icon: Building2, minRole: "admin" },
   { href: "/admin/values", label: "Values", icon: Heart, minRole: "admin" },

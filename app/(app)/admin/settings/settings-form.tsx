@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { updateOrgSettings, type ActionResult } from "@/lib/settings/actions";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,8 +12,6 @@ import { Switch } from "@/components/ui/switch";
 
 export type SettingsData = {
   appName: string;
-  monthlyAllowanceStaff: number;
-  monthlyAllowanceManager: number;
   pointsExpiryMonths: number | null;
   allowSelfRecognition: boolean;
 };
@@ -40,30 +39,13 @@ export function SettingsForm({ settings }: { settings: SettingsData }) {
             <Input id="appName" name="appName" defaultValue={settings.appName} required />
             <p className="text-muted text-xs">Shown in the UI and emails.</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="monthlyAllowanceStaff">Staff allowance / month</Label>
-              <Input
-                id="monthlyAllowanceStaff"
-                name="monthlyAllowanceStaff"
-                type="number"
-                min={0}
-                defaultValue={settings.monthlyAllowanceStaff}
-                className="font-mono"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="monthlyAllowanceManager">Manager allowance / month</Label>
-              <Input
-                id="monthlyAllowanceManager"
-                name="monthlyAllowanceManager"
-                type="number"
-                min={0}
-                defaultValue={settings.monthlyAllowanceManager}
-                className="font-mono"
-              />
-            </div>
-          </div>
+          <p className="text-muted text-sm">
+            Points, allowances, the euro conversion and the rewards budget live in{" "}
+            <Link href="/admin/economy" className="text-primary font-medium">
+              Economy
+            </Link>
+            .
+          </p>
           <div className="space-y-1.5">
             <Label htmlFor="pointsExpiryMonths">Points expiry (months)</Label>
             <Input

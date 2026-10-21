@@ -12,13 +12,17 @@ import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { getOrgSettings } from "@/lib/org-settings";
+import { getEconomyStatus } from "@/lib/budget";
+import { BudgetCard } from "@/components/admin/budget-card";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOverviewPage() {
   await requireAdmin();
 
-  const [users, recognitions, pendingNominations, openRedemptions, rewards] =
+  const settings = await getOrgSettings();
+  const [users, recognitions, pendingNominations, openRedemptions, rewards, economy] =
     await Promise.all([
       prisma.user.count({ where: { active: true } }),
       prisma.recognition.count({ where: { system: false } }),
@@ -27,6 +31,7 @@ export default async function AdminOverviewPage() {
         where: { status: { in: ["requested", "approved"] } },
       }),
       prisma.reward.count({ where: { active: true } }),
+      getEconomyStatus(settings),
     ]);
 
   const tiles = [
@@ -51,6 +56,10 @@ export default async function AdminOverviewPage() {
           </Link>
         }
       />
+
+      <div className="mb-4">
+        <BudgetCard status={economy} />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tiles.map((t) => (

@@ -11,9 +11,9 @@ import {
 } from "@/components/ui/sheet";
 import { formatNumber, pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { POINT_PRESETS } from "@/lib/economy";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"] as const;
-const PRESETS = [10, 25, 50];
 
 /**
  * Cash App-style points entry: a giant number over a keypad in a bottom sheet.
@@ -29,6 +29,7 @@ export function PointsKeypad({
   people,
   remaining,
   total,
+  resetsIn,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,6 +40,8 @@ export function PointsKeypad({
   people: number;
   remaining: number;
   total: number;
+  /** "resets in 9 days" */
+  resetsIn: string;
 }) {
   function press(k: (typeof KEYS)[number]) {
     if (k === "C") return onChange(0);
@@ -76,12 +79,12 @@ export function PointsKeypad({
           </motion.p>
           <p data-numeric className={cn("mt-3 text-sm", over ? "text-danger" : "text-muted")}>
             {people > 1 && value > 0 && `${pts(value * people)} total · `}
-            {formatNumber(left)} of {formatNumber(total)} left this month
+            {formatNumber(left)} of {formatNumber(total)} left · {resetsIn}
           </p>
         </div>
 
         <div className="mb-4 grid grid-cols-4 gap-2">
-          {PRESETS.map((n) => (
+          {POINT_PRESETS.map((n) => (
             <button
               key={n}
               type="button"
