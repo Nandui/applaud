@@ -75,7 +75,7 @@ export function LeaderboardFilters({
           scroll={false}
           className={cn(
             "flex h-8 shrink-0 items-center rounded-full px-3.5 text-sm font-semibold transition-colors",
-            period === p ? "bg-lime text-lime-fg" : "bg-surface-2",
+            period === p ? "bg-primary text-primary-fg" : "bg-surface-2",
           )}
         >
           {PERIOD_LABELS[p as Period]}
@@ -84,7 +84,7 @@ export function LeaderboardFilters({
       <label
         className={cn(
           "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full pr-3 pl-3 text-sm font-semibold",
-          site !== "all" ? "bg-lime text-lime-fg" : "bg-surface-2",
+          site !== "all" ? "bg-primary text-primary-fg" : "bg-surface-2",
         )}
       >
         <MapPin className="size-3.5" />

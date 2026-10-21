@@ -54,7 +54,7 @@ export default async function AdminAnalyticsPage({
 
       {/* Headline + stats */}
       <div className="grid gap-4 lg:grid-cols-4">
-        <Card className="from-primary/10 to-lime/10 border-primary/20 bg-gradient-to-br lg:col-span-2">
+        <Card className="from-primary/10 to-primary/10 border-primary/20 bg-gradient-to-br lg:col-span-2">
           <CardContent className="space-y-1">
             <div className="text-muted flex items-center gap-2 text-sm font-medium">
               <Activity className="size-4" /> Participation rate
@@ -151,7 +151,7 @@ export default async function AdminAnalyticsPage({
           </CardHeader>
           <CardContent className="flex h-full flex-col justify-center">
             <div className="flex items-center gap-2">
-              <Clock className="text-lime-ink size-5" />
+              <Clock className="text-primary size-5" />
               <p data-numeric className="text-3xl font-semibold">
                 {a.medianTimeToFirstDays ?? "—"}
                 {a.medianTimeToFirstDays !== null && (

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
 import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { RewardCard } from "@/components/rewards/reward-card";
+import { StoreTabs } from "@/components/shop/store-tabs";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +69,8 @@ export default async function RewardsPage({
   return (
     <div className="mx-auto max-w-3xl">
       <AppBar
-        title="Rewards"
+        title="Store"
+        tabs={<StoreTabs active="rewards" />}
         trailing={
           <Link href="/me" aria-label="Wallet history" className={appBarIconClass}>
             <History className="size-5.5" />
@@ -82,7 +84,7 @@ export default async function RewardsPage({
         <div className="relative">
           <p className="text-muted text-sm font-semibold">You&apos;ve got</p>
           <p className="font-display mt-1 flex items-baseline gap-2 text-5xl leading-none font-extrabold tracking-tight">
-            <span className="text-lime-ink text-3xl" aria-hidden>
+            <span className="text-primary text-3xl" aria-hidden>
               ✦
             </span>
             <span data-numeric>{formatNumber(balance)}</span>
@@ -106,7 +108,7 @@ export default async function RewardsPage({
               </div>
               <div className="bg-surface-3 mt-2 h-2 overflow-hidden rounded-full">
                 <div
-                  className="bg-lime h-full rounded-full"
+                  className="bg-primary h-full rounded-full"
                   style={{ width: `${Math.max(4, Math.round((balance / next.pointsCost) * 100))}%` }}
                 />
               </div>
@@ -127,7 +129,7 @@ export default async function RewardsPage({
                 scroll={false}
                 className={cn(
                   "flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-bold transition-colors",
-                  active ? "bg-lime text-lime-fg" : "bg-surface-2 text-foreground",
+                  active ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
                 )}
               >
                 {cat ?? "All"}

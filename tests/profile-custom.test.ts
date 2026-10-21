@@ -2,129 +2,105 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_PINNED,
-  levelFor,
+  isLight,
+  ownsItem,
   parseProfile,
   profileInputSchema,
-  toStoredProfile,
-  unlockedDecorations,
-  xpFor,
-  xpForLevel,
-  isLight,
-  DEFAULT_THEME,
+  withEquipped,
+  withPurchase,
 } from "../lib/profile-custom";
+import {
+  COSMETICS,
+  DEFAULT_BANNER,
+  DEFAULT_THEME,
+  bannerStyle,
+  cosmeticById,
+  themeColour,
+} from "../lib/cosmetics";
 import { daysLeft } from "../lib/periods";
 
-const none = { received: 0, given: 0, awardsWon: 0, milestones: 0, level: 1 };
-
-test("levels: thresholds grow by 50 XP per level", () => {
-  assert.equal(xpForLevel(1), 0);
-  assert.equal(xpForLevel(2), 50);
-  assert.equal(xpForLevel(3), 150);
-  assert.equal(xpForLevel(4), 300);
-  assert.equal(levelFor(0).level, 1);
-  assert.equal(levelFor(49).level, 1);
-  assert.equal(levelFor(50).level, 2);
-  const l = levelFor(160);
-  assert.equal(l.level, 3);
-  assert.equal(l.intoLevel, 10);
-  assert.equal(l.levelSpan, 150);
-  assert.ok(l.progress > 0 && l.progress < 1);
-});
-
-test("xp counts points plus shout-outs sent and received", () => {
-  assert.equal(xpFor({ pointsEarned: 100, given: 2, received: 3 }), 100 + 30 + 30);
-  assert.equal(xpFor({ pointsEarned: -40, given: 0, received: 0 }), 0);
-});
-
-test("decorations unlock from activity, never purchase", () => {
-  assert.equal(unlockedDecorations(none).size, 0);
-  const some = unlockedDecorations({ ...none, received: 10, given: 5 });
-  assert.deepEqual([...some].sort(), ["neon", "spark", "wave"]);
-  assert.ok(unlockedDecorations({ ...none, awardsWon: 1 }).has("gold"));
-  assert.ok(unlockedDecorations({ ...none, milestones: 1 }).has("party"));
-  assert.ok(unlockedDecorations({ ...none, level: 10 }).has("crown"));
-  assert.ok(!unlockedDecorations({ ...none, level: 9 }).has("crown"));
+test("catalogue ids are unique and prices are whole, non-negative points", () => {
+  const ids = COSMETICS.map((c) => c.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const c of COSMETICS) {
+    assert.ok(Number.isInteger(c.price) && c.price >= 0, c.id);
+    assert.ok(c.id.startsWith(`${c.kind}-`), c.id);
+    if (c.kind !== "frame") assert.ok(c.style, `${c.id} needs a style`);
+  }
+  // The defaults are free so everyone starts with a complete look.
+  assert.equal(cosmeticById(DEFAULT_BANNER)?.price, 0);
+  assert.equal(cosmeticById(DEFAULT_THEME)?.price, 0);
 });
 
 test("parseProfile tolerates empty and malformed JSON", () => {
   for (const raw of [null, undefined, "nope", 42, [], {}]) {
     const p = parseProfile(raw);
     assert.equal(p.bio, "");
-    assert.equal(p.status, null);
-    assert.equal(p.decoration, null);
+    assert.deepEqual(p.owned, []);
+    assert.equal(p.frame, null);
+    assert.equal(p.banner, null);
+    assert.equal(p.theme, null);
     assert.deepEqual(p.pinned, []);
-    assert.equal(p.themed, false);
-    assert.equal(p.theme.primary, DEFAULT_THEME.primary);
   }
   const bad = parseProfile({
     bio: "x".repeat(500),
-    theme: { primary: "red", accent: "#000000" },
-    decoration: "not-a-ring",
+    owned: ["frame-neon", "not-an-item", "frame-neon"],
     pinned: ["a", "b", "c", "d", "e"],
-    status: { emoji: "", text: "" },
   });
   assert.equal(bad.bio, "");
-  assert.equal(bad.themed, false);
-  assert.equal(bad.decoration, null);
-  assert.equal(bad.status, null);
+  assert.deepEqual(bad.owned, ["frame-neon"]);
   assert.equal(bad.pinned.length, MAX_PINNED);
 });
 
-test("parseProfile reads a stored profile back", () => {
+test("you can only wear what you own, in the right slot", () => {
   const p = parseProfile({
-    pronouns: "she/her",
-    bio: "hi",
-    status: { emoji: "🔥", text: "on shift" },
-    theme: { primary: "#ff4f9a", accent: "#ff9f43" },
-    decoration: "neon",
-    pinned: ["r1"],
+    owned: ["frame-neon"],
+    frame: "frame-gold", // not owned
+    banner: "frame-neon", // wrong kind
+    theme: "theme-violet", // free, always owned
   });
-  assert.equal(p.pronouns, "she/her");
-  assert.deepEqual(p.status, { emoji: "🔥", text: "on shift" });
-  assert.equal(p.themed, true);
-  assert.equal(p.decoration, "neon");
-  assert.deepEqual(p.pinned, ["r1"]);
+  assert.equal(p.frame, null);
+  assert.equal(p.banner, null);
+  assert.equal(p.theme, "theme-violet");
+  assert.equal(parseProfile({ owned: ["frame-neon"], frame: "frame-neon" }).frame, "frame-neon");
 });
 
-test("toStoredProfile drops locked rings and pins you can't use", () => {
-  const input = profileInputSchema.parse({
-    bio: "  hello  ",
-    statusEmoji: "☕",
-    themePrimary: "#AABBCC",
-    themeAccent: "#112233",
-    decoration: "gold",
-    pinned: ["r1", "r1", "someone-elses"],
-  });
-  const locked = toStoredProfile(input, {
-    decorations: new Set(["spark"]),
-    pinnable: new Set(["r1", "r2"]),
-  });
-  assert.equal(locked.bio, "hello");
-  assert.equal(locked.decoration, null);
-  assert.deepEqual(locked.pinned, ["r1"]);
-  assert.deepEqual(locked.theme, { primary: "#aabbcc", accent: "#112233" });
-  assert.deepEqual(locked.status, { emoji: "☕", text: "" });
-
-  const unlocked = toStoredProfile(input, {
-    decorations: new Set(["gold"]),
-    pinnable: new Set(),
-  });
-  assert.equal(unlocked.decoration, "gold");
-  assert.deepEqual(unlocked.pinned, []);
-  // Round-trips through the reader.
-  assert.equal(parseProfile(unlocked).decoration, "gold");
+test("buying adds the item and equips it", () => {
+  const start = parseProfile({});
+  assert.equal(ownsItem(start, "banner-lava"), false);
+  assert.equal(ownsItem(start, DEFAULT_BANNER), true);
+  const after = withPurchase(start, "banner-lava");
+  assert.deepEqual(after.owned, ["banner-lava"]);
+  assert.equal(after.banner, "banner-lava");
+  // Buying twice doesn't duplicate, and survives a round trip through JSON.
+  const again = parseProfile(JSON.parse(JSON.stringify(withPurchase(after, "banner-lava"))));
+  assert.deepEqual(again.owned, ["banner-lava"]);
+  assert.equal(again.banner, "banner-lava");
 });
 
-test("profile input rejects bad colours and too many pins", () => {
-  assert.equal(profileInputSchema.safeParse({ themePrimary: "purple" }).success, false);
-  assert.equal(profileInputSchema.safeParse({ pinned: ["a", "b", "c", "d"] }).success, false);
+test("equipping checks ownership; null takes the item off", () => {
+  const p = withPurchase(parseProfile({}), "frame-spark");
+  assert.equal(withEquipped(p, "frame", "frame-prism").frame, "frame-spark");
+  assert.equal(withEquipped(p, "frame", "banner-ocean").frame, "frame-spark");
+  assert.equal(withEquipped(p, "frame", null).frame, null);
+  assert.equal(withEquipped(p, "theme", "theme-violet").theme, "theme-violet");
 });
 
-test("isLight picks readable text for theme colours", () => {
-  assert.equal(isLight("#c6f432"), true);
+test("styles fall back to the defaults", () => {
+  assert.equal(bannerStyle(null), cosmeticById(DEFAULT_BANNER)!.style);
+  assert.equal(themeColour("nope"), cosmeticById(DEFAULT_THEME)!.style);
+  assert.equal(themeColour("theme-pink"), "#e8458b");
+});
+
+test("profile input trims and limits bio and pronouns", () => {
+  assert.equal(profileInputSchema.parse({ bio: "  hi  " }).bio, "hi");
+  assert.equal(profileInputSchema.safeParse({ bio: "x".repeat(151) }).success, false);
+  assert.equal(profileInputSchema.safeParse({ pronouns: "x".repeat(25) }).success, false);
+});
+
+test("isLight picks readable text for accent colours", () => {
   assert.equal(isLight("#ffffff"), true);
   assert.equal(isLight("#6a4dff"), false);
-  assert.equal(isLight("#0b0b10"), false);
   assert.equal(isLight("nope"), false);
 });
 

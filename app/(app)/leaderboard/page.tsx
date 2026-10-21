@@ -61,9 +61,7 @@ export default async function LeaderboardPage({
 
   return (
     <div className="mx-auto max-w-xl">
-      <AppBar title="Ranks">
-        <RanksTabs active="leaderboard" />
-      </AppBar>
+      <AppBar title="Ranks" tabs={<RanksTabs active="leaderboard" />} />
 
       <div className="space-y-4">
         <div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, Trophy, Gift, Wallet, Award, Shield, Plus, type LucideIcon } from "lucide-react";
+import { House, Trophy, Gift, Wallet, Award, Shield, Plus, Sparkles, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAdmin } from "@/lib/auth/types";
 import { UserAvatar } from "@/components/user-avatar";
@@ -26,6 +26,7 @@ export function SideNav({ user }: { user: SessionUser }) {
     { href: "/leaderboard", label: "Ranks", icon: Trophy, on: active("/leaderboard") },
     { href: "/awards", label: "Awards", icon: Award, on: active("/awards") },
     { href: "/rewards", label: "Rewards", icon: Gift, on: active("/rewards") },
+    { href: "/shop", label: "Profile shop", icon: Sparkles, on: active("/shop") },
     { href: "/me", label: "Wallet", icon: Wallet, on: active("/me") },
   ];
   if (isAdmin(user)) {
@@ -53,7 +54,7 @@ export function SideNav({ user }: { user: SessionUser }) {
       ))}
       <Link
         href="/recognize"
-        className="bg-brand mt-4 flex h-12 items-center justify-center gap-2 rounded-2xl font-semibold text-white shadow-[0_8px_24px_-8px_rgb(209_77_255/0.7)] transition-transform active:scale-[0.98]"
+        className="bg-primary text-primary-fg mt-4 flex h-11 items-center justify-center gap-2 rounded-xl font-semibold transition-opacity active:opacity-80"
       >
         <Plus className="size-5" strokeWidth={2.6} /> Send a shout-out
       </Link>

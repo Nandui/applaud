@@ -31,10 +31,10 @@ export default async function AdminOverviewPage() {
 
   const tiles = [
     { href: "/admin/users", label: "Active people", value: users, icon: Users, tone: "text-primary" },
-    { href: "/", label: "Recognitions", value: recognitions, icon: MessageSquare, tone: "text-lime-ink" },
+    { href: "/", label: "Recognitions", value: recognitions, icon: MessageSquare, tone: "text-primary" },
     { href: "/admin/nominations", label: "Pending nominations", value: pendingNominations, icon: BadgeCheck, tone: "text-warning" },
     { href: "/admin/redemptions", label: "Open redemptions", value: openRedemptions, icon: PackageOpen, tone: "text-warning" },
-    { href: "/admin/rewards", label: "Active rewards", value: rewards, icon: Gift, tone: "text-lime-ink" },
+    { href: "/admin/rewards", label: "Active rewards", value: rewards, icon: Gift, tone: "text-primary" },
   ];
 
   return (

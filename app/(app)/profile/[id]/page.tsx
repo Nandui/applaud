@@ -1,29 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil, Pin, Wallet } from "lucide-react";
+import { Pin } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
-import { prisma } from "@/lib/prisma";
 import { getProfileData } from "@/lib/profile";
 import { getCardsByIds, getGivenCards, getReceivedCards } from "@/lib/recognition/queries";
-import { DecoratedAvatar } from "@/components/user-avatar";
+import { bannerStyle, themeColour } from "@/lib/cosmetics";
+import { isLight } from "@/lib/profile-custom";
+import { FramedAvatar } from "@/components/user-avatar";
 import { RecognitionCard } from "@/components/feed/recognition-card";
+import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { BackButton } from "@/components/app-shell/back-button";
 import { AccountSheet } from "@/components/app-shell/account-sheet";
-import {
-  AboutCard,
-  Banner,
-  BadgeRow,
-  EmptyShowcase,
-  LevelCard,
-  Stats,
-  StatusBubble,
-  TrophyCase,
-  bannerButtonClass,
-  onPrimary,
-  themeVars,
-} from "@/components/profile/profile-parts";
-import { cn } from "@/lib/utils";
+import { Highlights, Managers, Stats } from "@/components/profile/profile-parts";
+import { TabLinks } from "@/components/tab-links";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +29,13 @@ export async function generateMetadata({
 
 type Tab = "received" | "given";
 
+const secondaryButton =
+  "bg-surface-2 flex h-9 flex-1 items-center justify-center rounded-lg text-sm font-semibold transition-opacity active:opacity-70";
+
 /**
- * Profile, Discord + Steam: themed banner and page tint, decorated avatar with
- * a status bubble, badge strip, level card, About me, pinned shout-outs, a
- * trophy case, then the person's shout-outs (Received / Given).
+ * Profile, laid out like Instagram: counts beside the avatar, name and bio,
+ * two buttons, highlight circles, then tabs. The banner, avatar frame and
+ * accent colour are the person's own picks from the profile shop.
  */
 export default async function ProfilePage({
   params,
@@ -61,17 +54,15 @@ export default async function ProfilePage({
   const { user, custom } = data;
   const isMe = viewer.id === user.id;
   const firstName = user.name.split(" ")[0];
+  const accent = themeColour(custom.theme);
+  const onAccent = isLight(accent) ? "#0a0a0a" : "#ffffff";
 
-  const [cards, pinnedCards, allValues] = await Promise.all([
+  const [cards, pinnedCards] = await Promise.all([
     tab === "given" ? getGivenCards(user.id, viewer.id) : getReceivedCards(user.id, viewer.id),
-    getCardsByIds(custom.pinned, viewer.id),
-    prisma.value.findMany({
-      where: { active: true },
-      orderBy: { order: "asc" },
-      select: { id: true, name: true, icon: true, color: true },
-    }),
+    tab === "received" ? getCardsByIds(custom.pinned, viewer.id) : Promise.resolve([]),
   ]);
   const pinnedSet = new Set(custom.pinned);
+  const listed = cards.filter((c) => !(tab === "received" && pinnedSet.has(c.id)));
   const viewerProps = {
     id: viewer.id,
     name: viewer.name,
@@ -80,138 +71,89 @@ export default async function ProfilePage({
   };
 
   return (
-    <div
-      className="relative isolate mx-auto max-w-xl"
-      style={themeVars(custom)}
-    >
-      {/* The theme washes down the top of the page (Discord profile themes). */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-0 -z-10 -mx-4 h-[34rem] opacity-30 md:-mx-8"
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg, color-mix(in srgb, var(--p1) 70%, transparent), color-mix(in srgb, var(--p2) 25%, transparent) 55%, transparent)",
-        }}
+    <div className="mx-auto max-w-xl">
+      <AppBar
+        title={<span className="text-xl">{user.name}</span>}
+        leading={isMe ? undefined : <BackButton />}
+        trailing={isMe ? <AccountSheet admin={isAdmin(viewer)} triggerClassName={appBarIconClass} /> : null}
       />
 
-      <Banner>
-        {isMe ? <span /> : <BackButton className={bannerButtonClass} />}
-        {isMe ? <AccountSheet admin={isAdmin(viewer)} triggerClassName={bannerButtonClass} /> : null}
-      </Banner>
+      <div className="h-24 rounded-xl" style={{ background: bannerStyle(custom.banner) }} />
 
-      {/* Avatar overlapping the banner, status bubble beside it */}
-      <div className="-mt-16 flex items-start gap-1">
-        <DecoratedAvatar
+      <div className="-mt-10 flex items-end gap-4 pl-2">
+        <FramedAvatar
           name={user.name}
           avatarUrl={user.avatarUrl}
-          decoration={custom.decoration}
-          className="size-26 text-2xl"
+          frame={custom.frame}
+          className="size-20 text-xl"
           large
         />
-        <div className="mt-16 min-w-0 pl-2">
-          <StatusBubble status={custom.status} />
+        <div className="flex flex-1 pb-1">
+          <Stats data={data} />
         </div>
       </div>
 
-      {/* Identity */}
-      <section className="mt-2 space-y-3">
-        <div>
-          <h1 className="font-display text-[1.85rem] leading-tight font-extrabold tracking-tight">
-            {user.name}
-          </h1>
-          <p className="text-muted mt-0.5 text-[0.95rem]">
-            {[user.jobTitle, custom.pronouns, user.site?.code].filter(Boolean).join(" · ")}
-          </p>
-        </div>
-        <BadgeRow data={data} />
-        <Stats data={data} />
-
-        <div className="flex gap-2 pt-1">
-          {isMe ? (
-            <>
-              <Link
-                href="/profile/edit"
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl font-bold transition-transform active:scale-[0.98]"
-                style={{ backgroundColor: "var(--p1)", color: onPrimary(custom) }}
-              >
-                <Pencil className="size-4" /> Edit profile
-              </Link>
-              <Link
-                href="/me"
-                className="bg-surface-2 flex h-11 items-center justify-center gap-2 rounded-2xl px-5 font-bold transition-transform active:scale-[0.98]"
-              >
-                <Wallet className="size-4" /> Wallet
-              </Link>
-            </>
-          ) : (
-            <Link
-              href={`/recognize?to=${user.id}`}
-              className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl font-bold transition-transform active:scale-[0.98]"
-              style={{ backgroundColor: "var(--p1)", color: onPrimary(custom) }}
-            >
-              <span aria-hidden>👏</span> Send {firstName} a shout-out
-            </Link>
-          )}
-        </div>
+      <section className="mt-3 space-y-1">
+        <h1 className="text-[0.95rem] font-bold">
+          {user.name}
+          {custom.pronouns ? <span className="text-muted ml-1.5 font-normal">{custom.pronouns}</span> : null}
+        </h1>
+        <p className="text-muted text-sm">{[user.jobTitle, user.site?.name].filter(Boolean).join(" · ")}</p>
+        {custom.bio ? <p className="text-sm whitespace-pre-line">{custom.bio}</p> : null}
+        <Managers data={data} />
       </section>
 
-      <div className="mt-5 space-y-3">
-        {(custom.bio || user.managers.length > 0 || user.site) && <AboutCard data={data} />}
-        <LevelCard data={data} isMe={isMe} />
-
-        {/* Pinned (the Steam showcase slot) */}
-        {pinnedCards.length > 0 ? (
-          <section className="bg-surface rounded-3xl px-4 pt-4">
-            <h2 className="font-display flex items-center gap-2 text-lg font-bold">
-              <Pin className="size-4.5 fill-current" style={{ color: "var(--p1)" }} /> Pinned
-            </h2>
-            {pinnedCards.map((card, i) => (
-              <RecognitionCard
-                key={card.id}
-                card={card}
-                index={i}
-                viewer={viewerProps}
-                pinned={isMe ? true : undefined}
-              />
-            ))}
-          </section>
+      <div className="mt-4 flex gap-2">
+        {isMe ? (
+          <>
+            <Link href="/profile/edit" className={secondaryButton}>
+              Edit profile
+            </Link>
+            <Link href="/shop" className={secondaryButton}>
+              Customize
+            </Link>
+          </>
         ) : (
-          <EmptyShowcase isMe={isMe} />
+          <Link
+            href={`/recognize?to=${user.id}`}
+            className="flex h-9 flex-1 items-center justify-center rounded-lg text-sm font-semibold transition-opacity active:opacity-80"
+            style={{ backgroundColor: accent, color: onAccent }}
+          >
+            Send {firstName} a shout-out
+          </Link>
         )}
-
-        <TrophyCase data={data} allValues={allValues} />
       </div>
 
-      {/* Shout-outs: Received / Given */}
-      <nav className="glass sticky top-0 z-20 -mx-4 mt-6 flex px-4 md:mx-0" aria-label="Shout-outs">
-        {(
-          [
-            { key: "received", label: "Received" },
-            { key: "given", label: "Given" },
-          ] as const
-        ).map((t) => (
-          <Link
-            key={t.key}
-            href={t.key === "received" ? `/profile/${user.id}` : `/profile/${user.id}?tab=given`}
-            replace
-            scroll={false}
-            className={cn(
-              "relative flex h-12 flex-1 items-center justify-center text-[0.95rem] font-bold transition-colors",
-              tab === t.key ? "text-foreground" : "text-muted",
-            )}
-          >
-            {t.label}
-            {tab === t.key && (
-              <span className="absolute inset-x-6 bottom-0 h-[3px] rounded-full" style={{ backgroundColor: "var(--p1)" }} />
-            )}
-          </Link>
-        ))}
-      </nav>
+      <div className="mt-5">
+        <Highlights data={data} />
+      </div>
 
-      {cards.length === 0 ? (
+      <TabLinks
+        className="glass sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 -mx-4 mt-4 md:mx-0"
+        accent={accent}
+        active={tab}
+        tabs={[
+          { key: "received", label: "Received", href: `/profile/${user.id}` },
+          { key: "given", label: "Given", href: `/profile/${user.id}?tab=given` },
+        ]}
+      />
+
+      {pinnedCards.length > 0 && (
+        <div>
+          {pinnedCards.map((card, i) => (
+            <div key={card.id}>
+              <p className="text-muted flex items-center gap-1.5 pt-3 text-xs font-semibold">
+                <Pin className="size-3.5 fill-current" /> Pinned
+              </p>
+              <RecognitionCard card={card} index={i} viewer={viewerProps} pinned={isMe ? true : undefined} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {listed.length === 0 && pinnedCards.length === 0 ? (
         <div className="text-muted flex flex-col items-center gap-2 px-6 py-16 text-center">
-          <span className="text-4xl">🌱</span>
-          <p className="text-foreground font-display font-bold">Nothing here yet</p>
+          <p className="text-foreground font-bold">No shout-outs yet</p>
           <p className="max-w-xs text-sm">
             {tab === "given"
               ? isMe
@@ -219,12 +161,12 @@ export default async function ProfilePage({
                 : `${firstName} hasn't sent any shout-outs yet.`
               : isMe
                 ? "Shout-outs you receive will show up here."
-                : `Be the first to hype up ${firstName}.`}
+                : `Be the first to give ${firstName} a shout-out.`}
           </p>
         </div>
       ) : (
         <div>
-          {cards.map((card, i) => (
+          {listed.map((card, i) => (
             <RecognitionCard
               key={card.id}
               card={card}

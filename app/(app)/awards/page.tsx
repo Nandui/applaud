@@ -81,9 +81,7 @@ export default async function AwardsPage() {
 
   return (
     <div className="mx-auto max-w-xl">
-      <AppBar title="Ranks">
-        <RanksTabs active="awards" />
-      </AppBar>
+      <AppBar title="Ranks" tabs={<RanksTabs active="awards" />} />
 
       {isManager(me) && pending.length > 0 && (
         <section className="mb-6">
@@ -108,7 +106,7 @@ export default async function AwardsPage() {
                       by {n.nominator.name} · {relativeTime(n.createdAt)}
                     </p>
                   </div>
-                  <span data-numeric className="bg-lime text-lime-fg rounded-full px-2.5 py-1 text-xs font-bold">
+                  <span data-numeric className="bg-primary text-primary-fg rounded-full px-2.5 py-1 text-xs font-bold">
                     +{n.program.points}
                   </span>
                 </div>
@@ -164,7 +162,7 @@ export default async function AwardsPage() {
             </div>
             <div className="flex flex-1 flex-col gap-3 p-4">
               <div className="flex items-center gap-2 text-xs">
-                <span data-numeric className="bg-lime text-lime-fg rounded-full px-2.5 py-1 font-bold">
+                <span data-numeric className="bg-primary text-primary-fg rounded-full px-2.5 py-1 font-bold">
                   +{p.points} pts
                 </span>
                 <span className="text-muted font-medium">

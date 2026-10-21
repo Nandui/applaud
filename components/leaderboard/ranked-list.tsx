@@ -53,7 +53,7 @@ export function RankedList({
       </ol>
       {pinMe && (
         <div className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-20 mt-3 md:bottom-4">
-          <ol className="border-lime/60 bg-surface overflow-hidden rounded-3xl border shadow-float">
+          <ol className="border-primary/60 bg-surface overflow-hidden rounded-3xl border shadow-float">
             <Row row={rows[myIndex]} rank={myIndex + 1} me />
           </ol>
         </div>
@@ -70,14 +70,14 @@ function Row({ row, rank, me }: { row: RankedRow; rank: number; me: boolean }) {
         href={`/profile/${row.id}`}
         className={cn(
           "active:bg-surface-2 flex items-center gap-3 px-4 py-3 transition-colors",
-          me && "bg-lime/10",
+          me && "bg-primary/10",
         )}
       >
         <span
           data-numeric
           className={cn(
             "font-display w-7 shrink-0 text-center text-lg font-extrabold",
-            medal < 0 && (me ? "text-lime-ink" : "text-muted"),
+            medal < 0 && (me ? "text-primary" : "text-muted"),
           )}
           style={medal >= 0 ? { color: MEDAL[medal] } : undefined}
         >
@@ -97,7 +97,7 @@ function Row({ row, rank, me }: { row: RankedRow; rank: number; me: boolean }) {
           <p className="flex items-center gap-1.5 font-semibold">
             <span className="truncate">{row.name}</span>
             {me && (
-              <span className="bg-lime text-lime-fg shrink-0 rounded-full px-1.5 py-px text-[10px] font-extrabold uppercase">
+              <span className="bg-primary text-primary-fg shrink-0 rounded-full px-1.5 py-px text-[10px] font-extrabold uppercase">
                 You
               </span>
             )}

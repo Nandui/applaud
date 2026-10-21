@@ -67,7 +67,7 @@ export function SignInForm({ samples }: { samples: Sample[] }) {
           {state?.error ? (
             <p className="text-danger text-sm">{state.error}</p>
           ) : null}
-          <Button type="submit" className="bg-lime text-lime-fg hover:bg-lime/90 h-13 w-full rounded-full text-base font-extrabold" disabled={pending}>
+          <Button type="submit" className="bg-primary text-primary-fg hover:bg-primary/90 h-13 w-full rounded-full text-base font-extrabold" disabled={pending}>
             <LogIn className="size-4" />
             {pending ? "Signing in…" : "Sign in"}
           </Button>

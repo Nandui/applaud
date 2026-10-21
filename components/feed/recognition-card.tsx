@@ -416,7 +416,7 @@ export function RecognitionCard({
                   aria-label="More"
                   className="text-muted hover:bg-surface-2 -my-2 -mr-2 ml-auto flex size-9 shrink-0 items-center justify-center rounded-full"
                 >
-                  {pinned ? <Pin className="text-lime-ink size-4 fill-current" /> : <Ellipsis className="size-5" />}
+                  {pinned ? <Pin className="text-primary size-4 fill-current" /> : <Ellipsis className="size-5" />}
                 </button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-56 rounded-2xl p-1.5">
@@ -477,7 +477,7 @@ export function RecognitionCard({
             {card.pointsEach > 0 && (
               <span
                 data-numeric
-                className="bg-lime text-lime-fg inline-flex h-6 items-center rounded-full px-2.5 text-xs font-bold"
+                className="bg-primary text-primary-fg inline-flex h-6 items-center rounded-full px-2.5 text-xs font-bold"
               >
                 +{pts(effectivePoints)}
               </span>

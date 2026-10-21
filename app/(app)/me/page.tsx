@@ -51,7 +51,7 @@ export default async function MePage() {
       <section className="flex flex-col items-center pt-4 pb-6 text-center">
         <p className="text-muted text-sm font-semibold">Redeemable balance</p>
         <p className="font-display mt-2 flex items-baseline gap-2 text-[4.25rem] leading-none font-extrabold tracking-tighter">
-          <span className="text-lime-ink text-4xl" aria-hidden>
+          <span className="text-primary text-4xl" aria-hidden>
             ✦
           </span>
           <span data-numeric>{formatNumber(user.walletBalance)}</span>
@@ -60,7 +60,7 @@ export default async function MePage() {
         <div className="mt-6 grid w-full grid-cols-2 gap-2">
           <Link
             href="/rewards"
-            className="bg-lime text-lime-fg flex h-12 items-center justify-center gap-2 rounded-full font-extrabold transition-transform active:scale-[0.98]"
+            className="bg-primary text-primary-fg flex h-12 items-center justify-center gap-2 rounded-full font-extrabold transition-transform active:scale-[0.98]"
           >
             <Gift className="size-4.5" /> Spend
           </Link>
@@ -82,7 +82,7 @@ export default async function MePage() {
             cy="40"
             r={R}
             fill="none"
-            stroke="var(--color-lime)"
+            stroke="var(--color-primary)"
             strokeWidth="9"
             strokeLinecap="round"
             strokeDasharray={C}
@@ -105,7 +105,7 @@ export default async function MePage() {
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div className="bg-surface rounded-3xl p-4">
-          <Inbox className="text-lime-ink size-5" />
+          <Inbox className="text-primary size-5" />
           <p data-numeric className="font-display mt-2 text-3xl font-extrabold">
             {formatNumber(receivedCount)}
           </p>
@@ -136,7 +136,7 @@ export default async function MePage() {
                 <span
                   className={cn(
                     "flex size-11 shrink-0 items-center justify-center rounded-full",
-                    up ? "bg-lime/15 text-lime-ink" : "bg-surface-2 text-muted",
+                    up ? "bg-primary/15 text-primary" : "bg-surface-2 text-muted",
                   )}
                 >
                   {up ? <ArrowDownLeft className="size-5" /> : <ArrowUpRight className="size-5" />}
@@ -151,7 +151,7 @@ export default async function MePage() {
                   data-numeric
                   className={cn(
                     "shrink-0 font-bold",
-                    up ? "text-lime-ink" : row.amount < 0 ? "text-foreground" : "text-muted",
+                    up ? "text-primary" : row.amount < 0 ? "text-foreground" : "text-muted",
                   )}
                 >
                   {formatSigned(row.amount)}

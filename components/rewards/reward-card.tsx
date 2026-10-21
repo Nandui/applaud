@@ -113,7 +113,7 @@ export function RewardCard({
                 data-numeric
                 className={cn(
                   "rounded-full px-2 py-0.5 text-xs font-extrabold",
-                  canAfford && !outOfStock ? "bg-lime text-lime-fg" : "bg-surface-2 text-foreground",
+                  canAfford && !outOfStock ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
                 )}
               >
                 ✦ {formatNumber(reward.pointsCost)}
@@ -130,7 +130,7 @@ export function RewardCard({
             </span>
             {!canAfford && !outOfStock ? (
               <span className="bg-surface-2 mt-2 block h-1.5 overflow-hidden rounded-full">
-                <span className="bg-lime block h-full rounded-full" style={{ width: `${progress}%` }} />
+                <span className="bg-primary block h-full rounded-full" style={{ width: `${progress}%` }} />
               </span>
             ) : null}
           </span>
@@ -168,7 +168,7 @@ export function RewardCard({
           <button
             type="submit"
             disabled={pending || disabled}
-            className="bg-lime text-lime-fg h-12 flex-1 rounded-full font-extrabold transition-transform active:scale-[0.98] disabled:opacity-45"
+            className="bg-primary text-primary-fg h-12 flex-1 rounded-full font-extrabold transition-transform active:scale-[0.98] disabled:opacity-45"
           >
             {pending
               ? "Redeeming…"

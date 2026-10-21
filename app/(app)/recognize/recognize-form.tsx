@@ -527,7 +527,7 @@ export function RecognizeForm({
                 disabled={allowance.remaining === 0}
                 className={cn(
                   "ml-auto flex h-8 items-center gap-1 rounded-full px-3 text-xs font-bold transition-colors disabled:opacity-40",
-                  points > 0 ? "bg-lime text-lime-fg" : "bg-surface-2 text-foreground",
+                  points > 0 ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
                 )}
               >
                 <span aria-hidden>✦</span>
@@ -676,7 +676,7 @@ function Celebration({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.4, type: "spring", stiffness: 400, damping: 15 }}
           data-numeric
-          className="bg-lime text-lime-fg mt-5 rounded-full px-4 py-1.5 text-base font-extrabold"
+          className="bg-primary text-primary-fg mt-5 rounded-full px-4 py-1.5 text-base font-extrabold"
         >
           +{pts(points)} each
         </motion.span>

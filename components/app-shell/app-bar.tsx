@@ -11,6 +11,7 @@ export function AppBar({
   trailing,
   className,
   children,
+  tabs,
   center = false,
 }: {
   title?: React.ReactNode;
@@ -19,13 +20,15 @@ export function AppBar({
   className?: string;
   /** Optional second row (segmented control, filter chips). */
   children?: React.ReactNode;
+  /** A TabLinks row, flush with the bar's bottom edge. */
+  tabs?: React.ReactNode;
   /** Centre the title between leading/trailing (modal-style screens). */
   center?: boolean;
 }) {
   return (
     <header
       className={cn(
-        "glass pt-safe sticky top-0 z-30 -mx-4 mb-3 md:mx-0 md:rounded-b-2xl",
+        "glass pt-safe sticky top-0 z-30 -mx-4 mb-3 md:mx-0",
         className,
       )}
     >
@@ -33,7 +36,7 @@ export function AppBar({
         {leading ? <div className="-ml-2 flex shrink-0 items-center">{leading}</div> : null}
         <div
           className={cn(
-            "font-display min-w-0 flex-1 truncate text-[1.45rem] leading-none font-bold tracking-[-0.03em]",
+            "min-w-0 flex-1 truncate text-[1.4rem] leading-none font-bold tracking-[-0.02em]",
             center &&
               "pointer-events-none absolute inset-x-16 text-center text-[1.05rem] font-semibold tracking-tight",
           )}
@@ -46,6 +49,7 @@ export function AppBar({
         ) : null}
       </div>
       {children ? <div className="px-4 pb-3">{children}</div> : null}
+      {tabs}
     </header>
   );
 }

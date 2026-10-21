@@ -40,7 +40,7 @@ export default async function FeedPage() {
             className="bg-surface-2 flex h-9 items-center gap-1.5 rounded-full pr-3.5 pl-1.5 text-sm font-bold transition-transform active:scale-95"
             aria-label="My wallet"
           >
-            <span className="bg-lime text-lime-fg flex size-6 items-center justify-center rounded-full text-[0.7rem] font-black">
+            <span className="bg-primary text-primary-fg flex size-6 items-center justify-center rounded-full text-[0.7rem] font-black">
               ✦
             </span>
             <span data-numeric>{formatNumber(wallet?.walletBalance ?? 0)}</span>

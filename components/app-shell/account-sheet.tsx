@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import {
-  Settings,
+  Menu,
+  Sparkles,
   Wallet,
   Gift,
   Award,
@@ -29,7 +30,7 @@ import { signOutAction } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
 
 /**
- * The gear on your own profile (Discord's "You" settings): appearance, every
+ * The ☰ menu on your own profile (as on Instagram): appearance, every
  * secondary destination that doesn't earn a tab, and sign out.
  */
 export function AccountSheet({
@@ -53,11 +54,11 @@ export function AccountSheet({
     <>
       <button
         type="button"
-        aria-label="Settings"
+        aria-label="Menu"
         className={triggerClassName}
         onClick={() => setOpen(true)}
       >
-        <Settings className="size-5" />
+        <Menu className="size-6" />
       </button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" showCloseButton={false} className="gap-0 px-0">
@@ -90,6 +91,7 @@ export function AccountSheet({
           <nav className="px-3 pt-2 pb-3">
             <Item href="/profile/edit" icon={Pencil} label="Edit profile" onClick={close} />
             <Item href="/me" icon={Wallet} label="Wallet & allowance" onClick={close} />
+            <Item href="/shop" icon={Sparkles} label="Profile shop" onClick={close} />
             <Item href="/rewards" icon={Gift} label="Rewards" onClick={close} />
             <Item href="/awards" icon={Award} label="Awards & nominations" onClick={close} />
             <Item href="/leaderboard" icon={Trophy} label="Ranks" onClick={close} />

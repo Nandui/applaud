@@ -5,59 +5,51 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Applaud v2 design system. Dark-first (with a light theme that follows the
- * phone), built to feel like the apps 19–24 year olds already live in:
- * Discord-style surfaces, an electric violet primary, and a lime highlight for
- * points and "you" moments. Every colour is a runtime CSS variable so the two
+ * Applaud design system: plain and familiar, like Instagram. Neutral white /
+ * black surfaces that follow the phone's theme, one violet accent, Geist
+ * throughout. Every colour is a runtime CSS variable so the two
  * themes swap without rebuilding utilities; shadcn/ui aliases map onto them.
  * Fonts come from next/font (layout.tsx) as --font-* variables.
  */
 :root {
-  --background: #f5f5f8;
-  --surface: #ffffff;
-  --surface-2: #eeeef3;
-  --surface-3: #e4e4ec;
-  --border: rgb(15 15 30 / 0.09);
-  --foreground: #0d0d14;
-  --muted: #6b6b7b;
+  --background: #ffffff;
+  --surface: #f5f5f7;
+  --surface-2: #ebebef;
+  --surface-3: #dedee4;
+  --border: rgb(0 0 0 / 0.1);
+  --foreground: #0a0a0a;
+  --muted: #737373;
 
   --primary: #6a4dff;
   --primary-fg: #ffffff;
-  --lime: #b6e52a;
-  --lime-fg: #0d0d14;
-  /* Lime as text: darker in light mode so it stays readable on white. */
-  --lime-ink: #4f7a00;
 
   --success: #12a150;
   --warning: #c27a00;
   --danger: #e5294f;
 
-  --glass: rgb(255 255 255 / 0.8);
-  --tabbar: rgb(255 255 255 / 0.86);
-  --shadow-color: 240 30% 20%;
+  --glass: rgb(255 255 255 / 0.9);
+  --tabbar: rgb(255 255 255 / 0.96);
+  --shadow-color: 240 10% 20%;
 }
 
 .dark {
-  --background: #0b0b10;
-  --surface: #15151c;
-  --surface-2: #1e1e27;
-  --surface-3: #2a2a35;
-  --border: rgb(255 255 255 / 0.08);
-  --foreground: #f4f4f7;
-  --muted: #9494a6;
+  --background: #000000;
+  --surface: #121212;
+  --surface-2: #262626;
+  --surface-3: #363636;
+  --border: rgb(255 255 255 / 0.12);
+  --foreground: #f5f5f5;
+  --muted: #a8a8a8;
 
   --primary: #8b70ff;
   --primary-fg: #ffffff;
-  --lime: #c6f432;
-  --lime-fg: #0b0b10;
-  --lime-ink: #c6f432;
 
   --success: #3ddc84;
   --warning: #ffb020;
   --danger: #ff4d6a;
 
-  --glass: rgb(11 11 16 / 0.78);
-  --tabbar: rgb(17 17 23 / 0.88);
+  --glass: rgb(0 0 0 / 0.86);
+  --tabbar: rgb(0 0 0 / 0.96);
   --shadow-color: 0 0% 0%;
 }
 
@@ -72,9 +64,6 @@
 
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);
-  --color-lime: var(--lime);
-  --color-lime-fg: var(--lime-fg);
-  --color-lime-ink: var(--lime-ink);
   /* shadcn's "accent" is the neutral hover/highlight fill in menus. */
   --color-accent: var(--surface-2);
   --color-accent-fg: var(--foreground);
@@ -89,7 +78,7 @@
   --color-brand-3: #ff4f9a;
   --color-brand-4: #ff9f43;
 
-  --font-display: var(--font-bricolage), "Bricolage Grotesque", ui-sans-serif, sans-serif;
+  --font-display: var(--font-geist), "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-geist), "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
 
@@ -157,8 +146,7 @@
   h3,
   h4,
   h5 {
-    font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
   }
   /* Points and numeric values use tabular figures. */
   .font-numeric,
@@ -231,7 +219,7 @@
 
 /* Bottom space so content clears the floating tab bar (and home indicator). */
 @utility pb-tabbar {
-  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
 /* Soft elevation that reads in both themes. */
@@ -241,7 +229,7 @@
     0 12px 32px -8px hsl(var(--shadow-color) / 0.35);
 }
 
-/* ---- Avatar decorations (earned rings, see lib/profile-custom.ts) ---- */
+/* ---- Avatar frames (shop items, see lib/cosmetics.ts) ---- */
 
 @keyframes deco-spin {
   to {
@@ -260,7 +248,7 @@
   }
 }
 
-.deco {
+.frame-ring {
   --deco-w: 4px;
   position: absolute;
   inset: calc(var(--deco-w) * -0.5);
@@ -270,40 +258,40 @@
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--deco-w) - 0.5px), #000 calc(100% - var(--deco-w)));
 }
 /* Bigger avatars wear a chunkier ring. */
-.deco-lg {
+.frame-ring-lg {
   --deco-w: 6px;
 }
-.deco-spark {
+.frame-spark {
   background: conic-gradient(from 0deg, #7c5cff, #c6f432, #7c5cff);
 }
-.deco-wave {
+.frame-wave {
   background: conic-gradient(from 90deg, #22d3ee, #3b82f6, #a78bfa, #22d3ee);
 }
-.deco-neon {
+.frame-neon {
   background: conic-gradient(#ff4f9a, #7c5cff, #22d3ee, #c6f432, #ff4f9a);
   filter: drop-shadow(0 0 6px rgb(124 92 255 / 0.7));
 }
-.deco-aurora {
+.frame-aurora {
   background: conic-gradient(#34d399, #22d3ee, #a78bfa, #f472b6, #34d399);
   animation: deco-spin 6s linear infinite;
   filter: drop-shadow(0 0 8px rgb(52 211 153 / 0.5));
 }
-.deco-gold {
+.frame-gold {
   background: conic-gradient(#fde68a, #f59e0b, #fff7d6, #d97706, #fde68a);
   filter: drop-shadow(0 0 6px rgb(245 158 11 / 0.55));
 }
-.deco-party {
+.frame-party {
   background: repeating-conic-gradient(#ff4f9a 0 20deg, #ffb020 20deg 40deg, #7c5cff 40deg 60deg, #22d3ee 60deg 80deg);
   animation: deco-spin 14s linear infinite;
 }
-.deco-crown {
+.frame-prism {
   background: conic-gradient(from 180deg, #c6f432, #fde047, #ff9f43, #ff4f9a, #7c5cff, #c6f432);
   animation: deco-pulse 2.4s ease-in-out infinite;
   filter: drop-shadow(0 0 10px rgb(198 244 50 / 0.5));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .deco {
+  .frame-ring {
     animation: none !important;
   }
 }

@@ -89,7 +89,7 @@ export function PointsKeypad({
               onClick={() => onChange(n)}
               className={cn(
                 "h-10 rounded-full text-sm font-bold transition-colors disabled:opacity-30",
-                value === n ? "bg-lime text-lime-fg" : "bg-surface-2",
+                value === n ? "bg-primary text-primary-fg" : "bg-surface-2",
               )}
             >
               <span data-numeric>{n}</span>
@@ -101,7 +101,7 @@ export function PointsKeypad({
             onClick={() => onChange(Math.max(0, max))}
             className={cn(
               "h-10 rounded-full text-sm font-bold transition-colors disabled:opacity-30",
-              value === max && max > 0 ? "bg-lime text-lime-fg" : "bg-surface-2",
+              value === max && max > 0 ? "bg-primary text-primary-fg" : "bg-surface-2",
             )}
           >
             Max

@@ -72,7 +72,7 @@ function RuleForm({ rule }: { rule: RuleRow }) {
 
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="bg-lime/10 text-lime-ink flex size-9 items-center justify-center rounded-lg">
+              <span className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-lg">
                 <Icon className="size-4.5" />
               </span>
               <div>

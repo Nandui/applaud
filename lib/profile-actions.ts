@@ -5,64 +5,61 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 import { isProjectBlobUrl } from "@/lib/blob";
-import { getProfileData } from "@/lib/profile";
-import { profileInputSchema, toStoredProfile } from "@/lib/profile-custom";
+import { KIND_LABELS, cosmeticById, type CosmeticKind } from "@/lib/cosmetics";
+import {
+  MAX_PINNED,
+  ownsItem,
+  parseProfile,
+  profileInputSchema,
+  withEquipped,
+  withPurchase,
+  type ProfileCustom,
+} from "@/lib/profile-custom";
 
 export type ProfileActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
-/**
- * Save the signed-in person's own profile customization. Decorations they
- * haven't earned and pins that aren't recognitions they received are dropped
- * server-side, whatever the client sent.
- */
+class ShopError extends Error {}
+
+async function loadCustom(userId: string): Promise<ProfileCustom> {
+  const row = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { profile: true } });
+  return parseProfile(row.profile);
+}
+
+function revalidateProfile(userId: string) {
+  revalidatePath(`/profile/${userId}`);
+  revalidatePath("/shop");
+}
+
+/** Save the signed-in person's pronouns and bio. */
 export async function updateMyProfile(
   _prev: ProfileActionResult | undefined,
   formData: FormData,
 ): Promise<ProfileActionResult> {
   const me = await requireUser();
-
   const parsed = profileInputSchema.safeParse({
     pronouns: formData.get("pronouns") ?? "",
     bio: formData.get("bio") ?? "",
-    statusEmoji: formData.get("statusEmoji") ?? "",
-    statusText: formData.get("statusText") ?? "",
-    themePrimary: formData.get("themePrimary") || undefined,
-    themeAccent: formData.get("themeAccent") || undefined,
-    decoration: formData.get("decoration") ?? "",
-    pinned: formData.getAll("pinned").map(String),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your profile details." };
   }
 
-  const data = await getProfileData(me.id);
-  if (!data) return { ok: false, error: "Profile not found." };
-
-  const pinnable = parsed.data.pinned.length
-    ? await prisma.recognitionRecipient.findMany({
-        where: { userId: me.id, recognitionId: { in: parsed.data.pinned } },
-        select: { recognitionId: true },
-      })
-    : [];
-
-  const stored = toStoredProfile(parsed.data, {
-    decorations: data.unlocked,
-    pinnable: new Set(pinnable.map((p) => p.recognitionId)),
+  const custom = await loadCustom(me.id);
+  await prisma.user.update({
+    where: { id: me.id },
+    data: { profile: { ...custom, ...parsed.data } },
   });
-
-  await prisma.user.update({ where: { id: me.id }, data: { profile: stored } });
   await writeAudit({
     actor: me,
     action: "profile.updated",
     entityType: "user",
     entityId: me.id,
-    summary: "Customised their profile",
+    summary: "Updated their bio",
     siteId: me.siteId,
   });
-
-  revalidatePath(`/profile/${me.id}`);
+  revalidateProfile(me.id);
   return { ok: true, message: "Profile saved" };
 }
 
@@ -89,38 +86,86 @@ export async function setMyAvatar(url: string | null): Promise<ProfileActionResu
 /** Pin or unpin one received recognition from the feed card menu. */
 export async function togglePin(recognitionId: string): Promise<ProfileActionResult> {
   const me = await requireUser();
-  const data = await getProfileData(me.id);
-  if (!data) return { ok: false, error: "Profile not found." };
-
   const received = await prisma.recognitionRecipient.findFirst({
     where: { userId: me.id, recognitionId },
     select: { id: true },
   });
   if (!received) return { ok: false, error: "You can only pin shout-outs you received." };
 
-  const current = data.custom.pinned;
-  const isPinned = current.includes(recognitionId);
-  if (!isPinned && current.length >= 3) {
-    return { ok: false, error: "You can pin up to 3. Unpin one first." };
+  const custom = await loadCustom(me.id);
+  const isPinned = custom.pinned.includes(recognitionId);
+  if (!isPinned && custom.pinned.length >= MAX_PINNED) {
+    return { ok: false, error: `You can pin up to ${MAX_PINNED}. Unpin one first.` };
   }
   const pinned = isPinned
-    ? current.filter((id) => id !== recognitionId)
-    : [...current, recognitionId];
-
-  const stored = toStoredProfile(
-    {
-      pronouns: data.custom.pronouns,
-      bio: data.custom.bio,
-      statusEmoji: data.custom.status?.emoji ?? "",
-      statusText: data.custom.status?.text ?? "",
-      themePrimary: data.custom.themed ? data.custom.theme.primary : undefined,
-      themeAccent: data.custom.themed ? data.custom.theme.accent : undefined,
-      decoration: data.custom.decoration ?? "",
-      pinned,
-    },
-    { decorations: data.unlocked, pinnable: new Set(pinned) },
-  );
-  await prisma.user.update({ where: { id: me.id }, data: { profile: stored } });
-  revalidatePath(`/profile/${me.id}`);
+    ? custom.pinned.filter((id) => id !== recognitionId)
+    : [...custom.pinned, recognitionId];
+  await prisma.user.update({ where: { id: me.id }, data: { profile: { ...custom, pinned } } });
+  revalidateProfile(me.id);
   return { ok: true, message: isPinned ? "Unpinned" : "Pinned to your profile" };
+}
+
+/**
+ * Buy a profile shop item with points, then wear it. The spend is a SHOP entry
+ * in the wallet ledger, checked against the live ledger balance inside the
+ * same transaction as the purchase (like reward redemptions).
+ */
+export async function buyItem(itemId: string): Promise<ProfileActionResult> {
+  const me = await requireUser();
+  const item = cosmeticById(itemId);
+  if (!item) return { ok: false, error: "That item isn't in the shop." };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const row = await tx.user.findUniqueOrThrow({ where: { id: me.id }, select: { profile: true } });
+      const custom = parseProfile(row.profile);
+      if (ownsItem(custom, item.id)) throw new ShopError("You already own this.");
+
+      if (item.price > 0) {
+        const agg = await tx.rewardLedger.aggregate({ _sum: { amount: true }, where: { userId: me.id } });
+        if ((agg._sum.amount ?? 0) < item.price) throw new ShopError("You don't have enough points yet.");
+        await tx.rewardLedger.create({
+          data: {
+            userId: me.id,
+            amount: -item.price,
+            type: "SHOP",
+            sourceType: "cosmetic",
+            sourceId: item.id,
+            note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()}`,
+          },
+        });
+        await tx.user.update({ where: { id: me.id }, data: { walletBalance: { decrement: item.price } } });
+      }
+      await tx.user.update({ where: { id: me.id }, data: { profile: withPurchase(custom, item.id) } });
+    });
+  } catch (error) {
+    if (error instanceof ShopError) return { ok: false, error: error.message };
+    throw error;
+  }
+
+  await writeAudit({
+    actor: me,
+    action: "shop.purchased",
+    entityType: "user",
+    entityId: me.id,
+    summary: `Bought ${item.name} (${KIND_LABELS[item.kind].one}, ${item.price} pts)`,
+    metadata: { itemId: item.id, price: item.price },
+    siteId: me.siteId,
+  });
+  revalidateProfile(me.id);
+  revalidatePath("/me");
+  return { ok: true, message: `${item.name} is yours! It's on your profile now.` };
+}
+
+/** Wear an item you own, or take off whatever is in a slot (`itemId` null). */
+export async function equipItem(kind: CosmeticKind, itemId: string | null): Promise<ProfileActionResult> {
+  const me = await requireUser();
+  const custom = await loadCustom(me.id);
+  if (itemId && !ownsItem(custom, itemId)) return { ok: false, error: "Buy it first." };
+  await prisma.user.update({
+    where: { id: me.id },
+    data: { profile: withEquipped(custom, kind, itemId) },
+  });
+  revalidateProfile(me.id);
+  return { ok: true, message: itemId ? "Equipped" : "Removed" };
 }

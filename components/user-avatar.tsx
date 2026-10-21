@@ -47,32 +47,34 @@ export function UserAvatar({
 }
 
 /**
- * An avatar wearing its earned decoration ring (see globals.css `.deco-*`),
- * with an optional status bubble. Used on profiles and the profile editor.
+ * An avatar wearing its shop frame (see globals.css `.frame-*` and
+ * lib/cosmetics.ts). Without a frame it's a plain avatar with the same gap,
+ * so layouts don't jump when someone equips one.
  */
-export function DecoratedAvatar({
+export function FramedAvatar({
   name,
   avatarUrl,
-  decoration,
+  frame,
   className,
-  ringClassName,
+  gapClassName,
   large = false,
 }: {
   name: string;
   avatarUrl?: string | null;
-  decoration?: string | null;
+  /** A frame item id, e.g. "frame-neon". */
+  frame?: string | null;
   className?: string;
-  /** The gap between avatar and decoration (matches the page background). */
-  ringClassName?: string;
-  /** Profile-sized: thicker decoration ring. */
+  /** The gap between avatar and frame (matches what's behind it). */
+  gapClassName?: string;
+  /** Profile-sized: thicker frame. */
   large?: boolean;
 }) {
   return (
     <span className="relative inline-flex shrink-0 rounded-full">
-      <span className={cn("bg-background rounded-full", large ? "p-[7px]" : "p-[4px]", ringClassName)}>
+      <span className={cn("bg-background rounded-full", large ? "p-[6px]" : "p-[3px]", gapClassName)}>
         <UserAvatar name={name} avatarUrl={avatarUrl} className={className} />
       </span>
-      {decoration ? <span aria-hidden className={cn("deco", `deco-${decoration}`, large && "deco-lg")} /> : null}
+      {frame ? <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")} /> : null}
     </span>
   );
 }
