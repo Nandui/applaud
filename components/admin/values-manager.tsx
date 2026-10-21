@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
+import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Loader2, Pencil, Plus, Upload } from "lucide-react";
@@ -80,8 +81,8 @@ function ValueFormDialog({
         contentType: file.type,
       });
       setImageUrl(blob.url);
-    } catch {
-      toast.error("Picture upload failed.");
+    } catch (error) {
+      toast.error(uploadErrorMessage(error));
     } finally {
       setUploading(false);
     }

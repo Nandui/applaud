@@ -12,6 +12,10 @@ export const dynamic = "force-dynamic";
  * content-type/size-restricted token for admins. It never receives the bytes.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.error("Blob upload refused: BLOB_READ_WRITE_TOKEN is not set. Connect a Blob store and redeploy.");
+    return NextResponse.json({ error: "Picture storage is not set up." }, { status: 503 });
+  }
   const body = (await request.json()) as HandleUploadBody;
 
   try {
@@ -35,6 +39,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json(json);
   } catch (error) {
+    // The client SDK hides this body, so log it for the Vercel Logs tab.
+    console.error("Blob upload token request failed:", error);
     return NextResponse.json(
       { error: (error as Error).message },
       { status: 400 },

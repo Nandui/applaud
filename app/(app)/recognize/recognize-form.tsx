@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { upload } from "@vercel/blob/client";
+import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import {
   Check,
@@ -162,9 +163,9 @@ export function RecognizeForm({
           contentType: file.type,
         });
         setImages((imgs) => [...imgs, { url: blob.url, name: file.name }]);
-      } catch {
+      } catch (error) {
         reservedRef.current = Math.max(0, reservedRef.current - 1);
-        toast.error(`${file.name}: upload failed.`);
+        toast.error(`${file.name}: ${uploadErrorMessage(error, "upload failed.")}`);
       } finally {
         setUploadingCount((c) => c - 1);
       }

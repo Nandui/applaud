@@ -9,6 +9,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { upload } from "@vercel/blob/client";
+import { uploadErrorMessage } from "@/lib/upload-error";
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { Pencil, Plus, Trash2, Upload, Loader2 } from "lucide-react";
@@ -125,8 +126,8 @@ function UserFormDialog({
         contentType: file.type,
       });
       setAvatarUrl(blob.url);
-    } catch {
-      toast.error("Picture upload failed.");
+    } catch (error) {
+      toast.error(uploadErrorMessage(error));
     } finally {
       setUploadingAvatar(false);
     }

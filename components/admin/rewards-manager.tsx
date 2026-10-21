@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Upload } from "lucide-react";
 import { upload } from "@vercel/blob/client";
+import { uploadErrorMessage } from "@/lib/upload-error";
 import {
   saveReward,
   setRewardActive,
@@ -113,8 +114,8 @@ function RewardFormDialog({
         contentType: file.type,
       });
       setImageUrl(blob.url);
-    } catch {
-      toast.error("Picture upload failed.");
+    } catch (error) {
+      toast.error(uploadErrorMessage(error));
     } finally {
       setUploading(false);
     }
