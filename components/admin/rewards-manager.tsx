@@ -37,7 +37,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
-import { centsToEuros, centsToPoints, parseEurosToCents, pointsToCents } from "@/lib/economy";
+import {
+  centsToEuros,
+  parseEurosToCents,
+  pointsToCents,
+  suggestMonthlyStock,
+  suggestPointsPrice,
+} from "@/lib/economy";
 
 export type RewardRow = {
   id: string;
@@ -95,6 +101,10 @@ function RewardFormDialog({
   const cashCents = parseEurosToCents(euroCost) ?? 0;
   const faceCents = pointsToCents(Math.max(0, Number(pointsCost) || 0), economy.pointsPerEuro);
   const perMonth = monthlyStock.trim() === "" ? null : Math.max(0, Math.floor(Number(monthlyStock)) || 0);
+  // A saved reward keeps its price unless the admin asks for the advice.
+  const [pointsTouched, setPointsTouched] = useState(editing !== null);
+  const suggested = suggestPointsPrice(cashCents, economy.pointsPerEuro);
+  const stockAdvice = suggestMonthlyStock(cashCents, economy.monthlyRewardBudgetCents);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   async function handleImageFile(file: File) {
@@ -224,30 +234,40 @@ function RewardFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pointsCost">Points cost</Label>
+              <Label htmlFor="euroCost">Our cost (€, if any)</Label>
+              <Input
+                id="euroCost"
+                name="euroCost"
+                inputMode="decimal"
+                value={euroCost}
+                onChange={(e) => {
+                  setEuroCost(e.target.value);
+                  // Until the admin types their own price, follow the advice.
+                  if (!pointsTouched) {
+                    const next = suggestPointsPrice(parseEurosToCents(e.target.value) ?? 0, economy.pointsPerEuro);
+                    if (next !== null) setPointsCost(String(next));
+                  }
+                }}
+                placeholder="0 for in-house perks"
+                className="font-mono"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="pointsCost">Points price</Label>
               <Input
                 id="pointsCost"
                 name="pointsCost"
                 type="number"
                 min={0}
                 value={pointsCost}
-                onChange={(e) => setPointsCost(e.target.value)}
+                onChange={(e) => {
+                  setPointsCost(e.target.value);
+                  setPointsTouched(true);
+                }}
                 className="font-mono"
                 required
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="euroCost">Cash cost (€)</Label>
-              <Input
-                id="euroCost"
-                name="euroCost"
-                inputMode="decimal"
-                value={euroCost}
-                onChange={(e) => setEuroCost(e.target.value)}
-                placeholder="0 for in-house perks"
-                className="font-mono"
               />
             </div>
             <div className="space-y-1.5">
@@ -264,20 +284,42 @@ function RewardFormDialog({
               />
             </div>
           </div>
-          <div className="bg-secondary space-y-1 rounded-lg p-3 text-xs" data-numeric>
-            <p>
-              <span className="text-muted">Points face value: </span>
-              <b>{centsToEuros(faceCents)}</b>
-              <span className="text-muted"> at {economy.pointsPerEuro} pts per €1</span>
-              {cashCents > 0 ? (
-                <>
-                  <span className="text-muted"> · face value of the cash cost: </span>
-                  <b>{centsToPoints(cashCents, economy.pointsPerEuro)} pts</b>
-                </>
-              ) : null}
-            </p>
+          <div className="bg-secondary space-y-2 rounded-lg p-3 text-xs" data-numeric>
+            {suggested !== null ? (
+              <div className="flex items-center justify-between gap-3">
+                <p>
+                  <span className="text-muted">Advised price: </span>
+                  <b>{formatNumber(suggested)} pts</b>
+                  <span className="text-muted">
+                    {" "}
+                    ({centsToEuros(cashCents)} at {formatNumber(economy.pointsPerEuro)} pts per €1, rounded up)
+                  </span>
+                </p>
+                {Number(pointsCost) !== suggested ? (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => {
+                      setPointsCost(String(suggested));
+                      setPointsTouched(true);
+                    }}
+                  >
+                    Use
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-muted">
+                No cost to us, so no advised price: price it by how special it feels (similar perks
+                cost 600 to 6,000 pts). Monthly stock keeps it in check.
+              </p>
+            )}
             {cashCents > faceCents ? (
-              <p className="text-warning">Costs more cash than its points are worth. Staff get a bargain, the budget pays.</p>
+              <p className="text-warning">
+                {formatNumber(Number(pointsCost) || 0)} pts is only worth {centsToEuros(faceCents)}, less than it costs us.
+                Staff get a bargain and the budget pays the difference.
+              </p>
             ) : null}
             <p>
               <span className="text-muted">Most per month: </span>
@@ -296,7 +338,19 @@ function RewardFormDialog({
                 </>
               )}
             </p>
-            <p className="text-muted">Cash cost counts against the monthly budget. Per month refills on the 1st.</p>
+            {stockAdvice !== null && (perMonth === null || perMonth > stockAdvice) ? (
+              <div className="flex items-center justify-between gap-3">
+                <p>
+                  <span className="text-muted">Advised stock: </span>
+                  <b>{formatNumber(stockAdvice)} a month</b>
+                  <span className="text-muted"> keeps it to a quarter of the budget</span>
+                </p>
+                <Button type="button" size="xs" variant="outline" onClick={() => setMonthlyStock(String(stockAdvice))}>
+                  Use
+                </Button>
+              </div>
+            ) : null}
+            <p className="text-muted">Our cost counts against the monthly budget. Per month refills on the 1st.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

@@ -7,6 +7,8 @@ import {
   economyMonth,
   parseEurosToCents,
   resetDateLabel,
+  suggestMonthlyStock,
+  suggestPointsPrice,
 } from "../lib/economy";
 import { BUILTIN_COSMETICS } from "../lib/cosmetics";
 
@@ -61,4 +63,22 @@ test("suggested rewards are priced at or above face value", () => {
   for (const r of SUGGESTED_REWARDS) {
     assert.ok(r.pointsCost >= r.euroCostCents, `${r.name} is cheaper in points than its cash cost`);
   }
+});
+
+test("advised points price is the face value rounded up to a tidy number", () => {
+  assert.equal(suggestPointsPrice(300), 300); // €3 coffee
+  assert.equal(suggestPointsPrice(450), 450);
+  assert.equal(suggestPointsPrice(349), 350); // never below cost
+  assert.equal(suggestPointsPrice(1234), 1250);
+  assert.equal(suggestPointsPrice(4520), 4550);
+  assert.equal(suggestPointsPrice(6020), 6100);
+  assert.equal(suggestPointsPrice(300, 200), 600); // follows the conversion
+  assert.equal(suggestPointsPrice(0), null); // perks are priced by feel
+});
+
+test("advised monthly stock keeps one reward to a quarter of the budget", () => {
+  assert.equal(suggestMonthlyStock(4500, 50000), 2); // spa: 2 x €45 <= €125
+  assert.equal(suggestMonthlyStock(300, 50000), 41);
+  assert.equal(suggestMonthlyStock(90000, 50000), 1);
+  assert.equal(suggestMonthlyStock(0, 50000), null);
 });
