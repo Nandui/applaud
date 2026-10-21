@@ -1,4 +1,4 @@
-// Applaud — employee recognition & rewards platform.
+// Yayup — employee recognition & rewards platform.
 // Conventions: cuid() IDs, string roles, Site (not Center),
 // append-only RewardLedger as the wallet source of truth.
 

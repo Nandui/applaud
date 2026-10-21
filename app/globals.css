@@ -5,7 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Applaud design system: plain and familiar, like Instagram. Neutral white /
+ * Yayup design system: plain and familiar, like Instagram. Neutral white /
  * black surfaces that follow the phone's theme, one violet accent, Geist
  * throughout. Every colour is a runtime CSS variable so the two
  * themes swap without rebuilding utilities; shadcn/ui aliases map onto them.
