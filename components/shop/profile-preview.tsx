@@ -21,7 +21,7 @@ export function ProfilePreview({
   const accent = look.theme;
   return (
     <div className={cn("bg-background border-border overflow-hidden rounded-2xl border", className)}>
-      <div className="h-20" style={{ background: look.banner }} />
+      <div className="aspect-[3/1]" style={{ background: look.banner }} />
       <div className="flex items-end gap-3 px-4 pb-4">
         <div className="-mt-9">
           <FramedAvatar name={name} avatarUrl={avatarUrl} frame={look.frame} className="size-16 text-lg" />

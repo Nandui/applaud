@@ -32,8 +32,8 @@ const secondaryButton =
   "bg-surface-2 flex h-9 flex-1 items-center justify-center rounded-lg text-sm font-semibold transition-opacity active:opacity-70";
 
 /**
- * Profile, laid out like Instagram: counts beside the avatar, name and bio,
- * two buttons, highlight circles, then tabs. The banner, avatar frame and
+ * Profile, laid out like Instagram under a full-width banner: counts beside
+ * the avatar, name and bio, two buttons, highlight circles, then tabs. The banner, avatar frame and
  * accent colour are the person's own picks from the profile shop.
  */
 export default async function ProfilePage({
@@ -78,14 +78,16 @@ export default async function ProfilePage({
         trailing={isMe ? <AccountSheet admin={isAdmin(viewer)} triggerClassName={appBarIconClass} /> : null}
       />
 
-      <div className="h-24 rounded-xl" style={{ background: look.banner }} />
+      {/* The banner is shown whole (uploads are 3:1) and edge to edge on
+          phones: it's the biggest thing people buy in the shop. */}
+      <div className="-mx-4 aspect-[3/1] md:mx-0 md:rounded-2xl" style={{ background: look.banner }} />
 
-      <div className="-mt-10 flex items-end gap-4 pl-2">
+      <div className="-mt-14 flex items-end gap-4 pl-2">
         <FramedAvatar
           name={user.name}
           avatarUrl={user.avatarUrl}
           frame={look.frame}
-          className="size-20 text-xl"
+          className="size-24 text-2xl"
           large
         />
         <div className="flex flex-1 pb-1">
