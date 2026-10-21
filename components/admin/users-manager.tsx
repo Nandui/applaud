@@ -8,7 +8,7 @@ import {
   useTransition,
 } from "react";
 import { toast } from "sonner";
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
@@ -120,7 +120,7 @@ function UserFormDialog({
     }
     setUploadingAvatar(true);
     try {
-      const blob = await upload(`avatars/${file.name}`, file, {
+      const blob = await uploadPresigned(`avatars/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/admin/avatar/upload",
         contentType: file.type,

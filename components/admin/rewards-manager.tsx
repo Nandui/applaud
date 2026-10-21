@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useActionState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Upload } from "lucide-react";
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import {
   saveReward,
@@ -108,7 +108,7 @@ function RewardFormDialog({
     }
     setUploading(true);
     try {
-      const blob = await upload(`rewards/${file.name}`, file, {
+      const blob = await uploadPresigned(`rewards/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/admin/reward/upload",
         contentType: file.type,

@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import { ChevronRight, Loader2 } from "lucide-react";
@@ -61,7 +61,7 @@ export function ProfileEditor({
     }
     startUpload(async () => {
       try {
-        const blob = await upload(`avatars/${file.name}`, file, {
+        const blob = await uploadPresigned(`avatars/${file.name}`, file, {
           access: "public",
           handleUploadUrl: "/api/profile/avatar/upload",
           contentType: file.type,

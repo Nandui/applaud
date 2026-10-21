@@ -4,7 +4,7 @@ import { useActionState, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import {
@@ -157,7 +157,7 @@ export function RecognizeForm({
     for (const file of valid) {
       setUploadingCount((c) => c + 1);
       try {
-        const blob = await upload(`recognitions/${file.name}`, file, {
+        const blob = await uploadPresigned(`recognitions/${file.name}`, file, {
           access: "public",
           handleUploadUrl: "/api/recognition/upload",
           contentType: file.type,

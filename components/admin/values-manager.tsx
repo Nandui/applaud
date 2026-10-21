@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -75,7 +75,7 @@ function ValueFormDialog({
     }
     setUploading(true);
     try {
-      const blob = await upload(`values/${file.name}`, file, {
+      const blob = await uploadPresigned(`values/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/admin/reward/upload",
         contentType: file.type,
