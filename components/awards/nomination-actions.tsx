@@ -38,7 +38,7 @@ export function NominationActions({
     <div className={compact ? "flex justify-end gap-1.5" : "grid grid-cols-2 gap-2"}>
       <Button
         size={compact ? "xs" : "default"}
-        className={compact ? undefined : "h-10 rounded-full"}
+        className={compact ? undefined : "h-10 rounded-xl"}
         disabled={pending}
         onClick={() => run(approveNomination, "Approved")}
       >
@@ -48,7 +48,7 @@ export function NominationActions({
         size={compact ? "xs" : "default"}
         variant={compact ? "ghost" : "secondary"}
         disabled={pending}
-        className={cn("text-danger hover:text-danger", !compact && "h-10 rounded-full")}
+        className={cn("text-danger hover:text-danger", !compact && "h-10 rounded-xl")}
         onClick={() => run(rejectNomination, "Rejected")}
       >
         <X className="size-3.5" /> Reject

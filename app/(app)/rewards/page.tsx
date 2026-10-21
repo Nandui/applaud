@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
 
 /**
- * Rewards store (CHOPT / Xbox Rewards): a balance hero with the next thing
- * you can unlock, category chips, then tiles with "N to go" progress bars.
+ * Rewards store: your balance with the next thing you can unlock, category
+ * filters, then a grid of rewards with "N to go" progress bars.
  */
 export default async function RewardsPage({
   searchParams,
@@ -79,12 +79,11 @@ export default async function RewardsPage({
       />
 
       {/* Balance hero */}
-      <section className="bg-surface relative overflow-hidden rounded-3xl p-5">
-        <div className="bg-brand absolute -top-20 -right-16 size-56 rounded-full opacity-40 blur-3xl" aria-hidden />
-        <div className="relative">
+      <section className="bg-surface mt-4 rounded-2xl p-4">
+        <div>
           <p className="text-muted text-sm font-semibold">You&apos;ve got</p>
-          <p className="font-display mt-1 flex items-baseline gap-2 text-5xl leading-none font-extrabold tracking-tight">
-            <span className="text-primary text-3xl" aria-hidden>
+          <p className="mt-1 flex items-baseline gap-1.5 text-4xl leading-none font-bold tracking-tight">
+            <span className="text-primary text-2xl" aria-hidden>
               ✦
             </span>
             <span data-numeric>{formatNumber(balance)}</span>
@@ -128,8 +127,8 @@ export default async function RewardsPage({
                 replace
                 scroll={false}
                 className={cn(
-                  "flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-bold transition-colors",
-                  active ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
+                  "flex h-8 shrink-0 items-center rounded-lg px-3.5 text-sm font-semibold transition-colors",
+                  active ? "bg-foreground text-background" : "bg-surface-2 text-foreground",
                 )}
               >
                 {cat ?? "All"}
@@ -142,14 +141,14 @@ export default async function RewardsPage({
       {rewards.length === 0 ? (
         <div className="text-muted flex flex-col items-center gap-2 py-16 text-center">
           <span className="text-4xl">🎁</span>
-          <p className="text-foreground font-display font-bold">No rewards right now</p>
+          <p className="text-foreground font-bold">No rewards right now</p>
           <p className="text-sm">Check back soon, new perks get added regularly.</p>
         </div>
       ) : (
         <div className="mt-5 space-y-7">
           {shown.map((category) => (
             <section key={category}>
-              <h2 className="font-display mb-3 text-xl font-bold">{category}</h2>
+              <h2 className="mb-2 text-[0.95rem] font-bold">{category}</h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {groups.get(category)!.map((reward) => (
                   <RewardCard key={reward.id} reward={reward} balance={balance} />

@@ -45,6 +45,7 @@ export default async function LeaderboardPage({
           id: r.id,
           name: r.name,
           avatarUrl: r.avatarUrl,
+          frame: r.frame,
           subtitle: [r.jobTitle, r.siteCode].filter(Boolean).join(" · "),
           primary: pts(r.points),
           secondary: `${formatNumber(r.count)} received`,
@@ -53,6 +54,7 @@ export default async function LeaderboardPage({
           id: g.id,
           name: g.name,
           avatarUrl: g.avatarUrl,
+          frame: g.frame,
           subtitle: [g.jobTitle, g.siteCode].filter(Boolean).join(" · "),
           primary: `${formatNumber(g.count)} sent`,
           secondary: `${pts(g.pointsGiven)} given`,
@@ -63,15 +65,13 @@ export default async function LeaderboardPage({
     <div className="mx-auto max-w-xl">
       <AppBar title="Ranks" tabs={<RanksTabs active="leaderboard" />} />
 
-      <div className="space-y-4">
-        <div>
-          <BoardSwitch board={board} />
-          <p className="text-muted mt-0.5 text-xs font-semibold">
-            {PERIOD_LABELS[period]}
-            {left !== null && ` · ${left} ${left === 1 ? "day" : "days"} left`}
-          </p>
-        </div>
+      <div className="space-y-3 pt-3">
+        <BoardSwitch board={board} />
         <LeaderboardFilters sites={sites} site={siteId ?? "all"} period={period} />
+        <p className="text-muted pt-1 text-[0.82rem]">
+          {PERIOD_LABELS[period]}
+          {left !== null && ` · ${left} ${left === 1 ? "day" : "days"} left`}
+        </p>
         <RankedList rows={rows} viewerId={me.id} />
       </div>
     </div>

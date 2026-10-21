@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { UserAvatar } from "@/components/user-avatar";
+import { FramedAvatar } from "@/components/user-avatar";
 
 export type RankedRow = {
   id: string;
   name: string;
   avatarUrl: string | null;
+  frame?: string | null;
   subtitle: string;
   primary: string;
   secondary?: string;
@@ -15,9 +16,9 @@ const MEDAL = ["#fbbf24", "#cbd5e1", "#f59e0b"];
 const MEDAL_EMOJI = ["🥇", "🥈", "🥉"];
 
 /**
- * Duolingo league list: big rank numbers, medals for the top three, your own
- * row highlighted, and pinned to the bottom of the screen when you're further
- * down the list so you always know where you stand.
+ * A plain ranked list: rank number, framed avatar, name and score, with medals
+ * for the top three. Your own row is highlighted, and pinned to the bottom of
+ * the screen when you're further down so you always know where you stand.
  */
 export function RankedList({
   rows,
@@ -33,7 +34,7 @@ export function RankedList({
     return (
       <div className="text-muted flex flex-col items-center gap-2 py-20 text-center">
         <span className="text-4xl">🏁</span>
-        <p className="text-foreground font-display font-bold">No one on the board yet</p>
+        <p className="text-foreground font-bold">No one on the board yet</p>
         <p className="text-sm">Shout-outs in this period will show up here.</p>
       </div>
     );
@@ -46,14 +47,14 @@ export function RankedList({
 
   return (
     <>
-      <ol className="bg-surface overflow-hidden rounded-3xl">
+      <ol className="-mx-4 md:mx-0">
         {visible.map((row, idx) => (
           <Row key={row.id} row={row} rank={idx + 1} me={row.id === viewerId} />
         ))}
       </ol>
       {pinMe && (
         <div className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-20 mt-3 md:bottom-4">
-          <ol className="border-primary/60 bg-surface overflow-hidden rounded-3xl border shadow-float">
+          <ol className="border-border bg-background overflow-hidden rounded-xl border shadow-float">
             <Row row={rows[myIndex]} rank={myIndex + 1} me />
           </ol>
         </div>
@@ -65,7 +66,7 @@ export function RankedList({
 function Row({ row, rank, me }: { row: RankedRow; rank: number; me: boolean }) {
   const medal = rank <= 3 ? rank - 1 : -1;
   return (
-    <li className="border-border border-b last:border-0">
+    <li>
       <Link
         href={`/profile/${row.id}`}
         className={cn(
@@ -76,7 +77,7 @@ function Row({ row, rank, me }: { row: RankedRow; rank: number; me: boolean }) {
         <span
           data-numeric
           className={cn(
-            "font-display w-7 shrink-0 text-center text-lg font-extrabold",
+            "w-6 shrink-0 text-center text-[0.95rem] font-bold",
             medal < 0 && (me ? "text-primary" : "text-muted"),
           )}
           style={medal >= 0 ? { color: MEDAL[medal] } : undefined}
@@ -84,10 +85,11 @@ function Row({ row, rank, me }: { row: RankedRow; rank: number; me: boolean }) {
           {rank}
         </span>
         <span className="relative">
-          <UserAvatar
+          <FramedAvatar
             name={row.name}
             avatarUrl={row.avatarUrl}
-            className={cn("size-11", medal >= 0 && "ring-2")}
+            frame={row.frame ?? null}
+            className="size-11 text-sm"
           />
           {medal >= 0 && (
             <span className="absolute -right-1.5 -bottom-1 text-base leading-none">{MEDAL_EMOJI[medal]}</span>

@@ -8,17 +8,12 @@ import { AppBar } from "@/components/app-shell/app-bar";
 import { NominateDialog } from "@/components/awards/nominate-dialog";
 import { NominationActions } from "@/components/awards/nomination-actions";
 import { RanksTabs } from "@/components/ranks/ranks-tabs";
-import { UserAvatar } from "@/components/user-avatar";
+import { cn } from "@/lib/utils";
+import { FramedAvatar, UserAvatar } from "@/components/user-avatar";
+import { parseProfile } from "@/lib/profile-custom";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Awards" };
-
-/** Card art per program, cycled (Xbox achievement tiles). */
-const ART = [
-  "radial-gradient(80% 90% at 85% 0%, rgb(253 230 138 / 0.85), transparent 60%), linear-gradient(150deg, #f59e0b, #b45309)",
-  "radial-gradient(80% 90% at 85% 0%, rgb(198 244 50 / 0.6), transparent 60%), linear-gradient(150deg, #7c5cff, #3b1fa8)",
-  "radial-gradient(80% 90% at 85% 0%, rgb(103 232 249 / 0.7), transparent 60%), linear-gradient(150deg, #ff4f9a, #9d174d)",
-];
 
 export default async function AwardsPage() {
   const me = await requireUser();
@@ -45,7 +40,7 @@ export default async function AwardsPage() {
       take: 6,
       select: {
         id: true,
-        nominee: { select: { id: true, name: true, avatarUrl: true } },
+        nominee: { select: { id: true, name: true, avatarUrl: true, profile: true } },
         program: { select: { name: true } },
       },
     }),
@@ -84,8 +79,8 @@ export default async function AwardsPage() {
       <AppBar title="Ranks" tabs={<RanksTabs active="awards" />} />
 
       {isManager(me) && pending.length > 0 && (
-        <section className="mb-6">
-          <h2 className="font-display mb-2 flex items-center gap-2 px-1 text-lg font-bold">
+        <section className="mb-6 pt-4">
+          <h2 className="mb-2 flex items-center gap-2 text-[0.95rem] font-bold">
             Needs your review
             <span data-numeric className="bg-danger rounded-full px-2 py-0.5 text-xs font-bold text-white">
               {pending.length}
@@ -93,7 +88,7 @@ export default async function AwardsPage() {
           </h2>
           <ul className="space-y-2">
             {pending.map((n) => (
-              <li key={n.id} className="bg-surface space-y-3 rounded-3xl p-4">
+              <li key={n.id} className="border-border space-y-3 rounded-xl border p-3.5">
                 <div className="flex items-center gap-3">
                   <UserAvatar name={n.nominee.name} avatarUrl={n.nominee.avatarUrl} className="size-10" />
                   <div className="min-w-0 flex-1 text-sm">
@@ -106,11 +101,11 @@ export default async function AwardsPage() {
                       by {n.nominator.name} · {relativeTime(n.createdAt)}
                     </p>
                   </div>
-                  <span data-numeric className="bg-primary text-primary-fg rounded-full px-2.5 py-1 text-xs font-bold">
+                  <span data-numeric className="text-primary text-sm font-bold">
                     +{n.program.points}
                   </span>
                 </div>
-                <p className="bg-surface-2 rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed">{n.justification}</p>
+                <p className="text-[0.9rem] leading-relaxed">{n.justification}</p>
                 <NominationActions id={n.id} />
               </li>
             ))}
@@ -119,20 +114,19 @@ export default async function AwardsPage() {
       )}
 
       {recentWins.length > 0 && (
-        <section className="mb-6">
-          <h2 className="font-display mb-2 px-1 text-lg font-bold">Recent winners</h2>
+        <section className="mb-6 pt-4">
+          <h2 className="mb-2 text-[0.95rem] font-bold">Recent winners</h2>
           <ul className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4">
             {recentWins.map((w) => (
               <li key={w.id} className="w-20 shrink-0 text-center">
                 <Link href={`/profile/${w.nominee.id}`} className="flex flex-col items-center gap-1.5">
                   <span className="relative">
-                    <span className="block rounded-full bg-gradient-to-br from-amber-300 to-amber-600 p-[3px]">
-                      <UserAvatar
-                        name={w.nominee.name}
-                        avatarUrl={w.nominee.avatarUrl}
-                        className="ring-background size-16 ring-2"
-                      />
-                    </span>
+                    <FramedAvatar
+                      name={w.nominee.name}
+                      avatarUrl={w.nominee.avatarUrl}
+                      frame={parseProfile(w.nominee.profile).frame}
+                      className="size-16"
+                    />
                     <span className="absolute -right-1 -bottom-1 text-xl">🏆</span>
                   </span>
                   <span className="w-full truncate text-xs font-semibold">{w.nominee.name.split(" ")[0]}</span>
@@ -144,42 +138,37 @@ export default async function AwardsPage() {
         </section>
       )}
 
-      <h2 className="font-display mb-2 px-1 text-lg font-bold">Award programs</h2>
+      <h2 className={cn("mb-2 text-[0.95rem] font-bold", recentWins.length === 0 && pending.length === 0 && "pt-4")}>
+        Award programs
+      </h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        {programs.map((p, i) => (
-          <article key={p.id} className="bg-surface flex flex-col overflow-hidden rounded-3xl">
-            <div
-              className="relative flex h-32 items-end p-4 text-white"
-              style={{ backgroundImage: ART[i % ART.length] }}
-            >
-              <Trophy className="absolute top-3 right-3 size-16 opacity-25" aria-hidden />
-              <div>
-                <span className="rounded-full bg-black/25 px-2.5 py-0.5 text-xs font-bold capitalize backdrop-blur">
-                  {p.cadence ?? "Any time"}
-                </span>
-                <h3 className="font-display mt-1.5 text-2xl leading-tight font-extrabold">{p.name}</h3>
+        {programs.map((p) => (
+          <article key={p.id} className="border-border flex flex-col gap-3 rounded-xl border p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
+                <Trophy className="size-6" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[1.05rem] leading-tight font-bold">{p.name}</h3>
+                <p className="text-muted mt-0.5 text-[0.82rem]">
+                  <span className="capitalize">{p.cadence ?? "Any time"}</span> ·{" "}
+                  {p.requiresApproval ? "needs approval" : "instant"}
+                </p>
               </div>
+              <span data-numeric className="text-primary shrink-0 text-sm font-bold">
+                +{p.points} pts
+              </span>
             </div>
-            <div className="flex flex-1 flex-col gap-3 p-4">
-              <div className="flex items-center gap-2 text-xs">
-                <span data-numeric className="bg-primary text-primary-fg rounded-full px-2.5 py-1 font-bold">
-                  +{p.points} pts
-                </span>
-                <span className="text-muted font-medium">
-                  {p.requiresApproval ? "Needs approval" : "Instant award"}
-                </span>
-              </div>
-              {p.description && <p className="text-muted flex-1 text-sm leading-relaxed">{p.description}</p>}
-              <NominateDialog
-                program={{
-                  id: p.id,
-                  name: p.name,
-                  points: p.points,
-                  requiresApproval: p.requiresApproval,
-                }}
-                colleagues={colleagueOpts}
-              />
-            </div>
+            {p.description && <p className="text-muted flex-1 text-[0.9rem] leading-relaxed">{p.description}</p>}
+            <NominateDialog
+              program={{
+                id: p.id,
+                name: p.name,
+                points: p.points,
+                requiresApproval: p.requiresApproval,
+              }}
+              colleagues={colleagueOpts}
+            />
           </article>
         ))}
       </div>

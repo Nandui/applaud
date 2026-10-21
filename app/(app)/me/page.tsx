@@ -38,7 +38,7 @@ export default async function MePage() {
       ? Math.min(100, Math.round((allowance.used / allowance.total) * 100))
       : 0;
 
-  // Remaining allowance as a ring, Apple Fitness style.
+  // Remaining allowance as a ring.
   const remainingPct = 100 - usedPct;
   const R = 34;
   const C = 2 * Math.PI * R;
@@ -47,11 +47,11 @@ export default async function MePage() {
     <div className="mx-auto max-w-xl">
       <AppBar title="Wallet" center leading={<BackButton fallback="/profile" />} />
 
-      {/* Balance (Cash App): one giant number and two big actions */}
+      {/* Balance and the two things you can do with points */}
       <section className="flex flex-col items-center pt-4 pb-6 text-center">
         <p className="text-muted text-sm font-semibold">Redeemable balance</p>
-        <p className="font-display mt-2 flex items-baseline gap-2 text-[4.25rem] leading-none font-extrabold tracking-tighter">
-          <span className="text-primary text-4xl" aria-hidden>
+        <p className="mt-2 flex items-baseline gap-1.5 text-5xl leading-none font-bold tracking-tight">
+          <span className="text-primary text-3xl" aria-hidden>
             ✦
           </span>
           <span data-numeric>{formatNumber(user.walletBalance)}</span>
@@ -60,13 +60,13 @@ export default async function MePage() {
         <div className="mt-6 grid w-full grid-cols-2 gap-2">
           <Link
             href="/rewards"
-            className="bg-primary text-primary-fg flex h-12 items-center justify-center gap-2 rounded-full font-extrabold transition-transform active:scale-[0.98]"
+            className="bg-primary text-primary-fg flex h-12 items-center justify-center gap-2 rounded-xl font-bold active:opacity-80"
           >
             <Gift className="size-4.5" /> Spend
           </Link>
           <Link
             href="/recognize"
-            className="bg-surface-2 flex h-12 items-center justify-center gap-2 rounded-full font-extrabold transition-transform active:scale-[0.98]"
+            className="bg-surface-2 flex h-12 items-center justify-center gap-2 rounded-xl font-bold active:opacity-80"
           >
             <Send className="size-4.5" /> Give
           </Link>
@@ -74,7 +74,7 @@ export default async function MePage() {
       </section>
 
       {/* Allowance */}
-      <section className="bg-surface flex items-center gap-4 rounded-3xl p-5">
+      <section className="bg-surface flex items-center gap-4 rounded-2xl p-5">
         <svg viewBox="0 0 80 80" className="size-20 shrink-0 -rotate-90" aria-hidden>
           <circle cx="40" cy="40" r={R} fill="none" stroke="var(--color-surface-3)" strokeWidth="9" />
           <circle
@@ -92,7 +92,7 @@ export default async function MePage() {
         <div className="min-w-0">
           <p className="text-muted text-sm font-semibold">Left to give this month</p>
           <p className="mt-0.5">
-            <span data-numeric className="font-display text-3xl font-extrabold">
+            <span data-numeric className="text-3xl font-bold">
               {formatNumber(allowance.remaining)}
             </span>{" "}
             <span className="text-muted text-sm">/ {formatNumber(allowance.total)} pts</span>
@@ -104,16 +104,16 @@ export default async function MePage() {
       </section>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <div className="bg-surface rounded-3xl p-4">
+        <div className="bg-surface rounded-2xl p-4">
           <Inbox className="text-primary size-5" />
-          <p data-numeric className="font-display mt-2 text-3xl font-extrabold">
+          <p data-numeric className="mt-2 text-3xl font-bold">
             {formatNumber(receivedCount)}
           </p>
           <p className="text-muted text-xs font-medium">shout-outs received</p>
         </div>
-        <div className="bg-surface rounded-3xl p-4">
+        <div className="bg-surface rounded-2xl p-4">
           <Send className="text-primary size-5" />
-          <p data-numeric className="font-display mt-2 text-3xl font-extrabold">
+          <p data-numeric className="mt-2 text-3xl font-bold">
             {formatNumber(givenCount)}
           </p>
           <p className="text-muted text-xs font-medium">shout-outs given</p>
@@ -121,18 +121,18 @@ export default async function MePage() {
       </div>
 
       {/* Activity */}
-      <h2 className="font-display mt-7 mb-2 px-1 text-xl font-bold">Activity</h2>
+      <h2 className="mt-7 mb-1 text-[0.95rem] font-bold">Activity</h2>
       {ledger.length === 0 ? (
-        <p className="bg-surface text-muted rounded-3xl px-6 py-10 text-center text-sm">
+        <p className="bg-surface text-muted rounded-2xl px-6 py-10 text-center text-sm">
           No wallet activity yet. Points you receive will show up here.
         </p>
       ) : (
-        <ul className="bg-surface divide-border divide-y overflow-hidden rounded-3xl">
+        <ul className="divide-border divide-y">
           {ledger.map((row) => {
             const meta = ledgerTypeMeta(row.type);
             const up = row.amount > 0;
             return (
-              <li key={row.id} className="flex items-center gap-3 px-4 py-3.5">
+              <li key={row.id} className="flex items-center gap-3 py-3">
                 <span
                   className={cn(
                     "flex size-11 shrink-0 items-center justify-center rounded-full",

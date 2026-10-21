@@ -22,7 +22,7 @@ function useHref() {
   };
 }
 
-/** Big text tabs (Duolingo league header): who is being ranked. */
+/** Who is being ranked: two plain segments, like Instagram's filter pills. */
 export function BoardSwitch({ board }: { board: Board }) {
   const href = useHref();
   const tabs: { key: Board; label: string }[] = [
@@ -30,7 +30,7 @@ export function BoardSwitch({ board }: { board: Board }) {
     { key: "given", label: "Top givers" },
   ];
   return (
-    <div className="flex gap-5">
+    <div className="bg-surface-2 grid grid-cols-2 gap-1 rounded-xl p-1">
       {tabs.map((t) => (
         <Link
           key={t.key}
@@ -38,8 +38,8 @@ export function BoardSwitch({ board }: { board: Board }) {
           replace
           scroll={false}
           className={cn(
-            "font-display relative text-[1.35rem] font-extrabold tracking-tight whitespace-nowrap transition-colors",
-            board === t.key ? "text-foreground" : "text-muted/60",
+            "flex h-9 items-center justify-center rounded-lg text-sm font-semibold whitespace-nowrap transition-colors",
+            board === t.key ? "bg-background text-foreground shadow-sm" : "text-muted",
           )}
         >
           {t.label}
@@ -74,8 +74,8 @@ export function LeaderboardFilters({
           replace
           scroll={false}
           className={cn(
-            "flex h-8 shrink-0 items-center rounded-full px-3.5 text-sm font-semibold transition-colors",
-            period === p ? "bg-primary text-primary-fg" : "bg-surface-2",
+            "flex h-8 shrink-0 items-center rounded-lg px-3.5 text-sm font-semibold transition-colors",
+            period === p ? "bg-foreground text-background" : "bg-surface-2",
           )}
         >
           {PERIOD_LABELS[p as Period]}
@@ -83,8 +83,8 @@ export function LeaderboardFilters({
       ))}
       <label
         className={cn(
-          "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full pr-3 pl-3 text-sm font-semibold",
-          site !== "all" ? "bg-primary text-primary-fg" : "bg-surface-2",
+          "relative flex h-8 shrink-0 items-center gap-1.5 rounded-lg pr-3 pl-3 text-sm font-semibold",
+          site !== "all" ? "bg-foreground text-background" : "bg-surface-2",
         )}
       >
         <MapPin className="size-3.5" />

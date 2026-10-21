@@ -85,16 +85,16 @@ export function RewardCard({
   const after = balance - reward.pointsCost;
   const progress = Math.min(100, Math.round((balance / reward.pointsCost) * 100));
 
-  // A store tile (CHOPT / Xbox Rewards). Tapping opens a bottom sheet with the
-  // balance maths and a thumb-reachable redeem button.
+  // A store tile: square picture, name, price. Tapping opens a bottom sheet
+  // with the balance maths and a thumb-reachable redeem button.
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
           type="button"
-          className="bg-surface group flex flex-col overflow-hidden rounded-3xl text-left transition-transform active:scale-[0.97]"
+          className="group flex flex-col overflow-hidden text-left active:opacity-80"
         >
-          <span className="relative block aspect-[4/3] w-full overflow-hidden">
+          <span className="relative block aspect-square w-full overflow-hidden rounded-xl">
             <RewardArt reward={reward} />
             {outOfStock ? (
               <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-bold text-white">
@@ -106,13 +106,13 @@ export function RewardCard({
               </span>
             ) : null}
           </span>
-          <span className="flex flex-1 flex-col p-3">
+          <span className="flex flex-1 flex-col pt-2">
             <span className="line-clamp-2 text-sm leading-snug font-bold">{reward.name}</span>
             <span className="mt-auto flex items-center justify-between gap-2 pt-2">
               <span
                 data-numeric
                 className={cn(
-                  "rounded-full px-2 py-0.5 text-xs font-extrabold",
+                  "rounded-full px-2 py-0.5 text-xs font-bold",
                   canAfford && !outOfStock ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
                 )}
               >
@@ -137,14 +137,14 @@ export function RewardCard({
         </button>
       </SheetTrigger>
       <SheetContent side="bottom" showCloseButton={false} className="gap-0 px-0">
-        <div className="mx-4 aspect-[16/9] overflow-hidden rounded-3xl">
+        <div className="mx-4 aspect-[16/9] overflow-hidden rounded-2xl">
           <RewardArt reward={reward} />
         </div>
         <SheetHeader className="pt-4 text-left">
           {reward.category ? (
             <span className="text-muted text-xs font-bold tracking-wide uppercase">{reward.category}</span>
           ) : null}
-          <SheetTitle className="font-display text-2xl leading-tight font-extrabold">{reward.name}</SheetTitle>
+          <SheetTitle className="text-xl leading-tight font-bold">{reward.name}</SheetTitle>
           <SheetDescription>
             {reward.description ?? "Redeeming deducts points from your wallet straight away."}
           </SheetDescription>
@@ -161,14 +161,14 @@ export function RewardCard({
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="bg-surface-2 h-12 rounded-full px-5 font-bold"
+            className="bg-surface-2 h-12 rounded-xl px-5 font-bold"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={pending || disabled}
-            className="bg-primary text-primary-fg h-12 flex-1 rounded-full font-extrabold transition-transform active:scale-[0.98] disabled:opacity-45"
+            className="bg-primary text-primary-fg h-12 flex-1 rounded-xl font-bold active:opacity-80 disabled:opacity-45"
           >
             {pending
               ? "Redeeming…"

@@ -68,14 +68,14 @@ export function NominateDialog({
       <SheetTrigger asChild>
         <button
           type="button"
-          className="bg-foreground text-background flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-bold transition-transform active:scale-[0.98]"
+          className="bg-primary text-primary-fg flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold active:opacity-80"
         >
           <Trophy className="size-4" /> Nominate someone
         </button>
       </SheetTrigger>
       <SheetContent side="bottom" showCloseButton={false} className="gap-0 px-0">
         <SheetHeader className="pt-2">
-          <SheetTitle className="font-display text-xl">Nominate for {program.name}</SheetTitle>
+          <SheetTitle className="text-base">Nominate for {program.name}</SheetTitle>
           <SheetDescription>
             {program.requiresApproval
               ? "Your nomination goes to their manager or an admin to approve."

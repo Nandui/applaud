@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { periodRange, type Period } from "@/lib/periods";
+import { parseProfile } from "@/lib/profile-custom";
 
 export { PERIODS, PERIOD_LABELS, type Period } from "@/lib/periods";
 
@@ -7,6 +8,8 @@ type LeaderUser = {
   id: string;
   name: string;
   avatarUrl: string | null;
+  /** Equipped avatar frame from the profile shop. */
+  frame: string | null;
   jobTitle: string | null;
   siteCode: string;
 };
@@ -93,6 +96,7 @@ export async function getLeaderboard({
       name: true,
       avatarUrl: true,
       jobTitle: true,
+      profile: true,
       site: { select: { code: true } },
     },
   });
@@ -103,6 +107,7 @@ export async function getLeaderboard({
         id: u.id,
         name: u.name,
         avatarUrl: u.avatarUrl,
+        frame: parseProfile(u.profile).frame,
         jobTitle: u.jobTitle,
         siteCode: u.site?.code ?? "",
       },
