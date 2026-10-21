@@ -2,14 +2,18 @@ import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getAllowanceStatus } from "@/lib/points";
-import { PageHeader } from "@/components/page-header";
 import { RecognizeForm } from "./recognize-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Give recognition" };
 
-export default async function RecognizePage() {
+export default async function RecognizePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ to?: string }>;
+}) {
   const me = await requireUser();
+  const { to } = await searchParams;
   const settings = await getOrgSettings();
 
   const [values, users, allowance] = await Promise.all([
@@ -43,17 +47,15 @@ export default async function RecognizePage() {
     siteCode: u.site?.code ?? "",
   }));
 
+  // "Recognise Aoife" from a profile preselects her (if she's pickable).
+  const initialSelected = to && recipients.some((r) => r.id === to) ? [to] : [];
+
   return (
-    <div className="mx-auto max-w-2xl">
-      <PageHeader
-        title="Give recognition"
-        description="Recognise a colleague against a company value."
-      />
-      <RecognizeForm
-        values={values}
-        recipients={recipients}
-        allowance={allowance}
-      />
-    </div>
+    <RecognizeForm
+      values={values}
+      recipients={recipients}
+      allowance={allowance}
+      initialSelected={initialSelected}
+    />
   );
 }

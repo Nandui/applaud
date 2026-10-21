@@ -14,13 +14,6 @@ import {
   quickSignIn,
   type AuthState,
 } from "@/lib/auth/actions";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,28 +41,33 @@ export function SignInForm({ samples }: { samples: Sample[] }) {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Welcome back</CardTitle>
-        <CardDescription>Enter your work email to continue.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
+    <div className="space-y-5 px-6 pt-7 pb-8">
+      <div className="space-y-1">
+        <h2 className="font-display text-2xl font-semibold">Welcome back</h2>
+        <p className="text-muted text-sm">Enter your work email to continue.</p>
+      </div>
+      <div className="space-y-5">
         <form action={action} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="sr-only">
+              Email
+            </Label>
             <Input
               id="email"
               name="email"
               type="email"
               placeholder="name@applaud.test"
               autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
               required
+              className="bg-secondary h-12 rounded-xl border-0 px-4"
             />
           </div>
           {state?.error ? (
             <p className="text-danger text-sm">{state.error}</p>
           ) : null}
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" className="h-12 w-full rounded-full text-base" disabled={pending}>
             <LogIn className="size-4" />
             {pending ? "Signing in…" : "Sign in"}
           </Button>
@@ -92,7 +90,7 @@ export function SignInForm({ samples }: { samples: Sample[] }) {
                     <input type="hidden" name="email" value={s.email} />
                     <button
                       type="submit"
-                      className="border-border hover:bg-secondary flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors"
+                      className="bg-secondary/60 active:bg-secondary flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors"
                     >
                       <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
                         <Icon className="size-4" />
@@ -115,7 +113,7 @@ export function SignInForm({ samples }: { samples: Sample[] }) {
             </div>
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

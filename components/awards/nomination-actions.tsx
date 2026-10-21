@@ -9,8 +9,19 @@ import {
   type ActionResult,
 } from "@/lib/awards/actions";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-export function NominationActions({ id }: { id: string }) {
+/**
+ * Approve / reject. Full-width thumb-sized buttons by default; `compact` keeps
+ * the small inline pair for the admin table.
+ */
+export function NominationActions({
+  id,
+  compact = false,
+}: {
+  id: string;
+  compact?: boolean;
+}) {
   const [pending, start] = useTransition();
 
   function run(fn: (fd: FormData) => Promise<ActionResult>, fallback: string) {
@@ -24,19 +35,20 @@ export function NominationActions({ id }: { id: string }) {
   }
 
   return (
-    <div className="flex justify-end gap-1.5">
+    <div className={compact ? "flex justify-end gap-1.5" : "grid grid-cols-2 gap-2"}>
       <Button
-        size="xs"
+        size={compact ? "xs" : "default"}
+        className={compact ? undefined : "h-10 rounded-full"}
         disabled={pending}
         onClick={() => run(approveNomination, "Approved")}
       >
         <Check className="size-3.5" /> Approve
       </Button>
       <Button
-        size="xs"
-        variant="ghost"
+        size={compact ? "xs" : "default"}
+        variant={compact ? "ghost" : "secondary"}
         disabled={pending}
-        className="text-danger hover:text-danger"
+        className={cn("text-danger hover:text-danger", !compact && "h-10 rounded-full")}
         onClick={() => run(rejectNomination, "Rejected")}
       >
         <X className="size-3.5" /> Reject

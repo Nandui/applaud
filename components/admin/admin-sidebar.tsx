@@ -16,7 +16,7 @@ export function AdminSidebar() {
   return (
     <nav
       aria-label="Admin"
-      className="flex gap-1 overflow-x-auto pb-2 md:flex-col md:gap-0.5 md:overflow-visible md:pb-0"
+      className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-col md:gap-0.5 md:overflow-visible md:px-0"
     >
       {ADMIN_NAV.map((item) => {
         const active = isActive(pathname, item);
@@ -25,10 +25,10 @@ export function AdminSidebar() {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "flex h-8 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors md:h-auto md:gap-2.5 md:rounded-md md:py-2 md:font-medium",
               active
-                ? "bg-primary/10 text-primary"
-                : "text-muted hover:text-foreground hover:bg-secondary",
+                ? "bg-foreground md:bg-primary/10 md:text-primary text-white"
+                : "bg-secondary md:text-muted md:hover:text-foreground md:hover:bg-secondary md:bg-transparent",
             )}
           >
             <item.icon className="size-4" />

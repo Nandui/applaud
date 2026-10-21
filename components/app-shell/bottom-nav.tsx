@@ -2,59 +2,72 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, Plus, Award } from "lucide-react";
+import { Home, Trophy, Plus, Gift } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
 import type { SessionUser } from "@/lib/auth/types";
 
+/** Routes that take over the whole screen (no tab bar), like a native modal. */
+const FULL_SCREEN = ["/recognize"];
+
 /**
- * Instagram/Facebook-style bottom tab bar for mobile. Desktop keeps the top
- * nav (this is `md:hidden`). The center "+" is the elevated create action.
+ * Phone tab bar (TikTok/Instagram pattern): four destinations plus a raised
+ * gradient "create" button in the thumb zone. Frosted, safe-area padded, and
+ * hidden on desktop where the TopNav takes over.
  */
 export function BottomNav({ user }: { user: SessionUser }) {
   const pathname = usePathname();
+  if (FULL_SCREEN.some((p) => pathname.startsWith(p))) return null;
+
   const active = (href: string, exact = false) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
   const profileHref = `/profile/${user.id}`;
+  const onProfile = active("/profile") || active("/me");
 
   return (
-    <nav className="bg-surface/90 border-border fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-md md:hidden">
-      <div className="mx-auto flex h-16 max-w-md items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+    <nav
+      aria-label="Main"
+      className="glass pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.06] md:hidden"
+    >
+      <div className="mx-auto flex h-[3.4rem] max-w-md items-stretch justify-around px-1">
         <Tab href="/" label="Home" active={active("/", true)}>
-          <Home className="size-5.5" />
+          <Home className="size-6" />
         </Tab>
         <Tab href="/leaderboard" label="Ranks" active={active("/leaderboard")}>
-          <Trophy className="size-5.5" />
+          <Trophy className="size-6" />
         </Tab>
 
         <Link
           href="/recognize"
-          aria-label="Recognise"
-          className="bg-primary text-primary-foreground ring-surface -mt-6 flex size-13 shrink-0 items-center justify-center rounded-full shadow-lg ring-4 transition-transform active:scale-95"
+          aria-label="Recognise someone"
+          className="flex flex-1 items-center justify-center"
         >
-          <Plus className="size-6" strokeWidth={2.5} />
+          <motion.span
+            whileTap={{ scale: 0.88 }}
+            className="bg-brand flex h-9 w-13 items-center justify-center rounded-[0.8rem] text-white shadow-[0_4px_14px_-2px_rgb(217_70_239/0.55)]"
+          >
+            <Plus className="size-6" strokeWidth={2.75} />
+          </motion.span>
         </Link>
 
-        <Tab href="/awards" label="Awards" active={active("/awards")}>
-          <Award className="size-5.5" />
+        <Tab href="/rewards" label="Rewards" active={active("/rewards")}>
+          <Gift className="size-6" />
         </Tab>
-        <Link
-          href={profileHref}
-          className={cn(
-            "flex w-14 flex-col items-center gap-0.5 text-[0.6rem] font-medium",
-            active("/profile") ? "text-primary" : "text-muted",
-          )}
-        >
-          <UserAvatar
-            name={user.name}
-            avatarUrl={user.avatarUrl}
+        <Tab href={profileHref} label="Me" active={onProfile}>
+          <span
             className={cn(
-              "size-6",
-              active("/profile") && "ring-primary ring-2 ring-offset-1",
+              "rounded-full p-[1.5px]",
+              onProfile ? "bg-foreground" : "bg-transparent",
             )}
-          />
-          <span>Profile</span>
-        </Link>
+          >
+            <UserAvatar
+              name={user.name}
+              avatarUrl={user.avatarUrl}
+              className="ring-surface size-[1.55rem] text-[0.55rem] ring-[1.5px]"
+            />
+          </span>
+        </Tab>
       </div>
     </nav>
   );
@@ -74,12 +87,15 @@ function Tab({
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex w-14 flex-col items-center gap-0.5 text-[0.6rem] font-medium transition-colors",
-        active ? "text-primary" : "text-muted hover:text-foreground",
+        "flex flex-1 flex-col items-center justify-center gap-0.5 text-[0.625rem] font-semibold transition-colors",
+        active ? "text-foreground [&_svg]:stroke-[2.4]" : "text-muted [&_svg]:stroke-[1.75]",
       )}
     >
-      {children}
+      <motion.span whileTap={{ scale: 0.85 }} className="flex h-7 items-center">
+        {children}
+      </motion.span>
       <span>{label}</span>
     </Link>
   );

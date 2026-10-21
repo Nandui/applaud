@@ -90,7 +90,7 @@ export function NominationsManager({ rows }: { rows: NominationRow[] }) {
       enableSorting: false,
       cell: ({ row }) =>
         row.original.status === "pending" ? (
-          <NominationActions id={row.original.id} />
+          <NominationActions id={row.original.id} compact />
         ) : (
           <span className="text-muted text-xs">
             {row.original.reviewedByName ? `by ${row.original.reviewedByName}` : "—"}

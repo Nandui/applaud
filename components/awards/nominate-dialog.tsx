@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { toast } from "sonner";
 import { Award } from "lucide-react";
 import { nominate, type ActionResult } from "@/lib/awards/actions";
@@ -13,13 +13,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,25 +33,26 @@ export function NominateDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [nomineeId, setNomineeId] = useState("");
-  const [state, formAction, pending] = useActionState<
+  // Toast + close from inside the action (not an effect watching its state).
+  const [, formAction, pending] = useActionState<
     ActionResult | undefined,
     FormData
-  >(nominate, undefined);
-
-  useEffect(() => {
-    if (state?.ok) {
-      toast.success(state.message ?? "Nomination submitted.");
+  >(async (prev, fd) => {
+    const res = await nominate(prev, fd);
+    if (res.ok) {
+      toast.success(res.message ?? "Nomination submitted.");
       setOpen(false);
-    } else if (state && !state.ok) {
-      toast.error(state.error);
+    } else {
+      toast.error(res.error);
     }
-  }, [state]);
+    return res;
+  }, undefined);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <Award className="size-4" /> Nominate
+        <Button className="h-10 w-full rounded-full">
+          <Award className="size-4" /> Nominate someone
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -75,19 +69,24 @@ export function NominateDialog({
           <input type="hidden" name="nomineeId" value={nomineeId} />
 
           <div className="space-y-1.5">
-            <Label>Colleague</Label>
-            <Select value={nomineeId} onValueChange={setNomineeId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a colleague" />
-              </SelectTrigger>
-              <SelectContent>
-                {colleagues.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} — {c.jobTitle ?? "—"} · {c.siteCode}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="nominee">Colleague</Label>
+            {/* Native select: phones open their own picker wheel/list. */}
+            <select
+              id="nominee"
+              value={nomineeId}
+              onChange={(e) => setNomineeId(e.target.value)}
+              className="border-input bg-surface h-11 w-full rounded-xl border px-3 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="" disabled>
+                Choose a colleague
+              </option>
+              {colleagues.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} — {c.jobTitle ?? "—"}
+                  {c.siteCode ? ` · ${c.siteCode}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-1.5">
@@ -98,15 +97,16 @@ export function NominateDialog({
               rows={4}
               maxLength={800}
               placeholder="Why do they deserve this award?"
+              className="rounded-xl"
               required
             />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending || !nomineeId}>
+            <Button type="submit" className="rounded-full" disabled={pending || !nomineeId}>
               {pending ? "Submitting…" : "Submit nomination"}
             </Button>
           </DialogFooter>

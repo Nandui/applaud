@@ -1,17 +1,58 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ChevronDown, MapPin } from "lucide-react";
 import { PERIODS, PERIOD_LABELS, type Period } from "@/lib/periods";
+import { cn } from "@/lib/utils";
 
 type SiteOption = { id: string; name: string };
+export type Board = "received" | "given";
 
+/** Build a leaderboard URL from the current params with one key changed. */
+function useHref() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return (key: string, value: string | null) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (value === null) sp.delete(key);
+    else sp.set(key, value);
+    const qs = sp.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
+}
+
+/** iOS-style segmented control: who's being ranked. */
+export function BoardSwitch({ board }: { board: Board }) {
+  const href = useHref();
+  const tabs: { key: Board; label: string }[] = [
+    { key: "received", label: "Most recognised" },
+    { key: "given", label: "Top givers" },
+  ];
+  return (
+    <div className="bg-secondary grid grid-cols-2 rounded-xl p-1">
+      {tabs.map((t) => (
+        <Link
+          key={t.key}
+          href={href("board", t.key === "received" ? null : t.key)}
+          replace
+          scroll={false}
+          className={cn(
+            "flex h-8 items-center justify-center rounded-[0.6rem] text-sm font-semibold transition-all",
+            board === t.key ? "bg-surface shadow-sm" : "text-muted",
+          )}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Period chips + a site picker. The site picker is a real <select> styled as
+ * a chip, so phones open their native wheel/list picker.
+ */
 export function LeaderboardFilters({
   sites,
   site,
@@ -22,44 +63,53 @@ export function LeaderboardFilters({
   period: string;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function update(key: "site" | "period", value: string) {
-    const sp = new URLSearchParams(searchParams.toString());
-    if (key === "site" && value === "all") sp.delete("site");
-    else sp.set(key, value);
-    router.push(`${pathname}?${sp.toString()}`);
-  }
+  const href = useHref();
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <Select value={site} onValueChange={(v) => update("site", v)}>
-        <SelectTrigger className="w-40" size="sm">
-          <SelectValue placeholder="All sites" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All sites</SelectItem>
+    <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:px-0">
+      {PERIODS.map((p) => (
+        <Link
+          key={p}
+          href={href("period", p)}
+          replace
+          scroll={false}
+          className={cn(
+            "flex h-8 shrink-0 items-center rounded-full px-3.5 text-sm font-semibold transition-colors",
+            period === p ? "bg-foreground text-white" : "bg-surface border",
+          )}
+        >
+          {PERIOD_LABELS[p as Period]}
+        </Link>
+      ))}
+      <label
+        className={cn(
+          "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full pr-3 pl-3 text-sm font-semibold",
+          site !== "all" ? "bg-foreground text-white" : "bg-surface border",
+        )}
+      >
+        <MapPin className="size-3.5" />
+        <span className="max-w-36 truncate">
+          {site === "all" ? "All sites" : (sites.find((s) => s.id === site)?.name ?? "Site")}
+        </span>
+        <ChevronDown className="size-3.5 opacity-60" />
+        <select
+          aria-label="Site"
+          value={site}
+          onChange={(e) =>
+            router.replace(href("site", e.target.value === "all" ? null : e.target.value), {
+              scroll: false,
+            })
+          }
+          className="absolute inset-0 cursor-pointer opacity-0"
+        >
+          <option value="all">All sites</option>
           {sites.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
+            <option key={s.id} value={s.id}>
               {s.name}
-            </SelectItem>
+            </option>
           ))}
-        </SelectContent>
-      </Select>
-
-      <Select value={period} onValueChange={(v) => update("period", v)}>
-        <SelectTrigger className="w-40" size="sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {PERIODS.map((p) => (
-            <SelectItem key={p} value={p}>
-              {PERIOD_LABELS[p as Period]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        </select>
+      </label>
     </div>
   );
 }

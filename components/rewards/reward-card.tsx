@@ -1,10 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { toast } from "sonner";
 import { Gift } from "lucide-react";
 import { redeemReward, type ActionResult } from "@/lib/rewards/actions";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber, pts } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export type RewardCardData = {
   id: string;
@@ -36,117 +36,155 @@ export function RewardCard({
   balance: number;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState<
+  // Toast + close from inside the action (not an effect watching its state).
+  const [, formAction, pending] = useActionState<
     ActionResult | undefined,
     FormData
-  >(redeemReward, undefined);
-
-  useEffect(() => {
-    if (state?.ok) {
-      toast.success(state.message ?? "Reward requested!");
+  >(async (prev, fd) => {
+    const res = await redeemReward(prev, fd);
+    if (res.ok) {
+      toast.success(res.message ?? "Reward requested!");
       setOpen(false);
-    } else if (state && !state.ok) {
-      toast.error(state.error);
+    } else {
+      toast.error(res.error);
     }
-  }, [state]);
+    return res;
+  }, undefined);
 
   const canAfford = balance >= reward.pointsCost;
   const outOfStock = reward.stock !== null && reward.stock <= 0;
   const disabled = !canAfford || outOfStock;
   const after = balance - reward.pointsCost;
 
+  // A storefront tile (Chick-fil-A / Sweatcoin rewards grids). Tapping opens a
+  // detail sheet with the balance maths and a thumb-reachable confirm button.
   return (
-    <Card className="flex flex-col">
-      <CardContent className="flex flex-1 flex-col gap-3">
-        <div className="bg-secondary text-muted flex aspect-[3/1.4] items-center justify-center rounded-lg">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="group flex flex-col text-left transition-transform active:scale-[0.97]"
+        >
+          <span className="bg-secondary relative block aspect-square w-full overflow-hidden rounded-2xl">
+            {reward.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={reward.imageUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="from-primary/15 to-brand-2/20 text-primary flex h-full w-full items-center justify-center bg-gradient-to-br">
+                <Gift className="size-10" strokeWidth={1.5} />
+              </span>
+            )}
+            <span
+              data-numeric
+              className={cn(
+                "absolute bottom-2 left-2 rounded-full px-2.5 py-1 text-xs font-bold backdrop-blur",
+                canAfford && !outOfStock
+                  ? "bg-surface/90 text-foreground"
+                  : "bg-black/55 text-white",
+              )}
+            >
+              {formatNumber(reward.pointsCost)} pts
+            </span>
+            {outOfStock && (
+              <span className="absolute inset-0 flex items-center justify-center bg-white/60 text-sm font-semibold">
+                Sold out
+              </span>
+            )}
+          </span>
+          <span className="mt-2 line-clamp-2 text-sm leading-snug font-semibold">
+            {reward.name}
+          </span>
+          <span className="text-muted text-xs" data-numeric>
+            {outOfStock
+              ? "Out of stock"
+              : !canAfford
+                ? `${formatNumber(reward.pointsCost - balance)} more pts to go`
+                : reward.stock !== null
+                  ? `${reward.stock} left`
+                  : "Available"}
+          </span>
+          {!canAfford && !outOfStock && (
+            <span className="bg-secondary mt-1.5 block h-1 overflow-hidden rounded-full">
+              <span
+                className="bg-brand block h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, Math.round((balance / reward.pointsCost) * 100))}%`,
+                }}
+              />
+            </span>
+          )}
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <div className="bg-secondary -mx-1 flex aspect-[16/9] items-center justify-center overflow-hidden rounded-2xl">
           {reward.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={reward.imageUrl}
               alt={reward.name}
-              className="h-full w-full rounded-lg object-cover"
+              className="h-full w-full object-cover"
             />
           ) : (
-            <Gift className="size-8" />
+            <Gift className="text-primary size-12" strokeWidth={1.5} />
           )}
         </div>
-
-        <div className="flex-1 space-y-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-display leading-tight font-semibold">
-              {reward.name}
-            </h3>
-            {reward.category && (
-              <Badge variant="secondary" className="shrink-0">
-                {reward.category}
-              </Badge>
-            )}
-          </div>
-          {reward.description && (
-            <p className="text-muted text-sm">{reward.description}</p>
+        <DialogHeader className="text-left">
+          {reward.category && (
+            <Badge variant="secondary" className="w-fit">
+              {reward.category}
+            </Badge>
           )}
-        </div>
-
-        <div className="flex items-center justify-between pt-1">
-          <div>
-            <span data-numeric className="text-lg font-semibold">
-              {formatNumber(reward.pointsCost)}
-            </span>
-            <span className="text-muted ml-1 text-sm">pts</span>
-            {reward.stock !== null && (
-              <p
-                className={cnStock(reward.stock)}
-                data-numeric
-              >
-                {reward.stock > 0 ? `${reward.stock} left` : "Out of stock"}
-              </p>
-            )}
+          <DialogTitle className="font-display text-xl leading-tight">
+            {reward.name}
+          </DialogTitle>
+          <DialogDescription>
+            {reward.description ??
+              "Redeeming deducts points from your wallet straight away."}
+          </DialogDescription>
+        </DialogHeader>
+        <dl className="bg-secondary space-y-2 rounded-2xl p-4 text-sm">
+          <Row label="Cost" value={`${pts(reward.pointsCost)}`} />
+          <Row label="Current balance" value={`${pts(balance)}`} />
+          <div className="border-border border-t pt-2">
+            <Row
+              label="Balance after"
+              value={`${pts(after)}`}
+              strong
+            />
           </div>
-
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" disabled={disabled}>
-                {outOfStock ? "Sold out" : canAfford ? "Redeem" : "Not enough"}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Redeem {reward.name}?</DialogTitle>
-                <DialogDescription>
-                  This will deduct points from your wallet straight away.
-                </DialogDescription>
-              </DialogHeader>
-              <dl className="border-border space-y-2 rounded-lg border p-3 text-sm">
-                <Row label="Cost" value={`${pts(reward.pointsCost)}`} />
-                <Row label="Current balance" value={`${pts(balance)}`} />
-                <div className="border-border border-t pt-2">
-                  <Row
-                    label="Balance after"
-                    value={`${pts(after)}`}
-                    strong
-                  />
-                </div>
-              </dl>
-              <form action={formAction}>
-                <input type="hidden" name="rewardId" value={reward.id} />
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={pending || disabled}>
-                    {pending ? "Redeeming…" : "Confirm redemption"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardContent>
-    </Card>
+        </dl>
+        <form action={formAction}>
+          <input type="hidden" name="rewardId" value={reward.id} />
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              className="rounded-full"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="rounded-full"
+              disabled={pending || disabled}
+            >
+              {pending
+                ? "Redeeming…"
+                : outOfStock
+                  ? "Sold out"
+                  : canAfford
+                    ? `Redeem for ${pts(reward.pointsCost)}`
+                    : "Not enough points yet"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -167,10 +205,4 @@ function Row({
       </dd>
     </div>
   );
-}
-
-function cnStock(stock: number) {
-  return stock > 0
-    ? "text-muted text-xs"
-    : "text-danger text-xs font-medium";
 }

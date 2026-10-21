@@ -7,17 +7,31 @@ type Person = { id: string; name: string; avatarUrl: string | null };
 /**
  * Instagram-style "stories" strip at the top of the feed: a horizontally
  * scrollable row of people (with gradient rings) recently active in the feed,
- * led by a "Recognise" create bubble. Tapping a person opens their profile.
+ * led by the viewer's own bubble with a "+" badge to recognise someone.
+ * Tapping a person opens their profile.
  */
-export function StoriesRow({ people }: { people: Person[] }) {
+export function StoriesRow({
+  people,
+  viewer,
+}: {
+  people: Person[];
+  viewer: { name: string; avatarUrl?: string | null };
+}) {
   return (
-    <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="no-scrollbar -mx-4 flex snap-x gap-3.5 overflow-x-auto px-4 pt-1 pb-3 md:mx-0 md:px-0">
       <Link
         href="/recognize"
-        className="flex w-16 shrink-0 flex-col items-center gap-1"
+        className="flex w-[4.6rem] shrink-0 snap-start flex-col items-center gap-1.5"
       >
-        <span className="border-primary text-primary flex size-16 items-center justify-center rounded-full border-2 border-dashed">
-          <Plus className="size-6" />
+        <span className="relative p-[3px]">
+          <UserAvatar
+            name={viewer.name}
+            avatarUrl={viewer.avatarUrl}
+            className="size-[4.1rem] text-base"
+          />
+          <span className="bg-brand ring-surface absolute right-0.5 bottom-0.5 flex size-6 items-center justify-center rounded-full text-white ring-[3px]">
+            <Plus className="size-3.5" strokeWidth={3} />
+          </span>
         </span>
         <span className="text-muted w-full truncate text-center text-xs">
           Recognise
@@ -28,18 +42,18 @@ export function StoriesRow({ people }: { people: Person[] }) {
         <Link
           key={p.id}
           href={`/profile/${p.id}`}
-          className="flex w-16 shrink-0 flex-col items-center gap-1"
+          className="flex w-[4.6rem] shrink-0 snap-start flex-col items-center gap-1.5 transition-transform active:scale-95"
         >
-          <span className="from-primary to-accent inline-block rounded-full bg-gradient-to-tr p-[2px]">
-            <span className="bg-card block rounded-full p-[2px]">
+          <span className="ring-brand inline-block rounded-full p-[2.5px]">
+            <span className="bg-surface block rounded-full p-[2.5px]">
               <UserAvatar
                 name={p.name}
                 avatarUrl={p.avatarUrl}
-                className="size-14"
+                className="size-[3.85rem] text-base"
               />
             </span>
           </span>
-          <span className="text-muted w-full truncate text-center text-xs">
+          <span className="w-full truncate text-center text-xs">
             {p.name.split(" ")[0]}
           </span>
         </Link>

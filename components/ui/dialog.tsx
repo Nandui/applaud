@@ -95,16 +95,24 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[ending-style]:animate-out data-[ending-style]:fade-out-0 data-[ending-style]:zoom-out-95 data-[open]:animate-in data-[open]:fade-in-0 data-[open]:zoom-in-95 sm:max-w-lg",
+          // Phones: a bottom sheet with a grabber that slides up from the
+          // home indicator. sm+: the classic centred dialog.
+          "fixed z-50 grid w-full gap-4 bg-surface outline-none data-[ending-style]:animate-out data-[open]:animate-in",
+          "inset-x-0 bottom-0 max-h-[92svh] overflow-y-auto rounded-t-[1.75rem] px-5 pt-7 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_-8px_40px_rgb(0_0_0/0.18)] duration-300 ease-out data-[ending-style]:slide-out-to-bottom data-[open]:slide-in-from-bottom",
+          "sm:inset-x-auto sm:top-[50%] sm:bottom-auto sm:left-[50%] sm:max-h-[85vh] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:p-6 sm:shadow-lg sm:duration-200 sm:data-[ending-style]:fade-out-0 sm:data-[ending-style]:zoom-out-95 sm:data-[ending-style]:slide-out-to-bottom-0 sm:data-[open]:fade-in-0 sm:data-[open]:zoom-in-95 sm:data-[open]:slide-in-from-bottom-0",
           className
         )}
         {...props}
       >
+        <span
+          aria-hidden
+          className="bg-border absolute top-2.5 left-1/2 h-1.5 w-10 -translate-x-1/2 rounded-full sm:hidden"
+        />
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[open]:bg-accent data-[open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="absolute top-4 right-4 hidden rounded-xs opacity-70 sm:block ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[open]:bg-accent data-[open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
             <span className="sr-only">Close</span>
@@ -137,7 +145,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end [&>[data-slot=button]]:h-11 sm:[&>[data-slot=button]]:h-9",
         className
       )}
       {...props}

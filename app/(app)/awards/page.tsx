@@ -5,8 +5,9 @@ import { relativeTime } from "@/lib/datetime";
 import { PageHeader } from "@/components/page-header";
 import { NominateDialog } from "@/components/awards/nominate-dialog";
 import { NominationActions } from "@/components/awards/nomination-actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { BackButton } from "@/components/app-shell/back-button";
+import { Trophy } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Awards" };
@@ -59,88 +60,89 @@ export default async function AwardsPage() {
     : [];
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Awards"
         description="Browse award programs and nominate a colleague."
+        leading={<BackButton />}
       />
 
       {isManager(me) && pending.length > 0 && (
-        <Card className="border-warning/40 mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">
-              Nominations to review ({pending.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <section className="mb-6">
+          <h2 className="font-display mb-2 flex items-center gap-2 px-1 text-lg font-semibold">
+            Needs your review
+            <span data-numeric className="bg-danger rounded-full px-2 py-0.5 text-xs font-bold text-white">
+              {pending.length}
+            </span>
+          </h2>
+          <ul className="bg-surface divide-border divide-y overflow-hidden rounded-3xl">
             {pending.map((n) => (
-              <div
-                key={n.id}
-                className="border-border flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm">
-                    <span className="font-semibold">{n.nominee.name}</span>{" "}
-                    <span className="text-muted">for</span>{" "}
-                    <span className="font-semibold">{n.program.name}</span>{" "}
-                    <span
-                      data-numeric
-                      className="text-success bg-success/10 ml-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    >
-                      +{n.program.points}
-                    </span>
-                  </p>
-                  <p className="text-muted text-xs">
-                    Nominated by {n.nominator.name} · {relativeTime(n.createdAt)}
-                  </p>
-                  <p className="mt-1 text-sm">{n.justification}</p>
-                </div>
-                <div className="shrink-0">
-                  <NominationActions id={n.id} />
-                </div>
-              </div>
+              <li key={n.id} className="space-y-2 p-4">
+                <p className="text-sm">
+                  <span className="font-semibold">{n.nominee.name}</span>{" "}
+                  <span className="text-muted">for</span>{" "}
+                  <span className="font-semibold">{n.program.name}</span>{" "}
+                  <span
+                    data-numeric
+                    className="text-success bg-success/10 ml-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                  >
+                    +{n.program.points}
+                  </span>
+                </p>
+                <p className="text-muted text-xs">
+                  Nominated by {n.nominator.name} · {relativeTime(n.createdAt)}
+                </p>
+                <p className="bg-secondary rounded-2xl px-3 py-2 text-sm">{n.justification}</p>
+                <NominationActions id={n.id} />
+              </li>
             ))}
-          </CardContent>
-        </Card>
+          </ul>
+        </section>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {programs.map((p) => (
-          <Card key={p.id} className="flex flex-col">
-            <CardContent className="flex flex-1 flex-col gap-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-display font-semibold">{p.name}</h3>
-                  <Badge variant="secondary" className="mt-1 capitalize">
-                    {p.cadence ?? "Ad hoc"}
-                  </Badge>
-                </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {programs.map((p, i) => (
+          <article key={p.id} className="bg-surface flex flex-col overflow-hidden rounded-3xl">
+            <div
+              className={cn(
+                "relative flex h-28 items-end p-4 text-white",
+                i % 3 === 0 ? "bg-brand" : i % 3 === 1 ? "bg-gradient-to-br from-indigo-500 to-cyan-400" : "bg-gradient-to-br from-amber-400 to-rose-500",
+              )}
+            >
+              <Trophy className="absolute top-3 right-3 size-16 opacity-20" aria-hidden />
+              <div>
+                <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-semibold capitalize backdrop-blur">
+                  {p.cadence ?? "Ad hoc"}
+                </span>
+                <h3 className="font-display mt-1.5 text-xl leading-tight font-semibold">{p.name}</h3>
+              </div>
+            </div>
+            <div className="flex flex-1 flex-col gap-3 p-4">
+              <div className="flex items-center gap-2 text-xs">
                 <span
                   data-numeric
-                  className="text-success bg-success/10 rounded-full px-2 py-0.5 text-xs font-semibold"
+                  className="text-success bg-success/10 rounded-full px-2 py-0.5 font-semibold"
                 >
                   +{p.points} pts
+                </span>
+                <span className="text-muted">
+                  {p.requiresApproval ? "Needs approval" : "Instant award"}
                 </span>
               </div>
               {p.description && (
                 <p className="text-muted flex-1 text-sm">{p.description}</p>
               )}
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-muted text-xs">
-                  {p.requiresApproval ? "Needs approval" : "Instant award"}
-                </span>
-                <NominateDialog
-                  program={{
-                    id: p.id,
-                    name: p.name,
-                    points: p.points,
-                    requiresApproval: p.requiresApproval,
-                  }}
-                  colleagues={colleagueOpts}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              <NominateDialog
+                program={{
+                  id: p.id,
+                  name: p.name,
+                  points: p.points,
+                  requiresApproval: p.requiresApproval,
+                }}
+                colleagues={colleagueOpts}
+              />
+            </div>
+          </article>
         ))}
       </div>
     </div>
