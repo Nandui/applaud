@@ -12,6 +12,8 @@
  * lib/catalogue.ts and hands the rows to these helpers.
  */
 
+import { withFit } from "./frame-fit";
+
 export type CosmeticKind = "frame" | "banner" | "theme";
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 
@@ -32,6 +34,8 @@ export type Cosmetic = {
   style: string | null;
   /** An uploaded picture: a frame overlay or a banner image. */
   imageUrl: string | null;
+  /** Uploaded frames: how the picture sits on the avatar, "size,x,y" (lib/frame-fit.ts). */
+  frameFit: string | null;
   /** Hidden items can't be bought, but people who own one keep wearing it. */
   active: boolean;
   /** The Store category it's grouped under (e.g. "Flags"), if any. */
@@ -175,7 +179,7 @@ const FALLBACK_THEME = BUILTIN_COSMETICS.find((c) => c.id === DEFAULT_THEME)!.st
 
 /** The built-in items as full catalogue rows (used when the table is empty). */
 export function builtinCatalogue(): Cosmetic[] {
-  return BUILTIN_COSMETICS.map((c) => ({ ...c, imageUrl: null, active: true, categoryId: null }));
+  return BUILTIN_COSMETICS.map((c) => ({ ...c, imageUrl: null, frameFit: null, active: true, categoryId: null }));
 }
 
 export function isKind(value: unknown): value is CosmeticKind {
@@ -201,9 +205,9 @@ export function isFrameImage(art: FrameArt): boolean {
   return art.startsWith("https://") || art.startsWith("http://");
 }
 
-/** A frame item's art, or null if it has none. */
-export function frameArt(item: Cosmetic): FrameArt | null {
-  return item.imageUrl ?? item.style ?? null;
+/** A frame item's art (an uploaded picture carries its fit), or null if it has none. */
+export function frameArt(item: Pick<Cosmetic, "style" | "imageUrl" | "frameFit">): FrameArt | null {
+  return item.imageUrl ? withFit(item.imageUrl, item.frameFit) : (item.style ?? null);
 }
 
 /** A banner item as a CSS background (its picture, cover-cropped, or its gradient). */

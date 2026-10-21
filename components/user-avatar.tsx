@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { isFrameImage, type FrameArt } from "@/lib/cosmetics";
+import { splitFrameImage } from "@/lib/frame-fit";
 
 /**
  * Default-avatar palettes (Discord gives everyone a coloured default). Picked
@@ -50,8 +51,9 @@ export function UserAvatar({
 /**
  * An avatar wearing its shop frame: a built-in CSS ring (globals.css
  * `.frame-*`) or an uploaded overlay picture (see lib/cosmetics.ts). Picture
- * frames are drawn 20% bigger than the avatar and centred on it, like Discord
- * avatar decorations. Without a frame it's a plain avatar with the same gap,
+ * frames are placed by their fit (lib/frame-fit.ts): drawn at its size and
+ * shifted so its see-through hole sits on the avatar, like Discord avatar
+ * decorations. Without a frame it's a plain avatar with the same gap,
  * so layouts don't jump when someone equips one.
  */
 export function FramedAvatar({
@@ -78,17 +80,29 @@ export function FramedAvatar({
         <UserAvatar name={name} avatarUrl={avatarUrl} className={className} />
       </span>
       {frame && isFrameImage(frame) ? (
-        // eslint-disable-next-line @next/next/no-img-element -- uploaded Blob art, any size
-        <img
-          src={frame}
-          alt=""
-          aria-hidden
-          draggable={false}
-          className="pointer-events-none absolute inset-[-10%] size-[120%] max-w-none object-contain select-none"
-        />
+        <FrameImage art={frame} />
       ) : frame ? (
         <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")} />
       ) : null}
     </span>
+  );
+}
+
+/** An uploaded frame picture, sized and shifted by its fit so its hole sits on the avatar. */
+function FrameImage({ art }: { art: FrameArt }) {
+  const { src, fit } = splitFrameImage(art);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- uploaded Blob art, any size
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      draggable={false}
+      className="pointer-events-none absolute top-1/2 left-1/2 h-auto max-w-none select-none"
+      style={{
+        width: `${fit.size * 100}%`,
+        transform: `translate(${-fit.x * 100}%, ${-fit.y * 100}%)`,
+      }}
+    />
   );
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, FolderPlus, Images, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, FolderPlus, Images, Loader2, Pencil, Plus, RotateCcw, Trash2, Upload, Wand2 } from "lucide-react";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import {
   COSMETIC_KINDS,
@@ -16,11 +16,14 @@ import {
   RARITIES,
   RARITY,
   bannerCss,
+  frameArt,
   type Cosmetic,
   type CosmeticKind,
   type Rarity,
   type StoreCategory,
 } from "@/lib/cosmetics";
+import { DEFAULT_FIT, clampFit, formatFit, parseFit, sameFit, type FrameFit } from "@/lib/frame-fit";
+import { measureFrame } from "@/lib/frame-measure";
 import {
   addCosmeticsInBulk,
   deleteCategory,
@@ -29,6 +32,7 @@ import {
   moveCosmetic,
   saveCategory,
   saveCosmetic,
+  saveFrameFits,
   setCosmeticActive,
   type ActionResult,
 } from "@/lib/store-actions";
@@ -89,7 +93,7 @@ function CategorySelect({
 /** What each kind's picture should look like, shown next to the upload button. */
 const PICTURE_HINTS: Record<Exclude<CosmeticKind, "theme">, string> = {
   frame:
-    "A square PNG, WebP or GIF with a see-through middle, at least 256×256. It's drawn 20% bigger than the avatar, so the photo fills the middle 5/6. Animated GIFs work.",
+    "A PNG, WebP or GIF with a see-through middle, at least 256×256. The see-through hole is found and fitted to the avatar automatically, so padding and ornaments are fine. Animated GIFs work.",
   banner: "A wide picture, about 3:1 (for example 1500×500). It's cropped to fit, so keep the important part in the middle.",
 };
 
@@ -118,12 +122,19 @@ function nameFromFile(fileName: string): string {
 }
 
 /** The item drawn small, the way the Store shows it. */
-function ItemArt({ item, sample, className }: { item: Pick<Cosmetic, "kind" | "style" | "imageUrl">; sample: Sample; className?: string }) {
+function ItemArt({
+  item,
+  sample,
+  className,
+}: {
+  item: Pick<Cosmetic, "kind" | "style" | "imageUrl" | "frameFit">;
+  sample: Sample;
+  className?: string;
+}) {
   if (item.kind === "frame") {
-    const art = item.imageUrl ?? item.style;
     return (
       <span className={cn("flex items-center justify-center", className)}>
-        <FramedAvatar name={sample.name} avatarUrl={sample.avatarUrl} frame={art} className="size-14" gapClassName="bg-surface" />
+        <FramedAvatar name={sample.name} avatarUrl={sample.avatarUrl} frame={frameArt(item)} className="size-14" gapClassName="bg-surface" />
       </span>
     );
   }
@@ -134,6 +145,141 @@ function ItemArt({ item, sample, className }: { item: Pick<Cosmetic, "kind" | "s
     <span className={cn("flex items-center justify-center", className)}>
       <span className="size-12 rounded-full" style={{ backgroundColor: item.style ?? undefined }} />
     </span>
+  );
+}
+
+/** One fit slider: a label, a range and its value. */
+function FitSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  format,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="grid grid-cols-[6.5rem_1fr_3rem] items-center gap-2 text-xs">
+      <span className="text-muted">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="accent-primary w-full"
+      />
+      <span className="text-right font-mono" data-numeric>
+        {format(value)}
+      </span>
+    </label>
+  );
+}
+
+/**
+ * How an uploaded frame sits on the avatar: previews at the sizes the app uses,
+ * an Auto-fit that finds the picture's see-through hole, and sliders to nudge.
+ */
+function FrameFitControls({
+  imageUrl,
+  fit,
+  onChange,
+  sample,
+}: {
+  imageUrl: string;
+  fit: FrameFit;
+  onChange: (fit: FrameFit) => void;
+  sample: Sample;
+}) {
+  const [measuring, setMeasuring] = useState(false);
+  const art = `${imageUrl}#fit=${formatFit(fit)}`;
+  const set = (patch: Partial<FrameFit>) => onChange(clampFit({ ...fit, ...patch }));
+
+  async function autoFit() {
+    setMeasuring(true);
+    const measured = await measureFrame(imageUrl);
+    setMeasuring(false);
+    if (measured) {
+      onChange(measured);
+      toast.success("Fitted to the see-through middle.");
+    } else toast.error("Couldn't find a see-through middle. Use the sliders instead.");
+  }
+
+  return (
+    <div className="border-border space-y-3 rounded-lg border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label>Fit to the avatar</Label>
+        <div className="flex gap-1">
+          <Button type="button" size="xs" variant="outline" disabled={measuring} onClick={autoFit}>
+            {measuring ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />} Auto-fit
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            disabled={sameFit(fit, DEFAULT_FIT)}
+            onClick={() => onChange(DEFAULT_FIT)}
+            aria-label="Reset the fit"
+          >
+            <RotateCcw className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="bg-surface flex items-center justify-center gap-6 rounded-md py-4">
+        {["size-9", "size-14", "size-20"].map((size) => (
+          <FramedAvatar
+            key={size}
+            name={sample.name}
+            avatarUrl={sample.avatarUrl}
+            frame={art}
+            className={size}
+            gapClassName="bg-surface"
+          />
+        ))}
+      </div>
+      <div className="space-y-1.5">
+        <FitSlider
+          label="Size"
+          value={fit.size}
+          min={0.8}
+          max={3}
+          step={0.01}
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={(size) => set({ size })}
+        />
+        {/* Moving the frame right means a point further left of the picture sits on the avatar. */}
+        <FitSlider
+          label="Left / right"
+          value={Math.round((0.5 - fit.x) * 1000) / 10}
+          min={-30}
+          max={30}
+          step={0.5}
+          format={(v) => (v > 0 ? `+${v}` : String(v))}
+          onChange={(v) => set({ x: 0.5 - v / 100 })}
+        />
+        <FitSlider
+          label="Up / down"
+          value={Math.round((0.5 - fit.y) * 1000) / 10}
+          min={-30}
+          max={30}
+          step={0.5}
+          format={(v) => (v > 0 ? `+${v}` : String(v))}
+          onChange={(v) => set({ y: 0.5 - v / 100 })}
+        />
+      </div>
+      <p className="text-muted text-xs">
+        Auto-fit puts the see-through middle exactly over the photo. Nudge it if the art should overlap a bit.
+      </p>
+    </div>
   );
 }
 
@@ -162,6 +308,7 @@ function ItemDialog({
   const [price, setPrice] = useState(String(editing?.price ?? 1));
   const [rarity, setRarity] = useState<Rarity>(editing?.rarity ?? "common");
   const [imageUrl, setImageUrl] = useState(editing?.imageUrl ?? "");
+  const [fit, setFit] = useState<FrameFit>(parseFit(editing?.frameFit) ?? DEFAULT_FIT);
   const [colour, setColour] = useState(editing?.kind === "theme" && editing.style ? editing.style : "#6a4dff");
   const [active, setActive] = useState(editing?.active ?? true);
   const [categoryId, setCategoryId] = useState((editing ? editing.categoryId : initialCategory) ?? NO_CATEGORY);
@@ -184,7 +331,13 @@ function ItemDialog({
     if (problem) return void toast.error(problem);
     setUploading(true);
     try {
-      setImageUrl(await uploadPicture(kind, file));
+      // Measure the frame from the file itself while it uploads.
+      const [url, measured] = await Promise.all([
+        uploadPicture(kind, file),
+        kind === "frame" ? measureFrame(file) : Promise.resolve(null),
+      ]);
+      setImageUrl(url);
+      setFit(measured ?? DEFAULT_FIT);
       if (!name) setName(nameFromFile(file.name));
     } catch (error) {
       toast.error(uploadErrorMessage(error));
@@ -194,10 +347,15 @@ function ItemDialog({
   }
 
   const points = Math.max(0, Math.floor(Number(price)) || 0);
-  const draft = { kind, style: kind === "theme" ? colour : builtinStyle, imageUrl: kind === "theme" ? null : imageUrl || null };
+  const draft = {
+    kind,
+    style: kind === "theme" ? colour : builtinStyle,
+    imageUrl: kind === "theme" ? null : imageUrl || null,
+    frameFit: formatFit(fit),
+  };
   const look =
     kind === "frame"
-      ? { ...DEFAULT_LOOK, frame: draft.imageUrl ?? draft.style }
+      ? { ...DEFAULT_LOOK, frame: frameArt(draft) }
       : kind === "banner"
         ? { ...DEFAULT_LOOK, banner: bannerCss(draft) }
         : { ...DEFAULT_LOOK, theme: colour };
@@ -213,6 +371,7 @@ function ItemDialog({
           <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="rarity" value={rarity} />
           <input type="hidden" name="imageUrl" value={kind === "theme" ? "" : imageUrl} />
+          <input type="hidden" name="frameFit" value={kind === "frame" && imageUrl ? formatFit(fit) : ""} />
           <input type="hidden" name="colour" value={colour} />
           <input type="hidden" name="active" value={String(active)} />
           <input type="hidden" name="categoryId" value={categoryId === NO_CATEGORY ? "" : categoryId} />
@@ -289,6 +448,10 @@ function ItemDialog({
                 )}
               </div>
             </div>
+          )}
+
+          {kind === "frame" && imageUrl && !uploading && (
+            <FrameFitControls imageUrl={imageUrl} fit={fit} onChange={setFit} sample={sample} />
           )}
 
           <div className="space-y-1.5">
@@ -405,11 +568,15 @@ function BulkDialog({
   async function run() {
     const points = Number(price);
     if (!Number.isInteger(points) || points < 0) return void toast.error("Enter a whole number of points.");
-    const items: { name: string; imageUrl: string }[] = [];
+    const items: { name: string; imageUrl: string; frameFit: string | null }[] = [];
     setProgress({ done: 0, total: files.length });
     for (const file of files) {
       try {
-        items.push({ name: nameFromFile(file.name), imageUrl: await uploadPicture(kind, file) });
+        const [imageUrl, fit] = await Promise.all([
+          uploadPicture(kind, file),
+          kind === "frame" ? measureFrame(file) : Promise.resolve(null),
+        ]);
+        items.push({ name: nameFromFile(file.name), imageUrl, frameFit: fit ? formatFit(fit) : null });
       } catch (error) {
         toast.error(`${file.name}: ${uploadErrorMessage(error, "didn't upload.")}`);
       }
@@ -783,6 +950,24 @@ export function StoreManager({
       : rows.filter((r) => (filter === NO_CATEGORY ? !r.categoryId : r.categoryId === filter));
 
   const euros = (points: number) => centsToEuros(pointsToCents(points, pointsPerEuro));
+  /** Uploaded frames that were added before frames were auto-fitted. */
+  const unfitted = rows.filter((r) => r.kind === "frame" && r.imageUrl && !r.frameFit);
+  const [fitting, setFitting] = useState(false);
+  async function fitAll() {
+    setFitting(true);
+    const updates: { id: string; frameFit: string }[] = [];
+    for (const row of unfitted) {
+      const fit = await measureFrame(row.imageUrl!);
+      if (fit) updates.push({ id: row.id, frameFit: formatFit(fit) });
+    }
+    const skipped = unfitted.length - updates.length;
+    if (updates.length > 0) {
+      const res = await saveFrameFits(updates);
+      if (res.ok) toast.success(`${res.message}${skipped ? ` ${skipped} couldn't be measured; fit those by hand.` : ""}`);
+      else toast.error(res.error);
+    } else toast.error("Couldn't find a see-through middle in those frames. Fit them by hand in Edit.");
+    setFitting(false);
+  }
   const forSale = rows.filter((r) => r.active && r.price > 0);
   const collection = forSale.reduce((sum, r) => sum + r.price, 0);
   const cheapest = forSale.length ? Math.min(...forSale.map((r) => r.price)) : 0;
@@ -906,9 +1091,17 @@ export function StoreManager({
                     {list.some((r) => !r.active) ? `, ${list.filter((r) => !r.active).length} hidden` : ""}
                   </span>
                 </h2>
-                <Button size="xs" variant="outline" onClick={() => openItem(null, kind)}>
-                  <Plus className="size-3.5" /> Add
-                </Button>
+                <div className="flex gap-1.5">
+                  {kind === "frame" && unfitted.length > 0 && (
+                    <Button size="xs" variant="outline" disabled={fitting} onClick={fitAll}>
+                      {fitting ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+                      Auto-fit {unfitted.length} {unfitted.length === 1 ? "frame" : "frames"}
+                    </Button>
+                  )}
+                  <Button size="xs" variant="outline" onClick={() => openItem(null, kind)}>
+                    <Plus className="size-3.5" /> Add
+                  </Button>
+                </div>
               </div>
               {list.length === 0 ? (
                 <p className="text-muted text-sm">Nothing here yet.</p>
