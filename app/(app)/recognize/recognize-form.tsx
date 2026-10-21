@@ -12,8 +12,7 @@ import {
   X,
   ImagePlus,
   Loader2,
-  ChevronDown,
-  ArrowRight,
+  ChevronRight,
   Lock,
   Globe,
 } from "lucide-react";
@@ -24,12 +23,12 @@ import {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
 } from "@/lib/config";
-import { valueIcon } from "@/lib/value-icons";
 import type { GifResult } from "@/lib/recognition/gif";
 import { GifPicker } from "@/components/recognize/gif-picker";
 import { PointsKeypad } from "@/components/recognize/points-keypad";
 import { Confetti } from "@/components/fx/confetti";
-import { UserAvatar } from "@/components/user-avatar";
+import { FramedAvatar } from "@/components/user-avatar";
+import { ValueSeal } from "@/components/value-seal";
 import { tint } from "@/components/value-chip";
 import { pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -39,23 +38,23 @@ type ValueOption = {
   name: string;
   icon: string | null;
   color: string | null;
+  imageUrl: string | null;
 };
 type RecipientOption = {
   id: string;
   name: string;
   jobTitle: string | null;
   avatarUrl: string | null;
+  frame: string | null;
   siteCode: string;
 };
 
 /**
- * The Send flow, built from screens people already know:
- * 1. "Send to" — Snapchat's people picker (search, Recents, round checks,
- *    a sticky bar with the chosen names and a send arrow).
- * 2. Compose — Threads' new-post screen (avatar + thread line, toolbar for
- *    photo / GIF / privacy / points, value chips).
- * 3. Points — Cash App's keypad in a sheet.
- * Then a confetti celebration. Every step stays mounted inside one <form> so
+ * The Send flow, in the same plain Instagram pattern as the rest of the app:
+ * 1. Who: a searchable people list with round checks and a Next button.
+ * 2. New shout-out: the recipients up top, the message, the value as a grid
+ *    of badges, then settings rows (photo, GIF, who can see it, points).
+ * Points use the keypad sheet. Every step stays mounted inside one <form> so
  * all fields still post to `createRecognition` exactly as before.
  */
 export function RecognizeForm({
@@ -77,7 +76,11 @@ export function RecognizeForm({
   me: { name: string; avatarUrl: string | null };
 }) {
   const router = useRouter();
-  const [sent, setSent] = useState<{ names: string; points: number } | null>(null);
+  const [sent, setSent] = useState<{
+    names: string;
+    points: number;
+    value: ValueOption | null;
+  } | null>(null);
   // Celebrate (or toast the error) from inside the action, not an effect.
   const [, formAction, pending] = useActionState<ActionResult | undefined, FormData>(
     async (prev, fd) => {
@@ -87,7 +90,11 @@ export function RecognizeForm({
           .getAll("recipientIds")
           .map((id) => recipients.find((r) => r.id === String(id))?.name.split(" ")[0])
           .filter(Boolean) as string[];
-        setSent({ names: joinNames(names), points: Number(fd.get("points") ?? 0) });
+        setSent({
+          names: joinNames(names),
+          points: Number(fd.get("points") ?? 0),
+          value: values.find((v) => v.id === String(fd.get("valueId"))) ?? null,
+        });
       } else {
         toast.error(res.error);
       }
@@ -216,7 +223,7 @@ export function RecognizeForm({
     (r.jobTitle ?? "").toLowerCase().includes(q) ||
     r.siteCode.toLowerCase().includes(q);
 
-  // Sections (Snapchat: Recents, then everyone A–Z). While searching, one list.
+  // Sections: Recents, your site, then everyone A–Z. While searching, one list.
   const sections: { title: string; people: RecipientOption[] }[] = q
     ? [{ title: "Results", people: recipients.filter(matches) }]
     : [
@@ -259,6 +266,7 @@ export function RecognizeForm({
       <Celebration
         names={sent.names}
         points={sent.points}
+        value={sent.value}
         onDone={() => router.push("/")}
         onAgain={() => {
           setSent(null);
@@ -291,19 +299,25 @@ export function RecognizeForm({
 
       {/* ---------------- Step 1: Send to ---------------- */}
       <div className={cn(step !== "to" && "hidden")}>
-        <header className="glass pt-safe sticky top-0 z-30 -mx-4 px-4 pb-3 md:mx-0 md:rounded-b-2xl">
-          <div className="flex h-14 items-center">
-            <Link
-              href="/"
-              aria-label="Close"
-              className="hover:bg-surface-2 -ml-2 flex size-10 items-center justify-center rounded-full"
-            >
-              <ChevronDown className="size-6.5" />
+        <header className="glass pt-safe border-border sticky top-0 z-30 -mx-4 border-b px-4 pb-3 md:mx-0">
+          <div className="relative flex h-12 items-center justify-between">
+            <Link href="/" aria-label="Close" className="-ml-1 flex size-10 items-center">
+              <X className="size-6.5" />
             </Link>
-            <h1 className="flex-1 text-center text-[1.05rem] font-semibold tracking-tight">
-              Send to
+            <h1 className="pointer-events-none absolute inset-x-0 text-center text-[1rem] font-bold">
+              New shout-out
             </h1>
-            <span className="size-10" />
+            <button
+              type="button"
+              disabled={selected.length === 0}
+              onClick={() => {
+                setStep("write");
+                setTimeout(() => textRef.current?.focus(), 250);
+              }}
+              className="text-primary relative text-[0.95rem] font-bold disabled:opacity-40"
+            >
+              Next
+            </button>
           </div>
           <div className="relative">
             <Search className="text-muted absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2" />
@@ -312,31 +326,54 @@ export function RecognizeForm({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name, role or site"
               type="search"
-              className="bg-surface-2 placeholder:text-muted h-11 w-full rounded-full pr-4 pl-10 outline-none focus:ring-2 focus:ring-primary/50"
+              className="bg-surface-2 placeholder:text-muted h-10 w-full rounded-xl pr-4 pl-10 outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
         </header>
 
-        <div className="space-y-5 pt-2 pb-32">
+        {/* Chosen people, as tappable avatars (tap to remove). */}
+        {selectedPeople.length > 0 && (
+          <div className="no-scrollbar border-border -mx-4 flex gap-4 overflow-x-auto border-b px-4 py-3">
+            {selectedPeople.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => toggle(r.id)}
+                aria-label={`Remove ${r.name}`}
+                className="flex w-16 shrink-0 flex-col items-center gap-1"
+              >
+                <span className="relative">
+                  <FramedAvatar name={r.name} avatarUrl={r.avatarUrl} frame={r.frame} className="size-14" />
+                  <span className="bg-surface-3 border-background absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2">
+                    <X className="size-3" strokeWidth={3} />
+                  </span>
+                </span>
+                <span className="w-full truncate text-center text-xs">{r.name.split(" ")[0]}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-4 pt-3 pb-32">
           {sections
             .filter((s) => s.people.length > 0)
             .map((section) => (
               <section key={section.title}>
-                <h2 className="mb-1.5 px-1 text-sm font-bold">{section.title}</h2>
-                <ul className="bg-surface overflow-hidden rounded-2xl">
+                <h2 className="mb-1 text-[0.95rem] font-bold">{section.title}</h2>
+                <ul>
                   {section.people.map((r) => {
                     const active = selected.includes(r.id);
                     return (
-                      <li key={r.id} className="border-border border-b last:border-0">
+                      <li key={r.id}>
                         <button
                           type="button"
                           onClick={() => toggle(r.id)}
                           aria-pressed={active}
-                          className="active:bg-surface-2 flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors"
+                          className="active:bg-surface-2 -mx-4 flex w-[calc(100%+2rem)] items-center gap-3 px-4 py-2 text-left transition-colors"
                         >
-                          <UserAvatar name={r.name} avatarUrl={r.avatarUrl} className="size-10" />
+                          <FramedAvatar name={r.name} avatarUrl={r.avatarUrl} frame={r.frame} className="size-11 text-sm" />
                           <span className="min-w-0 flex-1">
-                            <span className={cn("block truncate font-semibold", active && "text-primary")}>
+                            <span className="block truncate font-semibold">
                               {r.name}
                             </span>
                             <span className="text-muted block truncate text-[0.8rem]">
@@ -348,7 +385,7 @@ export function RecognizeForm({
                             className={cn(
                               "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-all",
                               active
-                                ? "border-primary bg-primary scale-110 text-white"
+                                ? "border-primary bg-primary text-white"
                                 : "border-surface-3",
                             )}
                           >
@@ -366,7 +403,7 @@ export function RecognizeForm({
           )}
         </div>
 
-        {/* Snapchat's send bar: chosen names + arrow. */}
+        {/* Next, in the thumb zone. */}
         <AnimatePresence>
           {selected.length > 0 && (
             <motion.div
@@ -374,25 +411,18 @@ export function RecognizeForm({
               animate={{ y: 0 }}
               exit={{ y: 100 }}
               transition={{ type: "spring", stiffness: 420, damping: 34 }}
-              className="pb-safe fixed inset-x-0 bottom-0 z-40 md:inset-x-auto md:bottom-6 md:left-1/2 md:w-[36rem] md:-translate-x-1/2"
+              className="pb-safe bg-background/95 border-border fixed inset-x-0 bottom-0 z-40 border-t px-4 pt-3 backdrop-blur md:inset-x-auto md:left-1/2 md:w-[36rem] md:-translate-x-1/2"
             >
-              <div className="bg-primary flex items-center gap-3 px-4 py-3 text-white md:rounded-2xl">
-                <span className="min-w-0 flex-1 truncate text-[0.95rem] font-semibold">
-                  {selectedPeople.map((r) => r.name).join(", ")}
-                </span>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    setStep("write");
-                    setTimeout(() => textRef.current?.focus(), 250);
-                  }}
-                  aria-label="Next"
-                  className="text-primary flex size-12 shrink-0 items-center justify-center rounded-full bg-white shadow-lg"
-                >
-                  <ArrowRight className="size-6" strokeWidth={2.6} />
-                </motion.button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("write");
+                  setTimeout(() => textRef.current?.focus(), 250);
+                }}
+                className="bg-primary text-primary-fg mb-3 flex h-12 w-full items-center justify-center rounded-xl text-[0.95rem] font-bold active:opacity-80"
+              >
+                Next · {namesLabel}
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -400,213 +430,214 @@ export function RecognizeForm({
 
       {/* ---------------- Step 2: compose ---------------- */}
       <div className={cn(step !== "write" && "hidden")}>
-        <header className="glass pt-safe sticky top-0 z-30 -mx-4 px-4 md:mx-0 md:rounded-b-2xl">
-          <div className="flex h-14 items-center">
-            <button
-              type="button"
-              onClick={() => setStep("to")}
-              className="-ml-1 px-1 text-[0.95rem] font-medium"
-            >
+        <header className="glass pt-safe border-border sticky top-0 z-30 -mx-4 border-b px-4 md:mx-0">
+          <div className="relative flex h-12 items-center justify-between">
+            <button type="button" onClick={() => setStep("to")} className="relative text-[0.95rem]">
               Back
             </button>
-            <h1 className="flex-1 text-center text-[1.05rem] font-semibold tracking-tight">
+            <h1 className="pointer-events-none absolute inset-x-0 text-center text-[1rem] font-bold">
               New shout-out
             </h1>
             <button
               type="submit"
               disabled={!canSubmit}
-              className="bg-foreground text-background disabled:bg-surface-3 disabled:text-muted h-9 rounded-full px-4 text-sm font-bold transition-colors"
+              className="text-primary relative text-[0.95rem] font-bold disabled:opacity-40"
             >
-              {pending ? <Loader2 className="size-4 animate-spin" /> : "Post"}
+              {pending ? <Loader2 className="size-4 animate-spin" /> : "Share"}
             </button>
           </div>
         </header>
 
-        <div className="flex gap-3 pt-3">
-          {/* Thread rail */}
-          <div className="flex w-10 shrink-0 flex-col items-center">
-            <UserAvatar name={me.name} avatarUrl={me.avatarUrl} className="size-10" />
-            <span className="bg-border mt-2 w-0.5 flex-1 rounded-full" />
-          </div>
+        {/* Who it's for: the same big, recipient-first header as the feed. */}
+        <button
+          type="button"
+          onClick={() => setStep("to")}
+          className="flex w-full items-center gap-3 pt-4 text-left"
+        >
+          <span className="flex shrink-0 items-center">
+            {selectedPeople.slice(0, 3).map((r, i) => (
+              <span key={r.id} className={cn(i > 0 && "-ml-4")} style={{ zIndex: 3 - i }}>
+                <FramedAvatar name={r.name} avatarUrl={r.avatarUrl} frame={r.frame} className="size-11 text-sm" />
+              </span>
+            ))}
+          </span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-[1.05rem] font-bold tracking-tight">
+              {selectedPeople.map((r) => r.name).join(", ")}
+            </span>
+            <span className="text-muted mt-0.5 block text-[0.82rem]">
+              from <span className="text-foreground font-semibold">{me.name}</span>
+            </span>
+          </span>
+          <ChevronRight className="text-muted size-5 shrink-0" />
+        </button>
 
-          <div className="min-w-0 flex-1 pb-6">
-            <p className="font-semibold">{me.name}</p>
-            <button
-              type="button"
-              onClick={() => setStep("to")}
-              className="mt-1 flex max-w-full flex-wrap items-center gap-1.5 text-left"
-            >
-              <span className="text-muted text-xs font-semibold">to</span>
-              {selectedPeople.map((r) => (
-                <span
-                  key={r.id}
-                  className="bg-surface-2 inline-flex h-7 items-center gap-1.5 rounded-full pr-2.5 pl-0.5 text-[0.8rem] font-semibold"
+        <textarea
+          ref={textRef}
+          id="message"
+          name="message"
+          value={message}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = `${e.target.scrollHeight}px`;
+          }}
+          placeholder={`What did ${firstNames[0] ?? "they"} do? Be specific, it hits harder.`}
+          rows={3}
+          maxLength={500}
+          required
+          className="placeholder:text-muted mt-4 block w-full resize-none bg-transparent text-[1.05rem] leading-relaxed outline-none"
+        />
+
+        {/* Attachments */}
+        {(images.length > 0 || uploadingCount > 0) && (
+          <div className="no-scrollbar -mx-4 mt-2 flex gap-2 overflow-x-auto px-4">
+            {images.map((img) => (
+              <div key={img.url} className="relative h-40 w-32 shrink-0 overflow-hidden rounded-xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removeImage(img.url)}
+                  aria-label={`Remove ${img.name}`}
+                  className="absolute top-1.5 right-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur"
                 >
-                  <UserAvatar name={r.name} avatarUrl={r.avatarUrl} className="size-6 text-[0.5rem]" />
-                  {r.name}
-                </span>
-              ))}
-            </button>
-
-            <textarea
-              ref={textRef}
-              id="message"
-              name="message"
-              value={message}
-              onChange={(e) => {
-                setMessage(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${e.target.scrollHeight}px`;
-              }}
-              placeholder={`What did ${firstNames[0] ?? "they"} do? Be specific, it hits harder.`}
-              rows={3}
-              maxLength={500}
-              required
-              className="placeholder:text-muted mt-3 block w-full resize-none bg-transparent text-[1.05rem] leading-relaxed outline-none"
-            />
-
-            {/* Attachments */}
-            {(images.length > 0 || uploadingCount > 0) && (
-              <div className="no-scrollbar -mr-4 mt-2 flex gap-2 overflow-x-auto pr-4">
-                {images.map((img) => (
-                  <div key={img.url} className="relative h-40 w-32 shrink-0 overflow-hidden rounded-2xl">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(img.url)}
-                      aria-label={`Remove ${img.name}`}
-                      className="absolute top-1.5 right-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur"
-                    >
-                      <X className="size-4" />
-                    </button>
-                  </div>
-                ))}
-                {Array.from({ length: uploadingCount }).map((_, i) => (
-                  <div
-                    key={`uploading-${i}`}
-                    className="bg-surface-2 flex h-40 w-32 shrink-0 items-center justify-center rounded-2xl"
-                  >
-                    <Loader2 className="text-muted size-5 animate-spin" />
-                  </div>
-                ))}
+                  <X className="size-4" />
+                </button>
               </div>
-            )}
-
-            {/* Toolbar: photo · GIF · privacy · points */}
-            <div className="text-muted mt-3 -ml-2 flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={images.length + uploadingCount >= MAX_RECOGNITION_IMAGES}
-                aria-label="Add a photo"
-                className="hover:bg-surface-2 hover:text-foreground flex size-10 items-center justify-center rounded-full disabled:opacity-40"
+            ))}
+            {Array.from({ length: uploadingCount }).map((_, i) => (
+              <div
+                key={`uploading-${i}`}
+                className="bg-surface-2 flex h-40 w-32 shrink-0 items-center justify-center rounded-xl"
               >
-                <ImagePlus className="size-5.5" />
-              </button>
-              <GifPicker
-                onSelect={addGif}
-                disabled={images.length + uploadingCount >= MAX_RECOGNITION_IMAGES}
-                triggerClassName="hover:bg-surface-2 hover:text-foreground flex size-10 items-center justify-center rounded-full disabled:opacity-40"
-              />
-              <button
-                type="button"
-                onClick={() => setIsPrivate((p) => !p)}
-                aria-pressed={isPrivate}
-                className={cn(
-                  "flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition-colors",
-                  isPrivate ? "bg-foreground text-background" : "hover:bg-surface-2 hover:text-foreground",
-                )}
-              >
-                {isPrivate ? <Lock className="size-3.5" /> : <Globe className="size-3.5" />}
-                {isPrivate ? "Private" : "Everyone"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setKeypadOpen(true)}
-                disabled={allowance.remaining === 0}
-                className={cn(
-                  "ml-auto flex h-8 items-center gap-1 rounded-full px-3 text-xs font-bold transition-colors disabled:opacity-40",
-                  points > 0 ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
-                )}
-              >
-                <span aria-hidden>✦</span>
-                <span data-numeric>{points > 0 ? `+${pts(points)}` : "Add points"}</span>
-              </button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ALLOWED_IMAGE_TYPES.join(",")}
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                void handleFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            {isPrivate && (
-              <p className="text-muted mt-1 text-xs">
-                Only you and {selected.length === 1 ? "them" : "the people you tagged"} will see it.
-              </p>
-            )}
+                <Loader2 className="text-muted size-5 animate-spin" />
+              </div>
+            ))}
           </div>
-        </div>
+        )}
 
-        {/* Value */}
-        <section className="mt-2 space-y-2.5">
-          <h2 className="px-1 text-sm font-bold">
-            Which value did they live? <span className="text-danger">*</span>
+        {/* Value: a grid of badges, the same ones shown on the post. */}
+        <section className="border-border mt-4 border-t pt-4">
+          <h2 className="text-[0.95rem] font-bold">
+            Recognised for <span className="text-danger">*</span>
           </h2>
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {values.map((v) => {
-              const Icon = valueIcon(v.icon);
               const active = valueId === v.id;
               return (
                 <motion.button
                   key={v.id}
                   type="button"
-                  whileTap={{ scale: 0.94 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setValueId(active ? "" : v.id)}
                   aria-pressed={active}
                   className={cn(
-                    "flex h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold transition-all",
-                    active ? "border-transparent text-white shadow-md" : "bg-surface text-foreground",
+                    "flex flex-col items-center gap-2 rounded-2xl border-2 px-1.5 pt-3 pb-2.5 transition-colors",
+                    active ? "" : "bg-surface border-transparent",
                   )}
                   style={
                     active
-                      ? { backgroundColor: v.color ?? "var(--primary)" }
-                      : { borderColor: tint(v.color, 0.35) }
+                      ? { borderColor: v.color ?? "var(--primary)", backgroundColor: tint(v.color, 0.12) }
+                      : undefined
                   }
                 >
-                  <Icon
-                    className="size-4"
-                    style={!active && v.color ? { color: v.color } : undefined}
-                  />
-                  {v.name}
+                  <ValueSeal value={v} size="sm" ribbon={false} />
+                  <span
+                    className="line-clamp-2 text-center text-[0.78rem] leading-tight font-semibold"
+                    style={active && v.color ? { color: v.color } : undefined}
+                  >
+                    {v.name}
+                  </span>
                 </motion.button>
               );
             })}
           </div>
         </section>
 
+        {/* Settings rows, like Instagram's "Tag people / Add location". */}
+        <div className="border-border divide-border mt-4 divide-y border-y">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={images.length + uploadingCount >= MAX_RECOGNITION_IMAGES}
+            className="flex w-full items-center gap-3 py-3.5 text-left disabled:opacity-40"
+          >
+            <ImagePlus className="size-5.5" />
+            <span className="flex-1">Add a photo</span>
+            <ChevronRight className="text-muted size-4.5" />
+          </button>
+          <div className="relative flex items-center gap-3 py-3.5">
+            <span className="flex size-5.5 items-center justify-center">
+              <span className="rounded-[0.3rem] border-2 border-current px-0.5 text-[0.5rem] leading-tight font-black">
+                GIF
+              </span>
+            </span>
+            <span className="flex-1">Add a GIF</span>
+            <ChevronRight className="text-muted size-4.5" />
+            {/* The picker's own trigger covers the whole row. */}
+            <GifPicker
+              onSelect={addGif}
+              disabled={images.length + uploadingCount >= MAX_RECOGNITION_IMAGES}
+              triggerClassName="absolute inset-0 opacity-0 disabled:cursor-not-allowed"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsPrivate((p) => !p)}
+            aria-pressed={isPrivate}
+            className="flex w-full items-center gap-3 py-3.5 text-left"
+          >
+            {isPrivate ? <Lock className="size-5.5" /> : <Globe className="size-5.5" />}
+            <span className="flex-1">Who can see it</span>
+            <span className="text-muted text-[0.95rem]">{isPrivate ? "Only them" : "Everyone"}</span>
+            <ChevronRight className="text-muted size-4.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setKeypadOpen(true)}
+            disabled={allowance.remaining === 0}
+            className="flex w-full items-center gap-3 py-3.5 text-left disabled:opacity-40"
+          >
+            <span aria-hidden className="text-primary flex size-5.5 items-center justify-center text-lg">
+              ✦
+            </span>
+            <span className="flex-1">Points</span>
+            <span data-numeric className={cn("text-[0.95rem]", points > 0 ? "text-primary font-bold" : "text-muted")}>
+              {points > 0 ? `+${pts(points)} each` : `${pts(allowance.remaining)} left to give`}
+            </span>
+            <ChevronRight className="text-muted size-4.5" />
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ALLOWED_IMAGE_TYPES.join(",")}
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            void handleFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        {isPrivate && (
+          <p className="text-muted mt-2 text-xs">
+            Only you and {selected.length === 1 ? "them" : "the people you tagged"} will see it.
+          </p>
+        )}
+
         {/* Primary action in the thumb zone */}
         <div className="pb-safe sticky bottom-0 z-20 -mx-4 mt-6 bg-gradient-to-t from-[var(--background)] from-60% to-transparent px-4 pt-6 md:mx-0 md:px-0">
-          <motion.button
+          <button
             type="submit"
             disabled={!canSubmit}
-            whileTap={{ scale: 0.98 }}
-            className="bg-brand mb-4 flex h-14 w-full items-center justify-center gap-2 rounded-full text-base font-bold text-white shadow-[0_10px_30px_-8px_rgb(209_77_255/0.7)] disabled:opacity-40 disabled:shadow-none"
+            className="bg-primary text-primary-fg mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[0.95rem] font-bold active:opacity-80 disabled:opacity-40"
           >
-            {pending ? (
-              <Loader2 className="size-5 animate-spin" />
-            ) : (
-              <span aria-hidden className="text-lg">👏</span>
-            )}
+            {pending && <Loader2 className="size-5 animate-spin" />}
             {pending
-              ? "Sending…"
-              : blocker ?? `Send to ${namesLabel}${points > 0 ? ` · +${pts(points)}` : ""}`}
-          </motion.button>
+              ? "Sharing…"
+              : blocker ?? `Share with ${namesLabel}${points > 0 ? ` · +${pts(points)}` : ""}`}
+          </button>
         </div>
       </div>
 
@@ -631,42 +662,47 @@ function joinNames(names: string[]): string {
     : `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
 }
 
-/** Runna / Duolingo-style "you did it" screen after a shout-out is sent. */
+/** The "sent" screen: the value's badge, who it went to, and the points. */
 function Celebration({
   names,
   points,
+  value,
   onDone,
   onAgain,
 }: {
   names: string;
   points: number;
+  value: ValueOption | null;
   onDone: () => void;
   onAgain: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[radial-gradient(120%_70%_at_50%_0%,rgb(124_92_255/0.45),transparent_60%),var(--background)] px-6 text-center">
+    <div className="bg-background fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden px-6 text-center">
       <Confetti />
       <motion.div
         initial={{ scale: 0.4, rotate: -20, opacity: 0 }}
         animate={{ scale: 1, rotate: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 14 }}
-        className="bg-brand flex size-32 items-center justify-center rounded-[2.5rem] text-7xl shadow-[0_20px_60px_-10px_rgb(209_77_255/0.8)]"
       >
-        👏
+        {value ? (
+          <ValueSeal value={value} size="lg" />
+        ) : (
+          <span className="bg-primary flex size-28 items-center justify-center rounded-full text-6xl">👏</span>
+        )}
       </motion.div>
       <motion.h1
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.15 }}
-        className="font-display mt-8 text-4xl font-extrabold tracking-tight"
+        className="mt-8 text-3xl font-extrabold tracking-tight"
       >
-        Sent!
+        Shared
       </motion.h1>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.25 }}
-        className="text-muted mt-2 max-w-xs text-lg"
+        className="text-muted mt-2 max-w-xs text-[1.05rem]"
       >
         {names} {names.includes("&") || names.includes("+") ? "are" : "is"} going to love this.
       </motion.p>
@@ -676,7 +712,7 @@ function Celebration({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.4, type: "spring", stiffness: 400, damping: 15 }}
           data-numeric
-          className="bg-primary text-primary-fg mt-5 rounded-full px-4 py-1.5 text-base font-extrabold"
+          className="bg-primary text-primary-fg mt-5 rounded-full px-4 py-1.5 text-base font-bold"
         >
           +{pts(points)} each
         </motion.span>
@@ -685,15 +721,11 @@ function Celebration({
         <button
           type="button"
           onClick={onDone}
-          className="bg-foreground text-background h-14 w-full rounded-full text-base font-bold transition-transform active:scale-[0.98]"
+          className="bg-primary text-primary-fg h-12 w-full rounded-xl text-[0.95rem] font-bold active:opacity-80"
         >
           Back to feed
         </button>
-        <button
-          type="button"
-          onClick={onAgain}
-          className="h-12 w-full rounded-full text-base font-semibold"
-        >
+        <button type="button" onClick={onAgain} className="h-12 w-full rounded-xl text-[0.95rem] font-semibold">
           Send another
         </button>
       </div>

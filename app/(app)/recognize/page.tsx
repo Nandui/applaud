@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getAllowanceStatus } from "@/lib/points";
+import { parseProfile } from "@/lib/profile-custom";
 import { RecognizeForm } from "./recognize-form";
 
 export const dynamic = "force-dynamic";
@@ -33,11 +34,12 @@ export default async function RecognizePage({
         name: true,
         jobTitle: true,
         avatarUrl: true,
+        profile: true,
         site: { select: { code: true } },
       },
     }),
     getAllowanceStatus(me, settings),
-    // People I've recognised lately: the Snapchat "Recents" section.
+    // People I've recognised lately, listed first.
     prisma.recognitionRecipient.findMany({
       where: { recognition: { senderId: me.id, system: false } },
       orderBy: { recognition: { createdAt: "desc" } },
@@ -55,6 +57,7 @@ export default async function RecognizePage({
     name: u.name,
     jobTitle: u.jobTitle,
     avatarUrl: u.avatarUrl,
+    frame: parseProfile(u.profile).frame,
     siteCode: u.site?.code ?? "",
   }));
 
