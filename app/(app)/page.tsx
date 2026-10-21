@@ -8,7 +8,7 @@ import { formatNumber } from "@/lib/format";
 import { AppBar } from "@/components/app-shell/app-bar";
 import { Wordmark } from "@/components/app-shell/brand";
 import { RecognitionCard } from "@/components/feed/recognition-card";
-import { UserAvatar } from "@/components/user-avatar";
+import { FramedAvatar } from "@/components/user-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -48,12 +48,17 @@ export default async function FeedPage() {
         }
       />
 
-      {/* Threads-style "What's new?" prompt: one tap into the Send flow. */}
+      {/* "What's new?" prompt: one tap into the Send flow. */}
       <Link
         href="/recognize"
-        className="border-border flex items-center gap-3 border-b px-0.5 py-3"
+        className="border-border flex items-center gap-3 border-b py-3"
       >
-        <UserAvatar name={me.name} avatarUrl={me.avatarUrl} className="size-10" />
+        <FramedAvatar
+          name={me.name}
+          avatarUrl={me.avatarUrl}
+          frame={parseProfile(wallet?.profile).frame}
+          className="size-10"
+        />
         <span className="min-w-0 flex-1">
           <span className="block text-[0.95rem] font-semibold">{me.name}</span>
           <span className="text-muted block truncate text-[0.95rem]">

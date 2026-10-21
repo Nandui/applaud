@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { shortTime, fullTimestamp } from "@/lib/datetime";
+import { parseProfile } from "@/lib/profile-custom";
 
 export type ReactionUser = { id: string; name: string; avatarUrl: string | null };
 export type ReactionSummary = {
@@ -17,6 +18,14 @@ export type FeedCardComment = {
   user: { id: string; name: string; avatarUrl: string | null };
 };
 
+/** Someone's shop look, so the feed can show the frames and banners they bought. */
+export type Look = { frame: string | null; banner: string | null; theme: string | null };
+
+function lookOf(profile: unknown): Look {
+  const p = parseProfile(profile);
+  return { frame: p.frame, banner: p.banner, theme: p.theme };
+}
+
 export type FeedCard = {
   id: string;
   message: string;
@@ -31,6 +40,7 @@ export type FeedCard = {
     name: string;
     avatarUrl: string | null;
     jobTitle: string | null;
+    look: Look;
   };
   value: { name: string; icon: string | null; color: string | null } | null;
   recipients: {
@@ -38,6 +48,7 @@ export type FeedCard = {
     name: string;
     avatarUrl: string | null;
     points: number;
+    look: Look;
   }[];
   pointsEach: number;
   reactions: ReactionSummary[];
@@ -45,10 +56,10 @@ export type FeedCard = {
 };
 
 const feedInclude = {
-  sender: { select: { id: true, name: true, avatarUrl: true, jobTitle: true } },
+  sender: { select: { id: true, name: true, avatarUrl: true, jobTitle: true, profile: true } },
   value: { select: { name: true, icon: true, color: true } },
   recipients: {
-    include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+    include: { user: { select: { id: true, name: true, avatarUrl: true, profile: true } } },
   },
   reactions: {
     select: {
@@ -98,6 +109,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       name: r.sender.name,
       avatarUrl: r.sender.avatarUrl,
       jobTitle: r.sender.jobTitle,
+      look: lookOf(r.sender.profile),
     },
     value: r.value
       ? { name: r.value.name, icon: r.value.icon, color: r.value.color }
@@ -107,6 +119,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       name: rr.user.name,
       avatarUrl: rr.user.avatarUrl,
       points: rr.points,
+      look: lookOf(rr.user.profile),
     })),
     pointsEach: r.recipients[0]?.points ?? 0,
     reactions: [...grouped.entries()].map(([emoji, g]) => ({

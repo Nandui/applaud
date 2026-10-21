@@ -30,8 +30,10 @@ import {
   type BoostType,
 } from "@/lib/config";
 import type { FeedCard } from "@/lib/recognition/queries";
-import { UserAvatar } from "@/components/user-avatar";
-import { ValueChip } from "@/components/value-chip";
+import { FramedAvatar, UserAvatar } from "@/components/user-avatar";
+import { bannerStyle, themeColour } from "@/lib/cosmetics";
+import { isLight } from "@/lib/profile-custom";
+import { ValueSeal } from "@/components/value-seal";
 import {
   Popover,
   PopoverContent,
@@ -106,55 +108,91 @@ function switchReaction(
     : [...without, { emoji, count: 1, reacted: true, users: [me] }];
 }
 
-/** "→ Cian, Saoirse" — who the shout-out is for, as tappable pills. */
-function RecipientPills({ recipients }: { recipients: FeedCard["recipients"] }) {
+/**
+ * A shout-out without a photo becomes a picture of the person it's for: their
+ * own banner from the profile shop, their framed avatar large in the middle,
+ * and their name. So what people buy shows up every time they're recognised.
+ */
+function BannerHero({ card }: { card: FeedCard }) {
+  const people = card.recipients.slice(0, 3);
+  const extra = card.recipients.length - people.length;
+  const lead = card.recipients[0];
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-      <span className="text-muted text-xs font-semibold">to</span>
-      {recipients.map((r) => (
-        <Link
-          key={r.id}
-          href={`/profile/${r.id}`}
-          className="bg-surface-2 hover:bg-surface-3 inline-flex h-7 items-center gap-1.5 rounded-full pr-2.5 pl-0.5 text-[0.8rem] font-semibold transition-colors"
-        >
-          <UserAvatar name={r.name} avatarUrl={r.avatarUrl} className="size-6 text-[0.5rem]" />
-          {r.name}
-        </Link>
-      ))}
+    <div
+      className="relative flex aspect-[5/4] flex-col items-center justify-center gap-3 px-6 text-center text-white"
+      style={{ background: bannerStyle(lead?.look.banner) }}
+    >
+      <div aria-hidden className="absolute inset-0 bg-black/10" />
+      {people.length > 0 && (
+        <div className="relative flex items-center">
+          {people.map((r, i) => (
+            <Link
+              key={r.id}
+              href={`/profile/${r.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className={cn(i > 0 && "-ml-5")}
+              style={{ zIndex: people.length - i }}
+            >
+              <FramedAvatar
+                name={r.name}
+                avatarUrl={r.avatarUrl}
+                frame={r.look.frame}
+                gapClassName="bg-white"
+                className={people.length === 1 ? "size-28 text-3xl" : "size-20 text-xl"}
+                large
+              />
+            </Link>
+          ))}
+        </div>
+      )}
+      <p className="relative max-w-sm text-2xl leading-tight font-extrabold tracking-tight [text-shadow:0_2px_12px_rgb(0_0_0/0.35)]">
+        {card.system
+          ? card.message
+          : people.map((r) => r.name.split(" ")[0]).join(", ") + (extra > 0 ? ` +${extra}` : "")}
+      </p>
     </div>
   );
 }
 
-/**
- * Horizontally scrolling media row (the Threads attachment strip). A single
- * image goes full width; several become a swipeable row of tall tiles.
- */
-function MediaRow({ urls }: { urls: string[] }) {
+/** Photos and GIFs full width, swipeable when there are several (Instagram carousel). */
+function MediaHero({ urls }: { urls: string[] }) {
+  const [at, setAt] = useState(0);
   if (urls.length === 1) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={urls[0]}
-        alt="Shout-out attachment"
+        alt="Shout-out photo"
         loading="lazy"
         draggable={false}
-        className="border-border mt-3 max-h-[28rem] w-full rounded-2xl border object-cover"
+        className="max-h-[36rem] min-h-64 w-full object-cover"
       />
     );
   }
   return (
-    <div className="no-scrollbar -mr-4 mt-3 flex snap-x gap-2 overflow-x-auto pr-4">
-      {urls.map((url, i) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={url}
-          src={url}
-          alt={`Attachment ${i + 1} of ${urls.length}`}
-          loading="lazy"
-          draggable={false}
-          className="border-border aspect-[4/5] w-[62%] shrink-0 snap-start rounded-2xl border object-cover"
-        />
-      ))}
+    <div className="relative">
+      <div
+        className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setAt(Math.round(el.scrollLeft / el.clientWidth));
+        }}
+      >
+        {urls.map((url, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={url}
+            src={url}
+            alt={`Photo ${i + 1} of ${urls.length}`}
+            loading="lazy"
+            draggable={false}
+            className="aspect-[4/5] w-full shrink-0 snap-center object-cover"
+          />
+        ))}
+      </div>
+      <span data-numeric className="absolute top-3 left-3 rounded-full bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">
+        {at + 1}/{urls.length}
+      </span>
     </div>
   );
 }
@@ -340,301 +378,294 @@ export function RecognitionCard({
   const allReactors = sortedReactions.flatMap((r) => r.users);
   const leadReactor =
     allReactors.find((u) => u.id !== viewer.id) ?? allReactors[0] ?? null;
-  const facePile = [...new Map(allReactors.map((u) => [u.id, u])).values()].slice(0, 3);
 
   const canPin =
     pinned !== undefined && !card.system && card.recipients.some((r) => r.id === viewer.id);
+
+  const firstRecipient = card.recipients[0];
+  const accent = themeColour(firstRecipient?.look.theme);
+  const hasMedia = card.imageUrls.length > 0;
 
   return (
     <motion.article
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.18) }}
-      className="border-border flex gap-3 border-b px-0.5 pt-4 pb-3"
+      className="pt-3 pb-6"
     >
-      {/* Left rail: author avatar + thread line + reactor face-pile (Threads). */}
-      <div className="flex w-10 shrink-0 flex-col items-center">
+      {/* Header: who sent it, and to whom (Instagram's name + location line) */}
+      <header className="flex items-center gap-2.5">
         {card.system ? (
-          <span className="bg-brand flex size-10 items-center justify-center rounded-full text-white">
+          <span className="bg-brand flex size-10 shrink-0 items-center justify-center rounded-full text-white">
             <Sparkles className="size-5" />
           </span>
         ) : (
-          <Link href={`/profile/${card.sender.id}`}>
-            <UserAvatar
+          <Link href={`/profile/${card.sender.id}`} className="shrink-0">
+            <FramedAvatar
               name={card.sender.name}
               avatarUrl={card.sender.avatarUrl}
-              className="size-10"
+              frame={card.sender.look.frame}
+              className="size-9 text-xs"
             />
           </Link>
         )}
-        <span className="bg-border my-2 w-0.5 flex-1 rounded-full" />
-        {facePile.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setReactorsOpen(true)}
-            aria-label="See who reacted"
-            className="relative h-6 w-8"
-          >
-            {facePile.map((u, i) => (
-              <UserAvatar
-                key={u.id}
-                name={u.name}
-                avatarUrl={u.avatarUrl}
-                className={cn(
-                  "ring-background absolute size-[1.15rem] text-[0.4rem] ring-2",
-                  i === 0 && "top-0 left-1",
-                  i === 1 && "top-2 left-3.5",
-                  i === 2 && "top-0 left-4.5",
-                )}
-              />
-            ))}
-          </button>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        {/* Header */}
-        <div className="flex items-center gap-1.5 text-[0.95rem] leading-tight">
-          {card.system ? (
-            <span className="truncate font-semibold">{card.sender.name}</span>
-          ) : (
-            <Link href={`/profile/${card.sender.id}`} className="truncate font-semibold">
-              {card.sender.name}
-            </Link>
-          )}
-          <time className="text-muted shrink-0 text-sm" title={card.createdAtFull}>
-            {card.createdAtLabel}
-          </time>
-          {card.visibility === "private" && (
-            <Lock className="text-muted size-3.5 shrink-0" aria-label="Private" />
-          )}
-          {canPin && (
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="More"
-                  className="text-muted hover:bg-surface-2 -my-2 -mr-2 ml-auto flex size-9 shrink-0 items-center justify-center rounded-full"
-                >
-                  {pinned ? <Pin className="text-primary size-4 fill-current" /> : <Ellipsis className="size-5" />}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-56 rounded-2xl p-1.5">
-                <button
-                  type="button"
-                  onClick={onPin}
-                  disabled={pinPending}
-                  className="hover:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold"
-                >
-                  {pinned ? <PinOff className="size-4.5" /> : <Pin className="size-4.5" />}
-                  {pinned ? "Unpin from profile" : "Pin to profile"}
-                </button>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-
-        {card.recipients.length > 0 && <RecipientPills recipients={card.recipients} />}
-
-        {/* Body. Double-tap applauds. */}
-        <div className="relative mt-2 select-none" onClick={onBodyTap}>
-          <p
-            className={cn(
-              "text-[0.98rem] leading-relaxed break-words whitespace-pre-line",
-              card.system &&
-                "bg-brand rounded-2xl px-4 py-5 font-display text-xl leading-snug font-semibold text-white",
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="flex items-center gap-1.5 text-[0.9rem]">
+            {card.system ? (
+              <span className="truncate font-semibold">{card.sender.name}</span>
+            ) : (
+              <Link href={`/profile/${card.sender.id}`} className="truncate font-semibold">
+                {card.sender.name}
+              </Link>
             )}
-          >
-            {card.message}
+            <time className="text-muted shrink-0" title={card.createdAtFull}>
+              · {card.createdAtLabel}
+            </time>
+            {card.visibility === "private" && (
+              <Lock className="text-muted size-3.5 shrink-0" aria-label="Private" />
+            )}
           </p>
-          {card.imageUrls.length > 0 && <MediaRow urls={card.imageUrls} />}
-
-          {/* Applause burst on double-tap / clap */}
-          <AnimatePresence>
-            {burst > 0 && (
-              <motion.span
-                key={burst}
-                aria-hidden
-                initial={{ scale: 0.2, opacity: 0, rotate: -12 }}
-                animate={{ scale: [0.2, 1.3, 1], opacity: [0, 1, 1], rotate: 0 }}
-                exit={{ scale: 1.5, opacity: 0, y: -30 }}
-                transition={{ duration: 0.42 }}
-                onAnimationComplete={() =>
-                  setTimeout(() => setBurst((b) => (b === burst ? 0 : b)), 250)
-                }
-                className="pointer-events-none absolute inset-0 m-auto flex size-24 items-center justify-center text-7xl drop-shadow-xl"
-              >
-                {myReaction ?? QUICK_EMOJI}
-              </motion.span>
-            )}
-          </AnimatePresence>
+          {card.recipients.length > 0 && !card.system && (
+            <p className="text-muted truncate text-[0.8rem]">
+              to{" "}
+              {card.recipients.map((r, i) => (
+                <Fragment key={r.id}>
+                  {i > 0 && (i === card.recipients.length - 1 ? " and " : ", ")}
+                  <Link href={`/profile/${r.id}`} className="text-foreground font-medium">
+                    {r.name}
+                  </Link>
+                </Fragment>
+              ))}
+            </p>
+          )}
         </div>
-
-        {/* Tags: value, points, boost */}
-        {(card.value || card.pointsEach > 0) && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {card.value && <ValueChip value={card.value} />}
-            {card.pointsEach > 0 && (
-              <span
-                data-numeric
-                className="bg-primary text-primary-fg inline-flex h-6 items-center rounded-full px-2.5 text-xs font-bold"
+        {canPin && (
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="More"
+                className="text-muted hover:bg-surface-2 -mr-2 flex size-9 shrink-0 items-center justify-center rounded-full"
               >
-                +{pts(effectivePoints)}
-              </span>
-            )}
-            {activeBoost && (
-              <span className="bg-brand inline-flex h-6 items-center gap-1 rounded-full px-2.5 text-xs font-bold text-white">
-                <span aria-hidden>{activeBoost.emoji}</span>
-                {activeBoost.label} <span data-numeric>{activeBoost.multiplier}×</span>
-              </span>
-            )}
-          </div>
+                {pinned ? <Pin className="text-primary size-4 fill-current" /> : <Ellipsis className="size-5" />}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 rounded-2xl p-1.5">
+              <button
+                type="button"
+                onClick={onPin}
+                disabled={pinPending}
+                className="hover:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold"
+              >
+                {pinned ? <PinOff className="size-4.5" /> : <Pin className="size-4.5" />}
+                {pinned ? "Unpin from profile" : "Pin to profile"}
+              </button>
+            </PopoverContent>
+          </Popover>
+        )}
+      </header>
+
+      {/* The picture: their photo/GIF, or the recipient's own banner and frame.
+          Double-tap applauds. */}
+      <div
+        className="relative -mx-4 mt-2.5 overflow-hidden select-none md:mx-0 md:rounded-2xl"
+        onClick={onBodyTap}
+      >
+        {hasMedia ? (
+          <MediaHero urls={card.imageUrls} />
+        ) : (
+          <BannerHero card={card} />
         )}
 
-        {/* Action row */}
-        <div className="-ml-2.5 mt-1.5 flex items-center">
-          <motion.button
-            type="button"
-            onClick={quickReact}
-            onPointerDown={startPress}
-            onPointerUp={endPress}
-            onPointerLeave={endPress}
-            onContextMenu={(e) => e.preventDefault()}
-            whileTap={{ scale: 0.82 }}
-            aria-label={myReaction ? `Remove your ${myReaction}` : "Applaud (hold for more)"}
-            aria-pressed={!!myReaction}
-            className="flex h-10 items-center gap-1 rounded-full px-2.5"
+        {card.value && (
+          <ValueSeal
+            value={card.value}
+            size="md"
+            className="absolute top-3 right-3 rotate-[8deg]"
+          />
+        )}
+        {hasMedia && firstRecipient && (
+          <Link
+            href={`/profile/${firstRecipient.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/55 py-1 pr-3 pl-1 text-sm font-semibold text-white backdrop-blur"
           >
+            <UserAvatar name={firstRecipient.name} avatarUrl={firstRecipient.avatarUrl} className="size-6 text-[0.5rem]" />
+            {firstRecipient.name}
+            {card.recipients.length > 1 && <span className="text-white/75">+{card.recipients.length - 1}</span>}
+          </Link>
+        )}
+        {card.pointsEach > 0 && (
+          <span
+            data-numeric
+            className={cn(
+              "absolute flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shadow-md",
+              hasMedia ? "right-3 bottom-3" : "bottom-3 left-3",
+            )}
+            style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#fff" }}
+          >
+            +{pts(effectivePoints)}
+            {activeBoost && (
+              <span aria-label={`${activeBoost.label} boost`}>
+                · {activeBoost.emoji} {activeBoost.multiplier}×
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Applause burst on double-tap / clap */}
+        <AnimatePresence>
+          {burst > 0 && (
             <motion.span
-              key={myReaction ?? "none"}
-              initial={{ scale: 0.5 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 600, damping: 14 }}
-              className={cn(
-                "text-[1.3rem] leading-none",
-                !myReaction && "opacity-70 grayscale",
-              )}
+              key={burst}
+              aria-hidden
+              initial={{ scale: 0.2, opacity: 0, rotate: -12 }}
+              animate={{ scale: [0.2, 1.3, 1], opacity: [0, 1, 1], rotate: 0 }}
+              exit={{ scale: 1.5, opacity: 0, y: -30 }}
+              transition={{ duration: 0.42 }}
+              onAnimationComplete={() =>
+                setTimeout(() => setBurst((b) => (b === burst ? 0 : b)), 250)
+              }
+              className="pointer-events-none absolute inset-0 m-auto flex size-28 items-center justify-center text-8xl drop-shadow-xl"
             >
               {myReaction ?? QUICK_EMOJI}
             </motion.span>
-            {totalReactions > 0 && (
-              <span
-                data-numeric
-                className={cn(
-                  "text-sm font-semibold",
-                  myReaction ? "text-foreground" : "text-muted",
-                )}
-              >
-                {formatNumber(totalReactions)}
-              </span>
-            )}
-          </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
 
-          <motion.button
-            type="button"
-            onClick={() => openComments(true)}
-            whileTap={{ scale: 0.85 }}
-            aria-label="Comment"
-            className="text-muted flex h-10 items-center gap-1 rounded-full px-2.5"
+      {/* Action row */}
+      <div className="-ml-2.5 mt-1 flex items-center">
+        <motion.button
+          type="button"
+          onClick={quickReact}
+          onPointerDown={startPress}
+          onPointerUp={endPress}
+          onPointerLeave={endPress}
+          onContextMenu={(e) => e.preventDefault()}
+          whileTap={{ scale: 0.82 }}
+          aria-label={myReaction ? `Remove your ${myReaction}` : "Applaud (hold for more)"}
+          aria-pressed={!!myReaction}
+          className="flex size-11 items-center justify-center rounded-full"
+        >
+          <motion.span
+            key={myReaction ?? "none"}
+            initial={{ scale: 0.5 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 600, damping: 14 }}
+            className={cn("text-[1.5rem] leading-none", !myReaction && "opacity-60 grayscale")}
           >
-            <MessageCircle className="size-5.5 -scale-x-100" strokeWidth={1.9} />
-            {comments.length > 0 && (
-              <span data-numeric className="text-sm font-semibold">
-                {formatNumber(comments.length)}
-              </span>
-            )}
-          </motion.button>
+            {myReaction ?? QUICK_EMOJI}
+          </motion.span>
+        </motion.button>
 
-          {/* Tray anchors here; holding the applaud button opens it too. */}
-          <Popover open={reactOpen} onOpenChange={setReactOpen}>
-            <PopoverTrigger asChild>
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.85 }}
-                aria-label="Pick a reaction"
-                className="text-muted flex size-10 items-center justify-center rounded-full"
-              >
-                <SmilePlus className="size-5.5" strokeWidth={1.9} />
-              </motion.button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="top"
-              align="start"
-              sideOffset={6}
-              className="w-auto rounded-full p-1.5 shadow-float"
-            >
-              <div className="flex gap-0.5">
-                {REACTION_EMOJIS.map((emoji, i) => (
-                  <motion.button
-                    key={emoji}
-                    type="button"
-                    onClick={() => pickReaction(emoji)}
-                    initial={{ y: 14, opacity: 0, scale: 0.6 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.03, type: "spring", stiffness: 520, damping: 20 }}
-                    whileHover={{ scale: 1.35, y: -6 }}
-                    whileTap={{ scale: 0.85 }}
-                    aria-label={`React ${emoji}`}
-                    className={cn(
-                      "rounded-full p-1.5 text-[1.8rem] leading-none",
-                      myReaction === emoji && "bg-primary/20",
-                    )}
-                  >
-                    {emoji}
-                  </motion.button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+        <motion.button
+          type="button"
+          onClick={() => openComments(true)}
+          whileTap={{ scale: 0.85 }}
+          aria-label="Comment"
+          className="flex size-11 items-center justify-center rounded-full"
+        >
+          <MessageCircle className="size-6 -scale-x-100" strokeWidth={1.8} />
+        </motion.button>
 
-          {boostMode && myBoostType && (
+        {/* Tray anchors here; holding the applaud button opens it too. */}
+        <Popover open={reactOpen} onOpenChange={setReactOpen}>
+          <PopoverTrigger asChild>
             <motion.button
               type="button"
-              whileTap={{ scale: 0.92 }}
-              onClick={() => onBoost(myBoostType)}
-              disabled={boostPending}
-              className={cn(
-                "ml-auto flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-bold disabled:opacity-50",
-                boostMode === "remove"
-                  ? "bg-surface-2 text-foreground"
-                  : "bg-brand text-white",
-              )}
+              whileTap={{ scale: 0.85 }}
+              aria-label="Pick a reaction"
+              className="flex size-11 items-center justify-center rounded-full"
             >
-              <span aria-hidden>{BOOSTS[myBoostType].emoji}</span>
-              {boostMode === "remove"
-                ? "Remove boost"
-                : `Boost ${BOOSTS[myBoostType].multiplier}×`}
+              <SmilePlus className="size-6" strokeWidth={1.8} />
             </motion.button>
-          )}
-        </div>
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="start"
+            sideOffset={6}
+            className="w-auto rounded-full p-1.5 shadow-float"
+          >
+            <div className="flex gap-0.5">
+              {REACTION_EMOJIS.map((emoji, i) => (
+                <motion.button
+                  key={emoji}
+                  type="button"
+                  onClick={() => pickReaction(emoji)}
+                  initial={{ y: 14, opacity: 0, scale: 0.6 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.03, type: "spring", stiffness: 520, damping: 20 }}
+                  whileHover={{ scale: 1.35, y: -6 }}
+                  whileTap={{ scale: 0.85 }}
+                  aria-label={`React ${emoji}`}
+                  className={cn(
+                    "rounded-full p-1.5 text-[1.8rem] leading-none",
+                    myReaction === emoji && "bg-primary/20",
+                  )}
+                >
+                  {emoji}
+                </motion.button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
 
-        {/* Footer: "Sorcha and 3 others · 2 replies" */}
-        {(totalReactions > 0 || comments.length > 0) && (
-          <p className="text-muted -mt-0.5 text-sm">
-            {totalReactions > 0 && leadReactor && (
-              <button type="button" onClick={() => setReactorsOpen(true)} className="hover:underline">
-                {sortedReactions.slice(0, 3).map((r) => (
-                  <Fragment key={r.emoji}>{r.emoji}</Fragment>
-                ))}{" "}
-                <span className="text-foreground font-medium">{leadReactor.name.split(" ")[0]}</span>
-                {totalReactions > 1 && (
-                  <>
-                    {" "}and <span data-numeric>{totalReactions - 1}</span>{" "}
-                    {totalReactions - 1 === 1 ? "other" : "others"}
-                  </>
-                )}
-              </button>
+        {boostMode && myBoostType && (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.92 }}
+            onClick={() => onBoost(myBoostType)}
+            disabled={boostPending}
+            className={cn(
+              "ml-auto flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-bold disabled:opacity-50",
+              boostMode === "remove" ? "bg-surface-2 text-foreground" : "bg-brand text-white",
             )}
-            {totalReactions > 0 && comments.length > 0 && " · "}
-            {comments.length > 0 && (
-              <button type="button" onClick={() => openComments()} className="hover:underline">
-                <span data-numeric>{comments.length}</span>{" "}
-                {comments.length === 1 ? "reply" : "replies"}
-              </button>
-            )}
-          </p>
+          >
+            <span aria-hidden>{BOOSTS[myBoostType].emoji}</span>
+            {boostMode === "remove" ? "Remove boost" : `Boost ${BOOSTS[myBoostType].multiplier}×`}
+          </motion.button>
         )}
       </div>
+
+      {/* "Applauded by Sorcha and 3 others" */}
+      {totalReactions > 0 && leadReactor && (
+        <button
+          type="button"
+          onClick={() => setReactorsOpen(true)}
+          className="block text-left text-[0.9rem]"
+        >
+          {sortedReactions.slice(0, 3).map((r) => (
+            <Fragment key={r.emoji}>{r.emoji}</Fragment>
+          ))}{" "}
+          Applauded by <span className="font-semibold">{leadReactor.name}</span>
+          {totalReactions > 1 && (
+            <>
+              {" "}and{" "}
+              <span className="font-semibold">
+                <span data-numeric>{totalReactions - 1}</span>{" "}
+                {totalReactions - 1 === 1 ? "other" : "others"}
+              </span>
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Caption */}
+      {!card.system && (
+        <p className="mt-1 text-[0.95rem] leading-snug break-words whitespace-pre-line">
+          <Link href={`/profile/${card.sender.id}`} className="mr-1.5 font-semibold">
+            {card.sender.name}
+          </Link>
+          {card.message}
+        </p>
+      )}
+
+      {comments.length > 0 && (
+        <button type="button" onClick={() => openComments()} className="text-muted mt-1 block text-[0.9rem]">
+          View {comments.length === 1 ? "1 comment" : `all ${formatNumber(comments.length)} comments`}
+        </button>
+      )}
 
       {/* Comments sheet */}
       <Sheet open={commentsOpen} onOpenChange={setCommentsOpen}>
