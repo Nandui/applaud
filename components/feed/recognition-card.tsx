@@ -30,7 +30,7 @@ import {
   type BoostType,
 } from "@/lib/config";
 import type { FeedCard } from "@/lib/recognition/queries";
-import { FramedAvatar, UserAvatar } from "@/components/user-avatar";
+import { FramedAvatar } from "@/components/user-avatar";
 import { bannerStyle, themeColour } from "@/lib/cosmetics";
 import { isLight } from "@/lib/profile-custom";
 import { ValueSeal } from "@/components/value-seal";
@@ -55,6 +55,8 @@ type Viewer = {
   name: string;
   avatarUrl?: string | null;
   role: string;
+  /** The viewer's equipped frame, for their own optimistic comments. */
+  frame?: string | null;
 };
 
 /** The one-tap reaction — this is an applause app, after all. */
@@ -80,7 +82,12 @@ function switchReaction(
   emoji: string,
   viewer: Viewer,
 ): FeedCard["reactions"] {
-  const me = { id: viewer.id, name: viewer.name, avatarUrl: viewer.avatarUrl ?? null };
+  const me = {
+    id: viewer.id,
+    name: viewer.name,
+    avatarUrl: viewer.avatarUrl ?? null,
+    frame: viewer.frame ?? null,
+  };
   const current = state.find((r) => r.reacted)?.emoji ?? null;
 
   const dropMine = (list: FeedCard["reactions"], target: string) =>
@@ -256,6 +263,7 @@ export function RecognitionCard({
           id: viewer.id,
           name: viewer.name,
           avatarUrl: viewer.avatarUrl ?? null,
+          frame: viewer.frame ?? null,
         },
       },
     ],
@@ -673,56 +681,66 @@ export function RecognitionCard({
         </p>
       )}
 
-      {comments.length > 0 && (
+      {comments.length > 2 && (
         <button type="button" onClick={() => openComments()} className="text-muted mt-1 block text-[0.9rem]">
-          View {comments.length === 1 ? "1 comment" : `all ${formatNumber(comments.length)} comments`}
+          View all {formatNumber(comments.length)} comments
         </button>
       )}
+      {comments.slice(-2).map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => openComments()}
+          className="mt-0.5 block w-full truncate text-left text-[0.9rem]"
+        >
+          <span className="mr-1.5 font-semibold">{c.user.name}</span>
+          {c.body}
+        </button>
+      ))}
 
       {/* Comments sheet */}
       <Sheet open={commentsOpen} onOpenChange={setCommentsOpen}>
         <SheetContent side="bottom" showCloseButton={false} className="gap-0 p-0">
           <SheetHeader className="border-b pt-1 pb-3 text-center">
-            <SheetTitle className="text-center text-base">Replies</SheetTitle>
+            <SheetTitle className="text-center text-base">Comments</SheetTitle>
             <SheetDescription className="sr-only">
-              Replies to {card.sender.name}&apos;s shout-out
+              Comments on {card.sender.name}&apos;s shout-out
             </SheetDescription>
           </SheetHeader>
           <div className="max-h-[55svh] min-h-[30svh] space-y-4 overflow-y-auto px-4 py-4">
             {comments.length === 0 ? (
               <div className="text-muted flex h-full flex-col items-center justify-center gap-1 py-10 text-center">
                 <p className="text-foreground font-display text-lg font-semibold">
-                  No replies yet
+                  No comments yet
                 </p>
-                <p className="text-sm">Hype them up 🙌</p>
+                <p className="text-sm">Be the first to hype them up 🙌</p>
               </div>
             ) : (
               comments.map((c) => (
                 <div key={c.id} className="flex items-start gap-3">
                   <Link href={`/profile/${c.user.id}`} className="shrink-0">
-                    <UserAvatar
+                    <FramedAvatar
                       name={c.user.name}
                       avatarUrl={c.user.avatarUrl}
-                      className="size-8"
+                      frame={c.user.frame}
+                      className="size-9 text-xs"
                     />
                   </Link>
-                  <div className="min-w-0 flex-1 text-sm">
-                    <div className="bg-surface-2 inline-block max-w-full rounded-2xl rounded-tl-md px-3.5 py-2">
-                      <Link href={`/profile/${c.user.id}`} className="block text-[0.8rem] font-semibold">
+                  <div className="min-w-0 flex-1 text-[0.9rem] leading-snug">
+                    <p className="flex items-baseline gap-1.5">
+                      <Link href={`/profile/${c.user.id}`} className="font-semibold">
                         {c.user.name}
                       </Link>
-                      <p className="leading-snug break-words whitespace-pre-line">{c.body}</p>
-                    </div>
-                    <p className="text-muted mt-1 flex gap-3 px-1 text-xs">
-                      <span>{c.createdAtLabel}</span>
-                      <button
-                        type="button"
-                        onClick={() => replyTo(c.user.name)}
-                        className="font-semibold"
-                      >
-                        Reply
-                      </button>
+                      <span className="text-muted text-xs">{c.createdAtLabel}</span>
                     </p>
+                    <p className="mt-0.5 break-words whitespace-pre-line">{c.body}</p>
+                    <button
+                      type="button"
+                      onClick={() => replyTo(c.user.name)}
+                      className="text-muted mt-1 text-xs font-semibold"
+                    >
+                      Reply
+                    </button>
                   </div>
                 </div>
               ))
@@ -744,17 +762,18 @@ export function RecognitionCard({
               ))}
             </div>
             <form onSubmit={submitComment} className="flex items-center gap-2.5">
-              <UserAvatar
+              <FramedAvatar
                 name={viewer.name}
-                avatarUrl={viewer.avatarUrl}
-                className="size-9 shrink-0"
+                avatarUrl={viewer.avatarUrl ?? null}
+                frame={viewer.frame ?? null}
+                className="size-9 shrink-0 text-xs"
               />
               <div className="bg-surface-2 focus-within:ring-primary/40 flex flex-1 items-center rounded-full pl-4 focus-within:ring-2">
                 <input
                   ref={commentInputRef}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  placeholder={`Reply to ${card.recipients[0]?.name.split(" ")[0] ?? "them"}…`}
+                  placeholder={`Add a comment for ${card.recipients[0]?.name.split(" ")[0] ?? "them"}…`}
                   maxLength={500}
                   enterKeyHint="send"
                   className="placeholder:text-muted h-11 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
@@ -762,7 +781,7 @@ export function RecognitionCard({
                 <button
                   type="submit"
                   disabled={!body.trim()}
-                  aria-label="Post reply"
+                  aria-label="Post comment"
                   className="bg-primary disabled:bg-surface-3 disabled:text-muted mr-1 flex size-9 shrink-0 items-center justify-center rounded-full text-white transition-colors"
                 >
                   <Send className="size-4" />
@@ -791,7 +810,7 @@ export function RecognitionCard({
                     className="active:bg-surface-2 flex items-center gap-3 px-4 py-2.5"
                   >
                     <span className="relative">
-                      <UserAvatar name={u.name} avatarUrl={u.avatarUrl} className="size-11" />
+                      <FramedAvatar name={u.name} avatarUrl={u.avatarUrl} frame={u.frame} className="size-11 text-sm" />
                       <span className="bg-surface absolute -right-1 -bottom-1 rounded-full text-base leading-none">
                         {r.emoji}
                       </span>

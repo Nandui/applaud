@@ -3,7 +3,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { shortTime, fullTimestamp } from "@/lib/datetime";
 import { parseProfile } from "@/lib/profile-custom";
 
-export type ReactionUser = { id: string; name: string; avatarUrl: string | null };
+export type ReactionUser = { id: string; name: string; avatarUrl: string | null; frame: string | null };
 export type ReactionSummary = {
   emoji: string;
   count: number;
@@ -15,7 +15,7 @@ export type FeedCardComment = {
   id: string;
   body: string;
   createdAtLabel: string;
-  user: { id: string; name: string; avatarUrl: string | null };
+  user: { id: string; name: string; avatarUrl: string | null; frame: string | null };
 };
 
 /** Someone's shop look, so the feed can show the frames and banners they bought. */
@@ -65,12 +65,12 @@ const feedInclude = {
     select: {
       emoji: true,
       userId: true,
-      user: { select: { id: true, name: true, avatarUrl: true } },
+      user: { select: { id: true, name: true, avatarUrl: true, profile: true } },
     },
   },
   comments: {
     orderBy: { createdAt: "asc" as const },
-    include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+    include: { user: { select: { id: true, name: true, avatarUrl: true, profile: true } } },
   },
 } as const;
 
@@ -91,6 +91,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       id: reaction.user.id,
       name: reaction.user.name,
       avatarUrl: reaction.user.avatarUrl,
+      frame: lookOf(reaction.user.profile).frame,
     });
     grouped.set(reaction.emoji, g);
   }
@@ -132,7 +133,12 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       id: c.id,
       body: c.body,
       createdAtLabel: shortTime(c.createdAt),
-      user: { id: c.user.id, name: c.user.name, avatarUrl: c.user.avatarUrl },
+      user: {
+        id: c.user.id,
+        name: c.user.name,
+        avatarUrl: c.user.avatarUrl,
+        frame: lookOf(c.user.profile).frame,
+      },
     })),
   };
 }

@@ -26,6 +26,7 @@ export default async function FeedPage() {
     name: me.name,
     avatarUrl: me.avatarUrl ?? null,
     role: me.role,
+    frame: parseProfile(wallet?.profile).frame,
   };
   const myPins = new Set(parseProfile(wallet?.profile).pinned);
 
