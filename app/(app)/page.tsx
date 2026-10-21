@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { RecognitionCard } from "@/components/feed/recognition-card";
 import { FeedComposer } from "@/components/feed/feed-composer";
-import { StoriesRow } from "@/components/feed/stories-row";
+import { UserAvatar } from "@/components/user-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -28,26 +28,6 @@ export default async function FeedPage() {
     avatarUrl: me.avatarUrl ?? null,
     role: me.role,
   };
-
-  // Build the "stories" strip from people recently active in the feed.
-  const peopleMap = new Map<
-    string,
-    { id: string; name: string; avatarUrl: string | null }
-  >();
-  for (const c of cards) {
-    if (!c.system) {
-      peopleMap.set(c.sender.id, {
-        id: c.sender.id,
-        name: c.sender.name,
-        avatarUrl: c.sender.avatarUrl,
-      });
-    }
-    for (const r of c.recipients) {
-      peopleMap.set(r.id, { id: r.id, name: r.name, avatarUrl: r.avatarUrl });
-    }
-  }
-  peopleMap.delete(me.id);
-  const people = [...peopleMap.values()].slice(0, 14);
 
   return (
     <div className="mx-auto max-w-xl">
@@ -79,9 +59,16 @@ export default async function FeedPage() {
         <FeedComposer viewer={{ name: me.name, avatarUrl: me.avatarUrl }} />
       </div>
 
-      <div className="bg-surface -mx-4 border-b border-black/[0.06] px-4 md:mx-0 md:mb-4 md:rounded-2xl md:border md:px-4 md:pt-3">
-        <StoriesRow people={people} viewer={{ name: me.name, avatarUrl: me.avatarUrl }} />
-      </div>
+      {/* Phones: a one-tap prompt into the composer (desktop has FeedComposer). */}
+      <Link
+        href="/recognize"
+        className="bg-surface -mx-4 flex items-center gap-3 border-b border-black/[0.06] px-4 pt-1 pb-3 md:hidden"
+      >
+        <UserAvatar name={me.name} avatarUrl={me.avatarUrl} className="size-9" />
+        <span className="bg-secondary text-muted flex h-10 flex-1 items-center rounded-full px-4 text-sm">
+          Who deserves a shout-out today?
+        </span>
+      </Link>
 
       {cards.length === 0 ? (
         <div className="flex flex-col items-center gap-4 px-6 py-20 text-center">
