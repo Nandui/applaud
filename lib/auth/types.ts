@@ -6,7 +6,7 @@ export type SessionUser = {
   name: string;
   email: string;
   role: Role;
-  siteId: string;
+  siteId: string | null;
   avatarUrl?: string | null;
 };
 

@@ -104,7 +104,7 @@ export async function getLeaderboard({
         name: u.name,
         avatarUrl: u.avatarUrl,
         jobTitle: u.jobTitle,
-        siteCode: u.site.code,
+        siteCode: u.site?.code ?? "",
       },
     ]),
   );

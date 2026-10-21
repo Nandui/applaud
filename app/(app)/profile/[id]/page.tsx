@@ -68,9 +68,11 @@ export default async function ProfilePage({
                   <Briefcase className="size-4" /> {user.jobTitle}
                 </div>
               )}
-              <div className="flex items-center justify-center gap-2">
-                <Building2 className="size-4" /> {user.site.name}
-              </div>
+              {user.site && (
+                <div className="flex items-center justify-center gap-2">
+                  <Building2 className="size-4" /> {user.site.name}
+                </div>
+              )}
               <div className="flex items-center justify-center gap-2">
                 <CalendarDays className="size-4" /> Since{" "}
                 {format(memberSince, "MMM yyyy")}

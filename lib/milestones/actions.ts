@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { requireAdmin } from "@/lib/auth/guards";
 import { runMilestones } from "@/lib/milestones/run";
+import { writeAudit } from "@/lib/audit";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -14,7 +15,7 @@ export async function updateMilestoneRule(
   _prev: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const type = String(formData.get("type") ?? "");
   const points = Math.max(0, Math.floor(Number(formData.get("points"))));
@@ -42,6 +43,14 @@ export async function updateMilestoneRule(
     where: { id },
     data: { points, active, config: config as Prisma.InputJsonObject },
   });
+  await writeAudit({
+    actor: admin,
+    action: "milestone.updated",
+    entityType: "milestone_rule",
+    entityId: id,
+    summary: `Updated ${type.replaceAll("_", " ")} milestone rule`,
+    metadata: { type, points, active, config: config as Prisma.InputJsonValue },
+  });
   revalidatePath("/admin/milestones");
   return { ok: true, message: "Milestone rule saved." };
 }
@@ -49,11 +58,19 @@ export async function updateMilestoneRule(
 export async function setMilestoneRuleActive(
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return { ok: false, error: "Missing rule." };
   await prisma.milestoneRule.update({ where: { id }, data: { active } });
+  await writeAudit({
+    actor: admin,
+    action: "milestone.updated",
+    entityType: "milestone_rule",
+    entityId: id,
+    summary: active ? "Reactivated a milestone rule" : "Deactivated a milestone rule",
+    metadata: { active },
+  });
   revalidatePath("/admin/milestones");
   return { ok: true };
 }

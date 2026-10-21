@@ -7,8 +7,13 @@ export const CELEBRATION_LABELS: Record<string, string> = {
 };
 
 export async function getProfileData(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  const key = userId?.trim();
+  if (!key || key === "undefined" || key === "null") return null;
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: key }, { email: key.toLowerCase() }],
+    },
     select: {
       id: true,
       name: true,
@@ -19,24 +24,29 @@ export async function getProfileData(userId: string) {
       createdAt: true,
       active: true,
       site: { select: { name: true, code: true } },
-      manager: { select: { id: true, name: true } },
+      managers: {
+        orderBy: { manager: { name: "asc" } },
+        select: { manager: { select: { id: true, name: true } } },
+      },
     },
   });
   if (!user) return null;
 
+  const id = user.id;
+
   const [receivedCount, givenCount, earn, valueRows, celebrations] =
     await Promise.all([
       prisma.recognitionRecipient.count({
-        where: { userId, recognition: { system: false } },
+        where: { userId: id, recognition: { system: false } },
       }),
-      prisma.recognition.count({ where: { senderId: userId, system: false } }),
+      prisma.recognition.count({ where: { senderId: id, system: false } }),
       prisma.rewardLedger.aggregate({
         _sum: { amount: true },
-        where: { userId, type: { in: ["RECOGNITION", "AWARD"] } },
+        where: { userId: id, type: { in: ["RECOGNITION", "AWARD"] } },
       }),
       prisma.recognitionRecipient.findMany({
         where: {
-          userId,
+          userId: id,
           recognition: { system: false, valueId: { not: null } },
         },
         select: {
@@ -50,7 +60,7 @@ export async function getProfileData(userId: string) {
         },
       }),
       prisma.celebration.findMany({
-        where: { userId },
+        where: { userId: id },
         orderBy: { occurredOn: "desc" },
         take: 10,
       }),

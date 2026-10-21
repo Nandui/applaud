@@ -40,7 +40,7 @@ export default async function RecognizePage() {
     name: u.name,
     jobTitle: u.jobTitle,
     avatarUrl: u.avatarUrl,
-    siteCode: u.site.code,
+    siteCode: u.site?.code ?? "",
   }));
 
   return (

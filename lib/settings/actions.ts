@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
+import { writeAudit } from "@/lib/audit";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -12,7 +13,7 @@ export async function updateOrgSettings(
   _prev: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const appName = String(formData.get("appName") ?? "").trim();
   const monthlyAllowanceStaff = Math.max(
@@ -48,6 +49,14 @@ export async function updateOrgSettings(
     where: { id: "singleton" },
     create: { id: "singleton", ...data },
     update: data,
+  });
+  await writeAudit({
+    actor: admin,
+    action: "settings.updated",
+    entityType: "org_settings",
+    entityId: "singleton",
+    summary: "Updated organisation settings",
+    metadata: data,
   });
   revalidatePath("/admin/settings");
   return { ok: true, message: "Settings saved." };

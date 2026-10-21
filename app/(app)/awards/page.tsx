@@ -35,15 +35,19 @@ export default async function AwardsPage() {
     id: c.id,
     name: c.name,
     jobTitle: c.jobTitle,
-    siteCode: c.site.code,
+    siteCode: c.site?.code ?? "",
   }));
 
-  // Review queue: admins see all pending; managers see their reports' pending.
+  // Review queue: admins see all pending; managers see the pending nominations
+  // of everyone who lists them as a manager. Someone with no managers at all
+  // only surfaces for admins.
   const pending = isManager(me)
     ? await prisma.nomination.findMany({
         where: {
           status: "pending",
-          ...(isAdmin(me) ? {} : { nominee: { managerId: me.id } }),
+          ...(isAdmin(me)
+            ? {}
+            : { nominee: { managers: { some: { managerId: me.id } } } }),
         },
         orderBy: { createdAt: "asc" },
         include: {

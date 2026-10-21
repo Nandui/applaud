@@ -11,8 +11,13 @@ import { toast } from "sonner";
 import { upload } from "@vercel/blob/client";
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { Pencil, Plus, Upload, Loader2 } from "lucide-react";
-import { saveUser, setUserActive, type ActionResult } from "@/lib/admin/actions";
+import { Pencil, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import {
+  deleteUser,
+  saveUser,
+  setUserActive,
+  type ActionResult,
+} from "@/lib/admin/actions";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { DataTable } from "@/components/data-table";
 import { UserAvatar } from "@/components/user-avatar";
@@ -23,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -34,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ManagerPicker } from "@/components/admin/manager-picker";
 
 export type UserRow = {
   id: string;
@@ -44,8 +51,8 @@ export type UserRow = {
   role: string;
   siteId: string;
   siteName: string;
-  managerId: string | null;
-  managerName: string | null;
+  managerIds: string[]; // zero or more people, name-sorted
+  managerNames: string[];
   hireDate: string | null; // yyyy-MM-dd
   birthday: string | null;
   active: boolean;
@@ -53,11 +60,9 @@ export type UserRow = {
 
 type Option = { id: string; name: string };
 
-const NONE = "__none__";
-
 // Base UI's Select shows the trigger label from a value→label `items` map (it
-// renders the raw value otherwise). Roles are fixed; sites/managers are built
-// from props.
+// renders the raw value otherwise). App roles are fixed; sites/managers are
+// built from props.
 const ROLE_LABELS: Record<string, string> = {
   staff: "Staff",
   manager: "Manager",
@@ -65,6 +70,15 @@ const ROLE_LABELS: Record<string, string> = {
   operations: "Operations",
   ceo: "CEO",
 };
+
+// Beyond this many, the table shows a count instead of a list of names.
+const MANAGER_NAMES_SHOWN = 2;
+
+function managerSummary(names: string[]): string {
+  if (names.length === 0) return "—";
+  if (names.length <= MANAGER_NAMES_SHOWN) return names.join(", ");
+  return `${names.length} managers`;
+}
 
 function UserFormDialog({
   open,
@@ -85,7 +99,9 @@ function UserFormDialog({
   >(saveUser, undefined);
   const [role, setRole] = useState(editing?.role ?? "staff");
   const [siteId, setSiteId] = useState(editing?.siteId ?? sites[0]?.id ?? "");
-  const [managerId, setManagerId] = useState(editing?.managerId ?? "");
+  const [managerIds, setManagerIds] = useState<string[]>(
+    editing?.managerIds ?? [],
+  );
   const [active, setActive] = useState(editing?.active ?? true);
   const [name, setName] = useState(editing?.name ?? "");
   const [avatarUrl, setAvatarUrl] = useState(editing?.avatarUrl ?? "");
@@ -124,12 +140,8 @@ function UserFormDialog({
   }, [state, onOpenChange]);
 
   const siteItems = Object.fromEntries(sites.map((s) => [s.id, s.name]));
-  const managerItems: Record<string, string> = {
-    [NONE]: "No manager",
-    ...Object.fromEntries(
-      managers.filter((m) => m.id !== editing?.id).map((m) => [m.id, m.name]),
-    ),
-  };
+  // Nobody manages themselves, so the editing user is never an option.
+  const managerOptions = managers.filter((m) => m.id !== editing?.id);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,7 +153,9 @@ function UserFormDialog({
           {editing && <input type="hidden" name="id" value={editing.id} />}
           <input type="hidden" name="role" value={role} />
           <input type="hidden" name="siteId" value={siteId} />
-          <input type="hidden" name="managerId" value={managerId} />
+          {managerIds.map((m) => (
+            <input key={m} type="hidden" name="managerIds" value={m} />
+          ))}
           <input type="hidden" name="active" value={String(active)} />
           <input type="hidden" name="avatarUrl" value={avatarUrl} />
 
@@ -210,10 +224,11 @@ function UserFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="jobTitle">Job title</Label>
+              <Label htmlFor="jobTitle">Company role</Label>
               <Input
                 id="jobTitle"
                 name="jobTitle"
+                placeholder="e.g. Duty Manager"
                 defaultValue={editing?.jobTitle ?? ""}
               />
             </div>
@@ -230,7 +245,7 @@ function UserFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Role</Label>
+              <Label>App role</Label>
               <Select value={role} onValueChange={setRole} items={ROLE_LABELS}>
                 <SelectTrigger>
                   <SelectValue />
@@ -261,26 +276,16 @@ function UserFormDialog({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Manager</Label>
-            <Select
-              value={managerId === "" ? NONE : managerId}
-              onValueChange={(v) => setManagerId(v === NONE ? "" : v)}
-              items={managerItems}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                <SelectItem value={NONE}>No manager</SelectItem>
-                {managers
-                  .filter((m) => m.id !== editing?.id)
-                  .map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+            <Label>Managers</Label>
+            <ManagerPicker
+              options={managerOptions}
+              value={managerIds}
+              onChange={setManagerIds}
+            />
+            <p className="text-muted text-xs">
+              Pick as many as apply — they can all review this person&apos;s
+              nominations. Leave empty for no manager.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -320,6 +325,55 @@ function UserFormDialog({
   );
 }
 
+function DeleteUserDialog({
+  user,
+  onOpenChange,
+}: {
+  user: UserRow | null;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [pending, start] = useTransition();
+
+  return (
+    <Dialog open={!!user} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove user</DialogTitle>
+          <DialogDescription>
+            {user
+              ? `${user.name} will be removed from ${user.siteName} and the people list. If they have recognition or points history, that history is kept and their record is archived instead of deleted. This can't be undone.`
+              : null}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={pending}
+            onClick={() => {
+              if (!user) return;
+              const fd = new FormData();
+              fd.set("id", user.id);
+              start(async () => {
+                const res = await deleteUser(fd);
+                if (res.ok) {
+                  toast.success(res.message ?? "User removed.");
+                  onOpenChange(false);
+                } else toast.error(res.error);
+              });
+            }}
+          >
+            {pending ? "Removing…" : "Remove"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ActiveToggle({ row }: { row: UserRow }) {
   const [pending, start] = useTransition();
   return (
@@ -351,13 +405,16 @@ export function UsersManager({
   rows,
   sites,
   managers,
+  currentUserId,
 }: {
   rows: UserRow[];
   sites: Option[];
   managers: Option[];
+  currentUserId: string;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState<UserRow | null>(null);
 
   const columns: ColumnDef<UserRow>[] = [
     {
@@ -383,21 +440,33 @@ export function UsersManager({
       ),
     },
     {
+      accessorKey: "jobTitle",
+      header: "Company role",
+      cell: ({ row }) => row.original.jobTitle ?? "—",
+    },
+    {
       accessorKey: "role",
-      header: "Role",
+      header: "App role",
       cell: ({ row }) => (
         <span
-          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${ROLE_TONE[row.original.role] ?? ""}`}
+          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_TONE[row.original.role] ?? ""}`}
         >
-          {row.original.role}
+          {ROLE_LABELS[row.original.role] ?? row.original.role}
         </span>
       ),
     },
     { accessorKey: "siteName", header: "Site" },
     {
-      accessorKey: "managerName",
-      header: "Manager",
-      cell: ({ row }) => row.original.managerName ?? "—",
+      id: "managers",
+      // Accessor (not just a cell) so search and sort still see every name
+      // even when the cell shows a count.
+      accessorFn: (row) => row.managerNames.join(", "),
+      header: "Managers",
+      cell: ({ row }) => (
+        <span title={row.original.managerNames.join(", ")}>
+          {managerSummary(row.original.managerNames)}
+        </span>
+      ),
     },
     {
       id: "active",
@@ -410,7 +479,7 @@ export function UsersManager({
       header: () => <span className="sr-only">Actions</span>,
       enableSorting: false,
       cell: ({ row }) => (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <Button
             size="xs"
             variant="outline"
@@ -421,6 +490,16 @@ export function UsersManager({
           >
             <Pencil className="size-3.5" /> Edit
           </Button>
+          {row.original.id !== currentUserId && (
+            <Button
+              size="xs"
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setDeleting(row.original)}
+            >
+              <Trash2 className="size-3.5" /> Remove
+            </Button>
+          )}
         </div>
       ),
     },
@@ -452,6 +531,12 @@ export function UsersManager({
         editing={editing}
         sites={sites}
         managers={managers}
+      />
+      <DeleteUserDialog
+        user={deleting}
+        onOpenChange={(o) => {
+          if (!o) setDeleting(null);
+        }}
       />
     </>
   );

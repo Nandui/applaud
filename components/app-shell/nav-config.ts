@@ -12,6 +12,7 @@ import {
   CalendarHeart,
   BarChart3,
   Settings,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/config";
@@ -47,5 +48,6 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/redemptions", label: "Redemptions", icon: PackageOpen, minRole: "admin" },
   { href: "/admin/milestones", label: "Milestones", icon: CalendarHeart, minRole: "admin" },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3, minRole: "admin" },
+  { href: "/admin/audit", label: "Audit log", icon: ScrollText, minRole: "admin" },
   { href: "/admin/settings", label: "Settings", icon: Settings, minRole: "admin" },
 ];

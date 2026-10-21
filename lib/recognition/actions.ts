@@ -17,6 +17,7 @@ import {
 } from "@/lib/config";
 import { isGiphyMediaUrl } from "@/lib/recognition/gif";
 import { isProjectBlobUrl } from "@/lib/blob";
+import { writeAudit } from "@/lib/audit";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -95,6 +96,7 @@ export async function createRecognition(
   if (!value) return { ok: false, error: "That value is unavailable." };
 
   const totalPoints = points * recipientIds.length;
+  let createdId: string | undefined;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -120,6 +122,7 @@ export async function createRecognition(
           },
         },
       });
+      createdId = recognition.id;
 
       if (points > 0) {
         for (const userId of recipientIds) {
@@ -145,6 +148,15 @@ export async function createRecognition(
     throw error;
   }
 
+  await writeAudit({
+    actor: me,
+    action: "recognition.created",
+    entityType: "recognition",
+    entityId: createdId,
+    summary: `Posted a recognition (${recipientIds.length} recipient${recipientIds.length === 1 ? "" : "s"}, ${points} pts each)`,
+    metadata: { recipientIds, points, visibility, valueId },
+    siteId: me.siteId,
+  });
   revalidatePath("/");
   revalidatePath("/me");
   return { ok: true, message: "Recognition posted!" };
@@ -175,18 +187,36 @@ export async function toggleReaction(formData: FormData): Promise<ActionResult> 
     where: { recognitionId, userId: me.id },
     orderBy: { createdAt: "asc" },
   });
+  let outcome: "added" | "changed" | "removed";
   if (!existing) {
     await prisma.reaction.create({
       data: { recognitionId, userId: me.id, emoji },
     });
+    outcome = "added";
   } else if (existing.emoji === emoji) {
     await prisma.reaction.delete({ where: { id: existing.id } });
+    outcome = "removed";
   } else {
     await prisma.reaction.update({
       where: { id: existing.id },
       data: { emoji },
     });
+    outcome = "changed";
   }
+  await writeAudit({
+    actor: me,
+    action: "recognition.reacted",
+    entityType: "recognition",
+    entityId: recognitionId,
+    summary:
+      outcome === "removed"
+        ? `Removed ${emoji} reaction`
+        : outcome === "added"
+          ? `Reacted ${emoji}`
+          : `Changed reaction to ${emoji}`,
+    metadata: { emoji, outcome },
+    siteId: me.siteId,
+  });
   revalidatePath("/");
   revalidatePath("/profile/[id]", "page");
   return { ok: true };
@@ -206,12 +236,21 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid comment." };
   }
-  await prisma.comment.create({
+  const comment = await prisma.comment.create({
     data: {
       recognitionId: parsed.data.recognitionId,
       userId: me.id,
       body: parsed.data.body,
     },
+  });
+  await writeAudit({
+    actor: me,
+    action: "recognition.commented",
+    entityType: "recognition",
+    entityId: parsed.data.recognitionId,
+    summary: "Commented on a recognition",
+    metadata: { commentId: comment.id },
+    siteId: me.siteId,
   });
   revalidatePath("/");
   revalidatePath("/profile/[id]", "page");
@@ -251,8 +290,9 @@ export async function toggleBoost(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: `Only ${BOOSTS[type].label} can apply that boost.` };
   }
 
+  let applied: { previous: BoostType | null; target: BoostType | null };
   try {
-    await prisma.$transaction(async (tx) => {
+    applied = await prisma.$transaction(async (tx) => {
       const rec = await tx.recognition.findUnique({
         where: { id: recognitionId },
         select: {
@@ -326,12 +366,30 @@ export async function toggleBoost(formData: FormData): Promise<ActionResult> {
       if (updated.count !== 1) {
         throw new BoostError("That recognition just changed — try again.");
       }
+      return { previous: current, target };
     });
   } catch (error) {
     if (error instanceof BoostError) return { ok: false, error: error.message };
     throw error;
   }
 
+  const { previous, target } = applied;
+    const summary = target
+      ? previous
+        ? `${BOOSTS[target].label} boost (${boostMultiplier(target)}×) upgraded from ${BOOSTS[previous].label}`
+        : `${BOOSTS[target].label} boost (${boostMultiplier(target)}×) applied`
+      : previous
+        ? `${BOOSTS[previous].label} boost removed`
+        : "Boost changed";
+    await writeAudit({
+      actor: me,
+      action: "points.boosted",
+      entityType: "recognition",
+      entityId: recognitionId,
+      summary,
+      metadata: { type, previous, target },
+      siteId: me.siteId,
+    });
   revalidatePath("/");
   revalidatePath("/me");
   revalidatePath("/profile/[id]", "page");
