@@ -12,6 +12,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { subDays, addDays } from "date-fns";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { SUGGESTED_REWARDS } from "../lib/economy";
+import { BUILTIN_COSMETICS } from "../lib/cosmetics";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL,
@@ -62,6 +63,7 @@ async function wipe() {
   await prisma.user.deleteMany();
   await prisma.site.deleteMany();
   await prisma.orgSettings.deleteMany();
+  await prisma.cosmetic.deleteMany();
 }
 
 async function main() {
@@ -85,6 +87,12 @@ async function main() {
     ),
   );
   const siteByCode = Object.fromEntries(sites.map((s) => [s.code, s]));
+
+  // ---------- Profile Store catalogue ----------
+  console.log("Creating Store items…");
+  await prisma.cosmetic.createMany({
+    data: BUILTIN_COSMETICS.map((c, i) => ({ ...c, sortOrder: (i + 1) * 10 })),
+  });
 
   // ---------- Org settings ----------
   console.log("Creating org settings…");

@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { cosmeticById, isFree, type CosmeticKind } from "@/lib/cosmetics";
+import {
+  bannerCss,
+  defaultLook,
+  frameArt,
+  itemById,
+  type Cosmetic,
+  type CosmeticKind,
+  type Look,
+} from "@/lib/cosmetics";
 
 /**
  * Profile customization. Everything a person chooses lives in the nullable
@@ -7,6 +15,10 @@ import { cosmeticById, isFree, type CosmeticKind } from "@/lib/cosmetics";
  * what they have equipped, and up to three pinned shout-outs. This module is
  * the single place that validates it and fills in defaults. Pure functions
  * only (no Prisma) so it can be unit-tested and shared by server and client.
+ *
+ * Item ids are checked against the Store catalogue (lib/cosmetics.ts), which
+ * lives in the database, so anything that needs to know whether an item is
+ * real, owned or worn takes the catalogue as an argument.
  */
 
 export const BIO_MAX = 150;
@@ -46,35 +58,53 @@ const storedSchema = z
   })
   .partial();
 
-export function ownsItem(custom: Pick<ProfileCustom, "owned">, id: string): boolean {
-  return isFree(id) || custom.owned.includes(id);
-}
-
-/** An equipped slot only counts when it's the right kind and actually owned. */
-function equipped(id: string | null | undefined, kind: CosmeticKind, owned: string[]): string | null {
-  const item = cosmeticById(id);
-  if (!item || item.kind !== kind) return null;
-  return isFree(item.id) || owned.includes(item.id) ? item.id : null;
+export function ownsItem(custom: Pick<ProfileCustom, "owned">, item: Pick<Cosmetic, "id" | "price">): boolean {
+  return item.price === 0 || custom.owned.includes(item.id);
 }
 
 /**
- * Read whatever is in the JSON column into a complete, safe object. Unknown or
- * malformed values fall back to defaults instead of throwing, so a bad row can
- * never break someone's profile page.
+ * Read whatever is in the JSON column into a complete, safe object. Malformed
+ * values fall back to defaults instead of throwing, so a bad row can never
+ * break someone's profile page. Item ids are kept as stored; `wornItem` and
+ * `resolveLook` decide against the catalogue whether they still count.
  */
 export function parseProfile(raw: unknown): ProfileCustom {
   const parsed = storedSchema.safeParse(raw ?? {});
   const p = parsed.success ? parsed.data : {};
-  const owned = [...new Set(p.owned ?? [])].filter((id) => cosmeticById(id));
   return {
     pronouns: p.pronouns ?? "",
     bio: p.bio ?? "",
-    owned,
-    frame: equipped(p.frame, "frame", owned),
-    banner: equipped(p.banner, "banner", owned),
-    theme: equipped(p.theme, "theme", owned),
+    owned: [...new Set(p.owned ?? [])],
+    frame: p.frame ?? null,
+    banner: p.banner ?? null,
+    theme: p.theme ?? null,
     pinned: (p.pinned ?? []).slice(0, MAX_PINNED),
   };
+}
+
+/** The item someone wears in a slot: it must exist, be that kind, and be theirs. */
+export function wornItem(custom: ProfileCustom, kind: CosmeticKind, catalogue: Cosmetic[]): Cosmetic | null {
+  const item = itemById(catalogue, custom[kind]);
+  if (!item || item.kind !== kind || !ownsItem(custom, item)) return null;
+  return item;
+}
+
+/** Someone's look, ready to draw: their frame art, banner CSS and accent colour. */
+export function resolveLook(custom: ProfileCustom, catalogue: Cosmetic[]): Look {
+  const fallback = defaultLook(catalogue);
+  const frame = wornItem(custom, "frame", catalogue);
+  const banner = wornItem(custom, "banner", catalogue);
+  const theme = wornItem(custom, "theme", catalogue);
+  return {
+    frame: frame ? frameArt(frame) : null,
+    banner: banner ? bannerCss(banner) : fallback.banner,
+    theme: theme?.style ?? fallback.theme,
+  };
+}
+
+/** Shorthand: the look straight from the raw `User.profile` column. */
+export function lookOf(profile: unknown, catalogue: Cosmetic[]): Look {
+  return resolveLook(parseProfile(profile), catalogue);
 }
 
 /** What the edit-profile form submits. */
@@ -84,19 +114,16 @@ export const profileInputSchema = z.object({
 });
 
 /** Buying adds the item to what you own and wears it straight away. */
-export function withPurchase(custom: ProfileCustom, id: string): ProfileCustom {
-  const item = cosmeticById(id);
-  if (!item) return custom;
-  const owned = custom.owned.includes(id) ? custom.owned : [...custom.owned, id];
-  return { ...custom, owned, [item.kind]: id };
+export function withPurchase(custom: ProfileCustom, item: Pick<Cosmetic, "id" | "kind">): ProfileCustom {
+  const owned = custom.owned.includes(item.id) ? custom.owned : [...custom.owned, item.id];
+  return { ...custom, owned, [item.kind]: item.id };
 }
 
-/** Wear an owned item, or take off whatever is in that slot (`id` null). */
-export function withEquipped(custom: ProfileCustom, kind: CosmeticKind, id: string | null): ProfileCustom {
-  if (id === null) return { ...custom, [kind]: null };
-  const item = cosmeticById(id);
-  if (!item || item.kind !== kind || !ownsItem(custom, id)) return custom;
-  return { ...custom, [kind]: id };
+/** Wear an owned item, or take off whatever is in that slot (`item` null). */
+export function withEquipped(custom: ProfileCustom, kind: CosmeticKind, item: Cosmetic | null): ProfileCustom {
+  if (item === null) return { ...custom, [kind]: null };
+  if (item.kind !== kind || !ownsItem(custom, item)) return custom;
+  return { ...custom, [kind]: item.id };
 }
 
 /** Relative luminance check so text on an accent colour stays readable. */

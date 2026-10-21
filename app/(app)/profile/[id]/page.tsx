@@ -5,7 +5,6 @@ import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
 import { getProfileData } from "@/lib/profile";
 import { getCardsByIds, getGivenCards, getReceivedCards } from "@/lib/recognition/queries";
-import { bannerStyle, themeColour } from "@/lib/cosmetics";
 import { isLight } from "@/lib/profile-custom";
 import { FramedAvatar } from "@/components/user-avatar";
 import { RecognitionCard } from "@/components/feed/recognition-card";
@@ -51,10 +50,10 @@ export default async function ProfilePage({
   const data = await getProfileData(id);
   if (!data) notFound();
 
-  const { user, custom } = data;
+  const { user, custom, look } = data;
   const isMe = viewer.id === user.id;
   const firstName = user.name.split(" ")[0];
-  const accent = themeColour(custom.theme);
+  const accent = look.theme;
   const onAccent = isLight(accent) ? "#0a0a0a" : "#ffffff";
 
   const [cards, pinnedCards] = await Promise.all([
@@ -68,7 +67,7 @@ export default async function ProfilePage({
     name: viewer.name,
     avatarUrl: viewer.avatarUrl ?? null,
     role: viewer.role,
-    frame: isMe ? custom.frame : null,
+    frame: isMe ? look.frame : null,
   };
 
   return (
@@ -79,13 +78,13 @@ export default async function ProfilePage({
         trailing={isMe ? <AccountSheet admin={isAdmin(viewer)} triggerClassName={appBarIconClass} /> : null}
       />
 
-      <div className="h-24 rounded-xl" style={{ background: bannerStyle(custom.banner) }} />
+      <div className="h-24 rounded-xl" style={{ background: look.banner }} />
 
       <div className="-mt-10 flex items-end gap-4 pl-2">
         <FramedAvatar
           name={user.name}
           avatarUrl={user.avatarUrl}
-          frame={custom.frame}
+          frame={look.frame}
           className="size-20 text-xl"
           large
         />

@@ -5,14 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 import { isProjectBlobUrl } from "@/lib/blob";
-import {
-  KIND_LABELS,
-  cosmeticById,
-  effectivePrice,
-  parseCosmeticPrices,
-  type CosmeticKind,
-} from "@/lib/cosmetics";
-import { getOrgSettings } from "@/lib/org-settings";
+import { KIND_LABELS, itemById, type CosmeticKind } from "@/lib/cosmetics";
+import { getCatalogue } from "@/lib/catalogue";
 import {
   MAX_PINNED,
   ownsItem,
@@ -119,16 +113,14 @@ export async function togglePin(recognitionId: string): Promise<ProfileActionRes
  */
 export async function buyItem(itemId: string): Promise<ProfileActionResult> {
   const me = await requireUser();
-  const base = cosmeticById(itemId);
-  if (!base) return { ok: false, error: "That item isn't in the shop." };
-  const settings = await getOrgSettings();
-  const item = { ...base, price: effectivePrice(base, parseCosmeticPrices(settings.cosmeticPrices)) };
+  const item = itemById(await getCatalogue(), itemId);
+  if (!item || !item.active) return { ok: false, error: "That item isn't in the shop." };
 
   try {
     await prisma.$transaction(async (tx) => {
       const row = await tx.user.findUniqueOrThrow({ where: { id: me.id }, select: { profile: true } });
       const custom = parseProfile(row.profile);
-      if (ownsItem(custom, item.id)) throw new ShopError("You already own this.");
+      if (ownsItem(custom, item)) throw new ShopError("You already own this.");
 
       if (item.price > 0) {
         const agg = await tx.rewardLedger.aggregate({ _sum: { amount: true }, where: { userId: me.id } });
@@ -145,7 +137,7 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
         });
         await tx.user.update({ where: { id: me.id }, data: { walletBalance: { decrement: item.price } } });
       }
-      await tx.user.update({ where: { id: me.id }, data: { profile: withPurchase(custom, item.id) } });
+      await tx.user.update({ where: { id: me.id }, data: { profile: withPurchase(custom, item) } });
     });
   } catch (error) {
     if (error instanceof ShopError) return { ok: false, error: error.message };
@@ -170,10 +162,12 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
 export async function equipItem(kind: CosmeticKind, itemId: string | null): Promise<ProfileActionResult> {
   const me = await requireUser();
   const custom = await loadCustom(me.id);
-  if (itemId && !ownsItem(custom, itemId)) return { ok: false, error: "Buy it first." };
+  const item = itemId ? itemById(await getCatalogue(), itemId) : null;
+  if (itemId && (!item || item.kind !== kind)) return { ok: false, error: "That item isn't in the shop." };
+  if (item && !ownsItem(custom, item)) return { ok: false, error: "Buy it first." };
   await prisma.user.update({
     where: { id: me.id },
-    data: { profile: withEquipped(custom, kind, itemId) },
+    data: { profile: withEquipped(custom, kind, item) },
   });
   revalidateProfile(me.id);
   return { ok: true, message: itemId ? "Equipped" : "Removed" };

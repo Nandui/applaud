@@ -10,13 +10,15 @@ import { NominationActions } from "@/components/awards/nomination-actions";
 import { RanksTabs } from "@/components/ranks/ranks-tabs";
 import { cn } from "@/lib/utils";
 import { FramedAvatar, UserAvatar } from "@/components/user-avatar";
-import { parseProfile } from "@/lib/profile-custom";
+import { lookOf } from "@/lib/profile-custom";
+import { getCatalogue } from "@/lib/catalogue";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Awards" };
 
 export default async function AwardsPage() {
   const me = await requireUser();
+  const catalogue = await getCatalogue();
 
   const [programs, colleagues, recentWins] = await Promise.all([
     prisma.awardProgram.findMany({
@@ -124,7 +126,7 @@ export default async function AwardsPage() {
                     <FramedAvatar
                       name={w.nominee.name}
                       avatarUrl={w.nominee.avatarUrl}
-                      frame={parseProfile(w.nominee.profile).frame}
+                      frame={lookOf(w.nominee.profile, catalogue).frame}
                       className="size-16"
                     />
                     <span className="absolute -right-1 -bottom-1 text-xl">🏆</span>

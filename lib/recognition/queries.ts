@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { shortTime, fullTimestamp } from "@/lib/datetime";
-import { parseProfile } from "@/lib/profile-custom";
+import { lookOf } from "@/lib/profile-custom";
+import { getCatalogue } from "@/lib/catalogue";
+import type { Cosmetic, FrameArt, Look } from "@/lib/cosmetics";
 
-export type ReactionUser = { id: string; name: string; avatarUrl: string | null; frame: string | null };
+export type ReactionUser = { id: string; name: string; avatarUrl: string | null; frame: FrameArt | null };
 export type ReactionSummary = {
   emoji: string;
   count: number;
@@ -15,16 +17,11 @@ export type FeedCardComment = {
   id: string;
   body: string;
   createdAtLabel: string;
-  user: { id: string; name: string; avatarUrl: string | null; frame: string | null };
+  user: { id: string; name: string; avatarUrl: string | null; frame: FrameArt | null };
 };
 
 /** Someone's shop look, so the feed can show the frames and banners they bought. */
-export type Look = { frame: string | null; banner: string | null; theme: string | null };
-
-function lookOf(profile: unknown): Look {
-  const p = parseProfile(profile);
-  return { frame: p.frame, banner: p.banner, theme: p.theme };
-}
+export type { Look };
 
 export type FeedCard = {
   id: string;
@@ -78,7 +75,7 @@ type RawRecognition = Prisma.RecognitionGetPayload<{
   include: typeof feedInclude;
 }>;
 
-export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
+export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosmetic[]): FeedCard {
   const grouped = new Map<
     string,
     { count: number; reacted: boolean; users: ReactionUser[] }
@@ -91,7 +88,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       id: reaction.user.id,
       name: reaction.user.name,
       avatarUrl: reaction.user.avatarUrl,
-      frame: lookOf(reaction.user.profile).frame,
+      frame: lookOf(reaction.user.profile, catalogue).frame,
     });
     grouped.set(reaction.emoji, g);
   }
@@ -110,7 +107,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       name: r.sender.name,
       avatarUrl: r.sender.avatarUrl,
       jobTitle: r.sender.jobTitle,
-      look: lookOf(r.sender.profile),
+      look: lookOf(r.sender.profile, catalogue),
     },
     value: r.value
       ? { name: r.value.name, icon: r.value.icon, color: r.value.color, imageUrl: r.value.imageUrl }
@@ -120,7 +117,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
       name: rr.user.name,
       avatarUrl: rr.user.avatarUrl,
       points: rr.points,
-      look: lookOf(rr.user.profile),
+      look: lookOf(rr.user.profile, catalogue),
     })),
     pointsEach: r.recipients[0]?.points ?? 0,
     reactions: [...grouped.entries()].map(([emoji, g]) => ({
@@ -137,7 +134,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string): FeedCard {
         id: c.user.id,
         name: c.user.name,
         avatarUrl: c.user.avatarUrl,
-        frame: lookOf(c.user.profile).frame,
+        frame: lookOf(c.user.profile, catalogue).frame,
       },
     })),
   };
@@ -149,6 +146,7 @@ export async function getReceivedCards(
   viewerId: string,
   take = 20,
 ): Promise<FeedCard[]> {
+  const catalogue = await getCatalogue();
   const rows = await prisma.recognition.findMany({
     where: {
       recipients: { some: { userId } },
@@ -162,7 +160,7 @@ export async function getReceivedCards(
     take,
     include: feedInclude,
   });
-  return rows.map((r) => toFeedCard(r, viewerId));
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
 /** Recognitions a user has sent (non-system), respecting the viewer's visibility. */
@@ -171,6 +169,7 @@ export async function getGivenCards(
   viewerId: string,
   take = 20,
 ): Promise<FeedCard[]> {
+  const catalogue = await getCatalogue();
   const rows = await prisma.recognition.findMany({
     where: {
       senderId: userId,
@@ -185,7 +184,7 @@ export async function getGivenCards(
     take,
     include: feedInclude,
   });
-  return rows.map((r) => toFeedCard(r, viewerId));
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
 /**
@@ -194,6 +193,7 @@ export async function getGivenCards(
  */
 export async function getCardsByIds(ids: string[], viewerId: string): Promise<FeedCard[]> {
   if (ids.length === 0) return [];
+  const catalogue = await getCatalogue();
   const rows = await prisma.recognition.findMany({
     where: {
       id: { in: ids },
@@ -209,11 +209,12 @@ export async function getCardsByIds(ids: string[], viewerId: string): Promise<Fe
   return ids
     .map((id) => byId.get(id))
     .filter((r): r is RawRecognition => Boolean(r))
-    .map((r) => toFeedCard(r, viewerId));
+    .map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
 /** Feed visible to a viewer: public posts + their own sent/received private posts. */
 export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
+  const catalogue = await getCatalogue();
   const rows = await prisma.recognition.findMany({
     where: {
       OR: [
@@ -226,5 +227,5 @@ export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCar
     take,
     include: feedInclude,
   });
-  return rows.map((r) => toFeedCard(r, viewerId));
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
 }
