@@ -8,7 +8,6 @@ import {
   useTransition,
 } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   Sparkles,
   Lock,
@@ -33,7 +32,8 @@ import {
 import type { FeedCard } from "@/lib/recognition/queries";
 import { FramedAvatar } from "@/components/user-avatar";
 import { DEFAULT_LOOK } from "@/lib/cosmetics";
-import { isLight } from "@/lib/profile-custom";
+import { isLight } from "@/lib/contrast";
+import { optimizedImage } from "@/lib/image-url";
 import { ValueSeal } from "@/components/value-seal";
 import { tint } from "@/components/value-chip";
 import {
@@ -172,6 +172,9 @@ function BannerHero({ card }: { card: FeedCard }) {
   );
 }
 
+/** The feed column is at most 576px wide; photos are resized to fit it. */
+const MEDIA_WIDTH = 600;
+
 /** Photos and GIFs full width, swipeable when there are several (Instagram carousel). */
 function MediaHero({ urls }: { urls: string[] }) {
   const [at, setAt] = useState(0);
@@ -179,9 +182,10 @@ function MediaHero({ urls }: { urls: string[] }) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={urls[0]}
+        src={optimizedImage(urls[0], MEDIA_WIDTH)}
         alt="Shout-out photo"
         loading="lazy"
+        decoding="async"
         draggable={false}
         className="max-h-[36rem] min-h-64 w-full object-cover"
       />
@@ -200,9 +204,10 @@ function MediaHero({ urls }: { urls: string[] }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={url}
-            src={url}
+            src={optimizedImage(url, MEDIA_WIDTH)}
             alt={`Photo ${i + 1} of ${urls.length}`}
             loading="lazy"
+            decoding="async"
             draggable={false}
             className="aspect-[4/5] w-full shrink-0 snap-center object-cover"
           />
@@ -406,11 +411,9 @@ export function RecognitionCard({
   const hasMedia = card.imageUrls.length > 0;
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.18) }}
-      className="pt-3 pb-6"
+    <article
+      className="card-in pt-3 pb-6"
+      style={{ "--card": Math.min(index, 6) } as React.CSSProperties}
     >
       {/* Header: who it's for, big; who sent it underneath. */}
       <header className="flex items-center gap-3">
@@ -496,24 +499,16 @@ export function RecognitionCard({
         {hasMedia ? <MediaHero urls={card.imageUrls} /> : <BannerHero card={card} />}
 
         {/* Applause burst on double-tap / clap */}
-        <AnimatePresence>
-          {burst > 0 && (
-            <motion.span
-              key={burst}
-              aria-hidden
-              initial={{ scale: 0.2, opacity: 0, rotate: -12 }}
-              animate={{ scale: [0.2, 1.3, 1], opacity: [0, 1, 1], rotate: 0 }}
-              exit={{ scale: 1.5, opacity: 0, y: -30 }}
-              transition={{ duration: 0.42 }}
-              onAnimationComplete={() =>
-                setTimeout(() => setBurst((b) => (b === burst ? 0 : b)), 250)
-              }
-              className="pointer-events-none absolute inset-0 m-auto flex size-28 items-center justify-center text-8xl drop-shadow-xl"
-            >
-              {myReaction ?? QUICK_EMOJI}
-            </motion.span>
-          )}
-        </AnimatePresence>
+        {burst > 0 && (
+          <span
+            key={burst}
+            aria-hidden
+            onAnimationEnd={() => setBurst((b) => (b === burst ? 0 : b))}
+            className="like-burst pointer-events-none absolute inset-0 m-auto flex size-28 items-center justify-center text-8xl drop-shadow-xl"
+          >
+            {myReaction ?? QUICK_EMOJI}
+          </span>
+        )}
       </div>
 
       {/* What it's for: the value's medal and name, with the points earned. */}
@@ -557,25 +552,18 @@ export function RecognitionCard({
 
       {/* Action row */}
       <div className="-ml-2.5 mt-1 flex items-center">
-        <motion.button
+        <button
           type="button"
           onClick={quickReact}
           onPointerDown={startPress}
           onPointerUp={endPress}
           onPointerLeave={endPress}
           onContextMenu={(e) => e.preventDefault()}
-          whileTap={{ scale: 0.82 }}
           aria-label={myReaction ? `Remove your ${myReaction}` : "Like (hold for more reactions)"}
           aria-pressed={!!myReaction}
-          className="flex size-11 items-center justify-center rounded-full"
+          className="press flex size-11 items-center justify-center rounded-full"
         >
-          <motion.span
-            key={myReaction ?? "none"}
-            initial={{ scale: 0.5 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 600, damping: 14 }}
-            className="text-[1.5rem] leading-none"
-          >
+          <span key={myReaction ?? "none"} className="like-pop text-[1.5rem] leading-none">
             {!myReaction ? (
               <Heart className="size-6.5" strokeWidth={1.8} />
             ) : myReaction === QUICK_EMOJI ? (
@@ -583,30 +571,28 @@ export function RecognitionCard({
             ) : (
               myReaction
             )}
-          </motion.span>
-        </motion.button>
+          </span>
+        </button>
 
-        <motion.button
+        <button
           type="button"
           onClick={() => openComments(true)}
-          whileTap={{ scale: 0.85 }}
           aria-label="Comment"
-          className="flex size-11 items-center justify-center rounded-full"
+          className="press flex size-11 items-center justify-center rounded-full"
         >
           <MessageCircle className="size-6 -scale-x-100" strokeWidth={1.8} />
-        </motion.button>
+        </button>
 
         {/* Tray anchors here; holding the applaud button opens it too. */}
         <Popover open={reactOpen} onOpenChange={setReactOpen}>
           <PopoverTrigger asChild>
-            <motion.button
+            <button
               type="button"
-              whileTap={{ scale: 0.85 }}
               aria-label="Pick a reaction"
-              className="flex size-11 items-center justify-center rounded-full"
+              className="press flex size-11 items-center justify-center rounded-full"
             >
               <SmilePlus className="size-6" strokeWidth={1.8} />
-            </motion.button>
+            </button>
           </PopoverTrigger>
           <PopoverContent
             side="top"
@@ -616,42 +602,40 @@ export function RecognitionCard({
           >
             <div className="flex gap-0.5">
               {REACTION_EMOJIS.map((emoji, i) => (
-                <motion.button
+                <button
                   key={emoji}
                   type="button"
                   onClick={() => pickReaction(emoji)}
-                  initial={{ y: 14, opacity: 0, scale: 0.6 }}
-                  animate={{ y: 0, opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.03, type: "spring", stiffness: 520, damping: 20 }}
-                  whileHover={{ scale: 1.35, y: -6 }}
-                  whileTap={{ scale: 0.85 }}
+                  style={{ "--tray": i } as React.CSSProperties}
                   aria-label={`React ${emoji}`}
                   className={cn(
-                    "rounded-full p-1.5 text-[1.8rem] leading-none",
+                    "tray-in rounded-full p-1.5 text-[1.8rem] leading-none",
                     myReaction === emoji && "bg-primary/20",
                   )}
                 >
-                  {emoji}
-                </motion.button>
+                  {/* Hover lift on the inner span so it doesn't fight the entrance animation. */}
+                  <span className="block transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.35] active:scale-[0.85]">
+                    {emoji}
+                  </span>
+                </button>
               ))}
             </div>
           </PopoverContent>
         </Popover>
 
         {boostMode && myBoostType && (
-          <motion.button
+          <button
             type="button"
-            whileTap={{ scale: 0.92 }}
             onClick={() => onBoost(myBoostType)}
             disabled={boostPending}
             className={cn(
-              "ml-auto flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-bold disabled:opacity-50",
+              "ml-auto flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition-transform active:scale-[0.92] disabled:opacity-50",
               boostMode === "remove" ? "bg-surface-2 text-foreground" : "bg-brand text-white",
             )}
           >
             <span aria-hidden>{BOOSTS[myBoostType].emoji}</span>
             {boostMode === "remove" ? "Remove boost" : `Boost ${BOOSTS[myBoostType].multiplier}×`}
-          </motion.button>
+          </button>
         )}
       </div>
 
@@ -830,6 +814,6 @@ export function RecognitionCard({
           </ul>
         </SheetContent>
       </Sheet>
-    </motion.article>
+    </article>
   );
 }

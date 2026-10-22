@@ -42,22 +42,25 @@ export async function getLeaderboard({
   const userFilter = siteId ? { siteId } : undefined;
 
   const [ledgerRows, recipientRows, sentRows] = await Promise.all([
-    // Points received = earn rows in the ledger (reconciles with the wallet).
-    prisma.rewardLedger.findMany({
+    // Points received = earn rows in the ledger (reconciles with the wallet),
+    // summed per person in the database rather than sent over row by row.
+    prisma.rewardLedger.groupBy({
+      by: ["userId"],
+      _sum: { amount: true },
       where: {
         type: { in: ["RECOGNITION", "AWARD"] },
         ...(createdAt ? { createdAt } : {}),
         ...(userFilter ? { user: userFilter } : {}),
       },
-      select: { userId: true, amount: true },
     }),
     // Peer recognitions received (non-system) for the count metric.
-    prisma.recognitionRecipient.findMany({
+    prisma.recognitionRecipient.groupBy({
+      by: ["userId"],
+      _count: { _all: true },
       where: {
         recognition: { system: false, ...(createdAt ? { createdAt } : {}) },
         ...(userFilter ? { user: userFilter } : {}),
       },
-      select: { userId: true },
     }),
     // Recognitions given (non-system).
     prisma.recognition.findMany({
@@ -72,11 +75,11 @@ export async function getLeaderboard({
 
   const pointsByUser = new Map<string, number>();
   for (const r of ledgerRows) {
-    pointsByUser.set(r.userId, (pointsByUser.get(r.userId) ?? 0) + r.amount);
+    pointsByUser.set(r.userId, r._sum.amount ?? 0);
   }
   const countByReceiver = new Map<string, number>();
   for (const r of recipientRows) {
-    countByReceiver.set(r.userId, (countByReceiver.get(r.userId) ?? 0) + 1);
+    countByReceiver.set(r.userId, r._count._all);
   }
   const giverStats = new Map<string, { count: number; pointsGiven: number }>();
   for (const r of sentRows) {
@@ -91,18 +94,20 @@ export async function getLeaderboard({
     ...countByReceiver.keys(),
     ...giverStats.keys(),
   ]);
-  const catalogue = await getCatalogue();
-  const users = await prisma.user.findMany({
-    where: { id: { in: [...involved] } },
-    select: {
-      id: true,
-      name: true,
-      avatarUrl: true,
-      jobTitle: true,
-      profile: true,
-      site: { select: { code: true } },
-    },
-  });
+  const [catalogue, users] = await Promise.all([
+    getCatalogue(),
+    prisma.user.findMany({
+      where: { id: { in: [...involved] } },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+        jobTitle: true,
+        profile: true,
+        site: { select: { code: true } },
+      },
+    }),
+  ]);
   const userMap = new Map<string, LeaderUser>(
     users.map((u) => [
       u.id,

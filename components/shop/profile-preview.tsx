@@ -1,6 +1,6 @@
 import { FramedAvatar } from "@/components/user-avatar";
 import type { Look, Rarity } from "@/lib/cosmetics";
-import { isLight } from "@/lib/profile-custom";
+import { isLight } from "@/lib/contrast";
 import { cn } from "@/lib/utils";
 import { ProfileBanner } from "@/components/profile/profile-banner";
 import { PopOnChange } from "@/components/fx/pop-on-change";

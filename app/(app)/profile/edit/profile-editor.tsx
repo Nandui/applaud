@@ -8,7 +8,7 @@ import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { updateMyProfile, setMyAvatar, type ProfileActionResult } from "@/lib/profile-actions";
-import { BIO_MAX, PRONOUNS_MAX } from "@/lib/profile-custom";
+import { BIO_MAX, PRONOUNS_MAX } from "@/lib/profile-limits";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { UserAvatar } from "@/components/user-avatar";
 

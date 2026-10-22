@@ -18,7 +18,7 @@ export default async function RecognizePage({
   const { to } = await searchParams;
   const settings = await getOrgSettings();
 
-  const [values, users, allowance, recent, mine] = await Promise.all([
+  const [values, users, allowance, recent, mine, catalogue] = await Promise.all([
     prisma.value.findMany({
       where: { active: true },
       orderBy: { order: "asc" },
@@ -51,9 +51,9 @@ export default async function RecognizePage({
       where: { id: me.siteId ?? "" },
       select: { code: true },
     }),
+    getCatalogue(),
   ]);
 
-  const catalogue = await getCatalogue();
   const recipients = users.map((u) => ({
     id: u.id,
     name: u.name,

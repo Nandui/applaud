@@ -140,7 +140,11 @@ test("uploaded frames and banners draw their picture", () => {
   const look = resolveLook(p, withUploads);
   assert.equal(look.frame, UPLOAD);
   assert.ok(isFrameImage(look.frame!));
-  assert.equal(look.banner, `center / cover no-repeat url("${UPLOAD}")`);
+  // Banner pictures are drawn from a resized copy, not the full upload.
+  assert.equal(
+    look.banner,
+    `center / cover no-repeat url("/_next/image?url=${encodeURIComponent(UPLOAD)}&w=1200&q=75")`,
+  );
   // Built-in frames are CSS classes, not pictures.
   assert.equal(isFrameImage("frame-neon"), false);
   // A picture uploaded onto a built-in banner replaces its gradient.

@@ -13,6 +13,7 @@
  */
 
 import { withFit } from "./frame-fit";
+import { cssImageUrl } from "./image-url";
 
 export type CosmeticKind = "frame" | "banner" | "theme";
 export type Rarity = "common" | "rare" | "epic" | "legendary";
@@ -212,7 +213,8 @@ export function frameArt(item: Pick<Cosmetic, "style" | "imageUrl" | "frameFit">
 
 /** A banner item as a CSS background (its picture, cover-cropped, or its gradient). */
 export function bannerCss(item: Pick<Cosmetic, "style" | "imageUrl">): string {
-  if (item.imageUrl) return `center / cover no-repeat url("${encodeURI(item.imageUrl)}")`;
+  // Banners span the content column (at most ~600px wide), never wider.
+  if (item.imageUrl) return `center / cover no-repeat url("${cssImageUrl(item.imageUrl, 600)}")`;
   return item.style ?? FALLBACK_BANNER;
 }
 

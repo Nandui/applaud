@@ -1,10 +1,14 @@
+import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/lib/config";
 import type { SessionUser } from "./types";
 
-/** Returns the signed-in user, or null when signed out. */
-export async function getCurrentUser(): Promise<SessionUser | null> {
+/**
+ * Returns the signed-in user, or null when signed out. Memoised per request:
+ * the app layout and the page both ask, and only one database read is needed.
+ */
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const session = await auth();
   const u = session?.user;
   if (!u) return null;
@@ -38,4 +42,4 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     siteId: dbUser.siteId,
     avatarUrl: dbUser.avatarUrl,
   };
-}
+});

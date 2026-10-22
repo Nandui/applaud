@@ -1,5 +1,6 @@
 import { ValueIcon } from "@/components/value-icon";
 import { cn } from "@/lib/utils";
+import { optimizedImage } from "@/lib/image-url";
 
 export type SealValue = {
   name: string;
@@ -47,7 +48,12 @@ export function ValueSeal({
       >
         {value.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={value.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
+          <img
+            src={optimizedImage(value.imageUrl, 128)}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 size-full object-cover"
+          />
         ) : (
           <>
             {size !== "xs" && (

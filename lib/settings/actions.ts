@@ -1,6 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { ORG_SETTINGS_TAG } from "@/lib/org-settings";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
@@ -45,6 +46,7 @@ export async function updateOrgSettings(
     summary: "Updated organisation settings",
     metadata: data,
   });
+  updateTag(ORG_SETTINGS_TAG);
   revalidatePath("/admin/settings");
   return { ok: true, message: "Settings saved." };
 }

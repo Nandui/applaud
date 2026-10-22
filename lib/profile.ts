@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { parseProfile, resolveLook } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
@@ -14,7 +15,8 @@ export const CELEBRATION_EMOJI: Record<string, string> = {
   onboarding: "🚀",
 };
 
-export async function getProfileData(userId: string) {
+/** Memoised per request: the page and its metadata both ask for it. */
+export const getProfileData = cache(async (userId: string) => {
   const key = userId?.trim();
   if (!key || key === "undefined" || key === "null") return null;
 
@@ -43,7 +45,7 @@ export async function getProfileData(userId: string) {
 
   const id = user.id;
 
-  const [receivedCount, givenCount, earn, valueRows, celebrations, awards] =
+  const [receivedCount, givenCount, earn, valueRows, celebrations, awards, catalogue] =
     await Promise.all([
       prisma.recognitionRecipient.count({
         where: { userId: id, recognition: { system: false } },
@@ -84,6 +86,7 @@ export async function getProfileData(userId: string) {
           program: { select: { name: true, cadence: true } },
         },
       }),
+      getCatalogue(),
     ]);
 
   const tagMap = new Map<
@@ -104,7 +107,6 @@ export async function getProfileData(userId: string) {
 
   const pointsEarned = earn._sum.amount ?? 0;
   const custom = parseProfile(user.profile);
-  const catalogue = await getCatalogue();
 
   return {
     user,
@@ -126,6 +128,6 @@ export async function getProfileData(userId: string) {
       wonAt: a.reviewedAt ?? a.createdAt,
     })),
   };
-}
+});
 
 export type ProfileData = NonNullable<Awaited<ReturnType<typeof getProfileData>>>;

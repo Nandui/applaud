@@ -26,7 +26,6 @@ export default async function RewardsPage({
   const { c: activeCategory } = await searchParams;
   const me = await requireUser();
 
-  const settings = await getOrgSettings();
   const [user, catalogue, claims, economy] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: me.id },
@@ -51,7 +50,7 @@ export default async function RewardsPage({
       },
     }),
     getMonthlyClaimCounts(),
-    getEconomyStatus(settings),
+    getOrgSettings().then(getEconomyStatus),
   ]);
   // Monthly stock and the company budget decide what can be claimed right now.
   // Staff never see euros: a reward over budget just shows "All claimed".

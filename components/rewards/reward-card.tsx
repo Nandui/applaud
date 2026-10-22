@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { formatNumber, pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { optimizedImage } from "@/lib/image-url";
 
 export type RewardCardData = {
   id: string;
@@ -46,7 +47,12 @@ function artFor(name: string) {
 function RewardArt({ reward, className }: { reward: RewardCardData; className?: string }) {
   return reward.imageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={reward.imageUrl} alt="" className={cn("h-full w-full object-cover", className)} />
+    <img
+      src={optimizedImage(reward.imageUrl, 384)}
+      alt=""
+      loading="lazy"
+      className={cn("h-full w-full object-cover", className)}
+    />
   ) : (
     <span
       className={cn(

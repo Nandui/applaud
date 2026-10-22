@@ -3,6 +3,7 @@ import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { RARITY, isFrameImage, type FrameArt, type Rarity } from "@/lib/cosmetics";
 import { splitFrameImage } from "@/lib/frame-fit";
+import { cssImageUrl, optimizedImage } from "@/lib/image-url";
 
 /**
  * Default-avatar palettes (Discord gives everyone a coloured default). Picked
@@ -35,7 +36,10 @@ export function UserAvatar({
 }) {
   return (
     <Avatar className={cn("size-9", className)}>
-      {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} className="object-cover" /> : null}
+      {/* One resized copy per person (96px, the profile size) serves every avatar size. */}
+      {avatarUrl ? (
+        <AvatarImage src={optimizedImage(avatarUrl, 96)} alt={name} className="object-cover" />
+      ) : null}
       <AvatarFallback
         className={cn(
           "bg-gradient-to-br text-xs font-bold text-white",
@@ -111,7 +115,10 @@ export function FramedAvatar({
  * the avatar, with its shimmer (masked to the picture) when it has one.
  */
 function FrameImage({ art, shineClassName }: { art: FrameArt; shineClassName?: string }) {
-  const { src, fit } = splitFrameImage(art);
+  const { src: original, fit } = splitFrameImage(art);
+  // Frames are drawn a little wider than the avatar; the largest is the 96px
+  // profile avatar, so a 160px copy covers every place they appear.
+  const src = optimizedImage(original, 160);
   return (
     <span
       aria-hidden
@@ -126,7 +133,7 @@ function FrameImage({ art, shineClassName }: { art: FrameArt; shineClassName?: s
       {shineClassName ? (
         <span
           className={cn(shineClassName, "frame-shine-image inset-0")}
-          style={{ "--frame-mask": `url("${encodeURI(src)}")` } as React.CSSProperties}
+          style={{ "--frame-mask": `url("${cssImageUrl(original, 160)}")` } as React.CSSProperties}
         />
       ) : null}
     </span>

@@ -1,6 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { ORG_SETTINGS_TAG } from "@/lib/org-settings";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
@@ -11,6 +12,7 @@ export type ActionResult =
   | { ok: false; error: string };
 
 function revalidateEconomy() {
+  updateTag(ORG_SETTINGS_TAG);
   for (const path of ["/admin", "/admin/economy", "/admin/points", "/admin/rewards", "/rewards", "/shop", "/recognize", "/me"]) {
     revalidatePath(path);
   }
