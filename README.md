@@ -33,7 +33,10 @@ npm run dev                   # http://localhost:3000
 | ----------------------- | ---------------------------------------------------- |
 | `DATABASE_URL`          | Postgres connection string (Neon, or local)          |
 | `AUTH_SECRET`           | next-auth signing secret (`npx auth secret`)         |
-| `AUTH_URL`              | App base URL                                         |
+| `AUTH_URL`              | App base URL (optional on Vercel)                    |
+| `AUTH_GOOGLE_ID`        | Google OAuth client ID — the production sign-in      |
+| `AUTH_GOOGLE_SECRET`    | Google OAuth client secret                           |
+| `AUTH_GOOGLE_DOMAIN`    | Workspace domain(s) allowed to sign in with Google   |
 | `CRON_SECRET`           | Bearer token for the milestone cron endpoint         |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob store — recognition photo/GIF uploads    |
 | `GIPHY_API_KEY`         | GIPHY GIF-library search in the composer (optional)  |

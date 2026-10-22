@@ -2,6 +2,7 @@
 
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
+import { devSignInEnabled } from "@/lib/auth/mode";
 
 export type AuthState = { error?: string } | undefined;
 
@@ -10,6 +11,7 @@ export async function authenticate(
   _prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
+  if (!devSignInEnabled) return { error: "Use Continue with Google." };
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return { error: "Enter your email." };
   try {
@@ -27,8 +29,20 @@ export async function authenticate(
 
 /** Used by the dev quick-switch buttons (known-good seeded emails). */
 export async function quickSignIn(formData: FormData) {
+  if (!devSignInEnabled) return;
   const email = String(formData.get("email") ?? "");
   await signIn("credentials", { email, redirectTo: "/" });
+}
+
+/** Only same-site paths, so `callbackUrl` can't bounce people off-site. */
+function safeRedirect(value: FormDataEntryValue | null): string {
+  const path = String(value ?? "");
+  return path.startsWith("/") && !path.startsWith("//") ? path : "/";
+}
+
+/** The "Continue with Google" button. */
+export async function googleSignIn(formData: FormData) {
+  await signIn("google", { redirectTo: safeRedirect(formData.get("callbackUrl")) });
 }
 
 export async function signOutAction() {
