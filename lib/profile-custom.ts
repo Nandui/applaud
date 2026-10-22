@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { BIO_MAX, MAX_PINNED, PRONOUNS_MAX } from "@/lib/profile-limits";
 import {
+  DEFAULT_BANNER,
+  DEFAULT_THEME,
   bannerCss,
   defaultLook,
   frameArt,
@@ -28,7 +30,7 @@ export { isLight } from "@/lib/contrast";
 export type ProfileCustom = {
   pronouns: string;
   bio: string;
-  /** Shop item ids this person has bought. Free items are implied. */
+  /** Shop item ids this person has bought or claimed (free items too). */
   owned: string[];
   frame: string | null;
   banner: string | null;
@@ -58,8 +60,13 @@ const storedSchema = z
   })
   .partial();
 
-export function ownsItem(custom: Pick<ProfileCustom, "owned">, item: Pick<Cosmetic, "id" | "price">): boolean {
-  return item.price === 0 || custom.owned.includes(item.id);
+/**
+ * Whether someone owns an item. Free items count only once claimed in the
+ * shop, so everyone has to visit it; the default banner and theme are the
+ * exception, being what everyone wears when nothing else is equipped.
+ */
+export function ownsItem(custom: Pick<ProfileCustom, "owned">, item: Pick<Cosmetic, "id">): boolean {
+  return item.id === DEFAULT_BANNER || item.id === DEFAULT_THEME || custom.owned.includes(item.id);
 }
 
 /**
@@ -113,7 +120,7 @@ export const profileInputSchema = z.object({
   bio: z.string().trim().max(BIO_MAX).optional().default(""),
 });
 
-/** Buying adds the item to what you own and wears it straight away. */
+/** Buying (or claiming a free item) adds it to what you own and wears it straight away. */
 export function withPurchase(custom: ProfileCustom, item: Pick<Cosmetic, "id" | "kind">): ProfileCustom {
   const owned = custom.owned.includes(item.id) ? custom.owned : [...custom.owned, item.id];
   return { ...custom, owned, [item.kind]: item.id };
@@ -125,7 +132,7 @@ export function withOwned(custom: ProfileCustom, items: Pick<Cosmetic, "id">[]):
 }
 
 export type Bundle = {
-  /** The items "Buy all" would buy: for sale in the category and not owned yet. */
+  /** The items "Buy all" would buy: for sale in the category and not owned yet, free ones included. */
   items: Cosmetic[];
   /** Their plain sum in points (bundles have no discount). */
   price: number;

@@ -28,6 +28,7 @@ import {
 import { FramedAvatar } from "@/components/user-avatar";
 import { ProfilePreview } from "@/components/shop/profile-preview";
 import { PopOnChange } from "@/components/fx/pop-on-change";
+import { NewLabel } from "@/components/app-shell/new-items";
 
 export type Wearer = {
   name: string;
@@ -77,16 +78,20 @@ export function ShopItem({
   me,
   owned,
   balance,
+  isNew = false,
 }: {
   item: Cosmetic;
   me: Wearer;
   owned: boolean;
   balance: number;
+  /** Added since this person last looked at the shop. */
+  isNew?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const worn = me.worn[item.kind];
   const wearing = worn === item.id || (!worn && DEFAULTS[item.kind] === item.id);
+  const free = item.price === 0;
   const short = item.price - balance;
   const rarity = RARITY[item.rarity];
 
@@ -111,6 +116,7 @@ export function ShopItem({
           <PopOnChange value={String(wearing)} className="block w-full">
             <span className="bg-surface border-border relative block aspect-square w-full overflow-hidden rounded-xl border">
               <ItemArt item={item} me={me} />
+              {isNew && !owned ? <NewLabel className="absolute top-1.5 left-1.5" /> : null}
               {wearing ? (
                 <span className="bg-foreground text-background absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full">
                   <Check className="size-3" strokeWidth={3} />
@@ -124,7 +130,7 @@ export function ShopItem({
               {rarity.label}
             </span>
             <span className="text-muted font-medium" data-numeric>
-              {owned ? "Owned" : item.price === 0 ? "Free" : pts(item.price)}
+              {owned ? "Owned" : free ? "Free" : pts(item.price)}
             </span>
           </span>
         </button>
@@ -155,14 +161,19 @@ export function ShopItem({
                 className="bg-primary text-primary-fg h-12 w-full rounded-xl font-semibold transition-opacity active:opacity-80 disabled:opacity-40"
               >
                 {pending
-                  ? "Buying…"
-                  : short > 0
-                    ? `You need ${pts(short)} more`
-                    : `Buy for ${pts(item.price)}`}
+                  ? free
+                    ? "Getting it…"
+                    : "Buying…"
+                  : free
+                    ? "Get it free"
+                    : short > 0
+                      ? `You need ${pts(short)} more`
+                      : `Buy for ${pts(item.price)}`}
               </button>
               <p className="text-muted text-center text-xs" data-numeric>
-                You have {formatNumber(balance)} pts
-                {short <= 0 ? ` · ${formatNumber(balance - item.price)} left after` : ""}
+                {free
+                  ? "Free, but only for people who grab it here."
+                  : `You have ${formatNumber(balance)} pts${short <= 0 ? ` · ${formatNumber(balance - item.price)} left after` : ""}`}
               </p>
             </>
           ) : wearing ? (

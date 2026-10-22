@@ -78,7 +78,7 @@ export async function saveCosmetic(
     return { ok: false, error: `Give it a name of up to ${NAME_MAX} characters.` };
   }
   if (categoryId === false) return { ok: false, error: "That category no longer exists." };
-  if (price === null) return { ok: false, error: "Enter a whole number of points (0 makes it free for everyone)." };
+  if (price === null) return { ok: false, error: "Enter a whole number of points (0 makes it free to claim)." };
   if (!isRarity(rarity)) return { ok: false, error: "Pick a rarity." };
   if (imageUrl && !isProjectBlobUrl(imageUrl)) return { ok: false, error: "Unrecognised picture URL." };
 
@@ -113,7 +113,9 @@ export async function saveCosmetic(
   };
   let entityId = id;
   if (existing) {
-    await prisma.cosmetic.update({ where: { id }, data });
+    // Shown again after being hidden: it's new to everyone who hasn't seen it since.
+    const relisted = active && !existing.active ? { listedAt: new Date() } : {};
+    await prisma.cosmetic.update({ where: { id }, data: { ...data, ...relisted } });
   } else {
     const created = await prisma.cosmetic.create({
       data: { ...data, kind, sortOrder: await nextSortOrder(kind) },
@@ -223,7 +225,11 @@ export async function setCosmeticActive(id: string, active: boolean): Promise<Ac
   if (!active && (id === DEFAULT_BANNER || id === DEFAULT_THEME)) {
     return { ok: false, error: "This is everyone's default, so it stays in the Store." };
   }
-  const item = await prisma.cosmetic.update({ where: { id }, data: { active } });
+  const before = await prisma.cosmetic.findUnique({ where: { id }, select: { active: true } });
+  if (!before) return { ok: false, error: "That item no longer exists." };
+  // Shown again after being hidden: it's new to everyone who hasn't seen it since.
+  const relisted = active && !before.active ? { listedAt: new Date() } : {};
+  const item = await prisma.cosmetic.update({ where: { id }, data: { active, ...relisted } });
   await writeAudit({
     actor: admin,
     action: "cosmetic.updated",

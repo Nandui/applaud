@@ -127,18 +127,19 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
       if (item.price > 0) {
         const agg = await tx.rewardLedger.aggregate({ _sum: { amount: true }, where: { userId: me.id } });
         if ((agg._sum.amount ?? 0) < item.price) throw new ShopError("You don't have enough points yet.");
-        await tx.rewardLedger.create({
-          data: {
-            userId: me.id,
-            amount: -item.price,
-            type: "SHOP",
-            sourceType: "cosmetic",
-            sourceId: item.id,
-            note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()}`,
-          },
-        });
         await tx.user.update({ where: { id: me.id }, data: { walletBalance: { decrement: item.price } } });
       }
+      // Free items get a 0-point entry too, so claims count as buyers in Admin > Store.
+      await tx.rewardLedger.create({
+        data: {
+          userId: me.id,
+          amount: 0 - item.price,
+          type: "SHOP",
+          sourceType: "cosmetic",
+          sourceId: item.id,
+          note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()}`,
+        },
+      });
       await tx.user.update({ where: { id: me.id }, data: { profile: withPurchase(custom, item) } });
     });
   } catch (error) {
@@ -151,7 +152,7 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
     action: "shop.purchased",
     entityType: "user",
     entityId: me.id,
-    summary: `Bought ${item.name} (${KIND_LABELS[item.kind].one}, ${item.price} pts)`,
+    summary: `${item.price === 0 ? "Claimed" : "Bought"} ${item.name} (${KIND_LABELS[item.kind].one}, ${item.price} pts)`,
     metadata: { itemId: item.id, price: item.price },
     siteId: me.siteId,
   });
@@ -188,20 +189,18 @@ export async function buyBundle(categoryId: string, expectedPrice: number): Prom
       if (bought.price > 0) {
         const agg = await tx.rewardLedger.aggregate({ _sum: { amount: true }, where: { userId: me.id } });
         if ((agg._sum.amount ?? 0) < bought.price) throw new ShopError("You don't have enough points yet.");
-        await tx.rewardLedger.createMany({
-          data: bought.items
-            .filter((item) => item.price > 0)
-            .map((item) => ({
-              userId: me.id,
-              amount: -item.price,
-              type: "SHOP",
-              sourceType: "cosmetic",
-              sourceId: item.id,
-              note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()} (${category.name} bundle)`,
-            })),
-        });
         await tx.user.update({ where: { id: me.id }, data: { walletBalance: { decrement: bought.price } } });
       }
+      await tx.rewardLedger.createMany({
+        data: bought.items.map((item) => ({
+          userId: me.id,
+          amount: 0 - item.price,
+          type: "SHOP",
+          sourceType: "cosmetic",
+          sourceId: item.id,
+          note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()} (${category.name} bundle)`,
+        })),
+      });
       await tx.user.update({ where: { id: me.id }, data: { profile: withOwned(custom, bought.items) } });
     });
   } catch (error) {

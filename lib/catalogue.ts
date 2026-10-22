@@ -35,6 +35,7 @@ const loadCatalogue = unstable_cache(
       frameFit: r.frameFit,
       active: r.active,
       categoryId: r.categoryId,
+      listedAt: r.listedAt.getTime(),
     }));
   },
   ["store-catalogue"],

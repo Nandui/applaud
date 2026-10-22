@@ -15,6 +15,7 @@ import {
 import { formatNumber, pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { optimizedImage } from "@/lib/image-url";
+import { NewLabel } from "@/components/app-shell/new-items";
 
 export type RewardCardData = {
   id: string;
@@ -28,6 +29,8 @@ export type RewardCardData = {
   monthLeft: number | null;
   /** Set when this month's allocation is all claimed: the day it comes back, e.g. "1 November". */
   backOn: string | null;
+  /** Added since this person last looked at the rewards. */
+  isNew?: boolean;
 };
 
 // Placeholder art when a reward has no image: a gradient picked from the name.
@@ -110,6 +113,7 @@ export function RewardCard({
         >
           <span className="relative block aspect-square w-full overflow-hidden rounded-xl">
             <RewardArt reward={reward} />
+            {reward.isNew ? <NewLabel className="absolute top-2 left-2 shadow-sm" /> : null}
             {outOfStock ? (
               <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-bold text-white">
                 {reward.backOn ? "All claimed" : "Sold out"}

@@ -9,6 +9,8 @@ import { StoreTabs } from "@/components/shop/store-tabs";
 import { ProfilePreview } from "@/components/shop/profile-preview";
 import { ShopItem } from "@/components/shop/shop-item";
 import { BundleCard } from "@/components/shop/bundle-card";
+import { MarkSeen } from "@/components/app-shell/new-items";
+import { isNewSince, visitStamp } from "@/lib/seen";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Profile shop" };
@@ -21,15 +23,18 @@ export const metadata = { title: "Profile shop" };
  */
 export default async function ShopPage() {
   const viewer = await requireUser();
+  const renderedAt = visitStamp();
   const [me, catalogue, allCategories] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: viewer.id },
-      select: { name: true, avatarUrl: true, walletBalance: true, profile: true },
+      select: { name: true, avatarUrl: true, walletBalance: true, profile: true, shopSeenAt: true },
     }),
     getCatalogue(),
     getCategories(),
   ]);
   const custom = parseProfile(me.profile);
+  // Listed since your last visit and not yours yet: tagged "New" this time round.
+  const isNew = (c: Cosmetic) => c.active && !ownsItem(custom, c) && isNewSince(c.listedAt, me.shopSeenAt);
   // Hidden items leave the shop, but anyone who owns one still sees it here.
   const shown = catalogue.filter((c) => c.active || ownsItem(custom, c));
   // Items in a hidden category are listed by kind like any other.
@@ -53,6 +58,7 @@ export default async function ShopPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <AppBar title="Store" tabs={<StoreTabs active="shop" />} />
+      <MarkSeen area="shop" renderedAt={renderedAt} />
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted text-sm">Your look</p>
@@ -76,7 +82,7 @@ export default async function ShopPage() {
           const bundle = bundleFor(custom, catalogue, cat.id);
           return (
             <section key={cat.id}>
-              <h2 className="mb-3 text-lg font-bold">{cat.name}</h2>
+              <SectionTitle title={cat.name} fresh={items.filter(isNew).length} />
               <div className="mb-4">
                 <BundleCard
                   categoryId={cat.id}
@@ -95,6 +101,7 @@ export default async function ShopPage() {
                     me={wearer}
                     owned={ownsItem(custom, item)}
                     balance={me.walletBalance}
+                    isNew={isNew(item)}
                   />
                 ))}
               </div>
@@ -103,7 +110,7 @@ export default async function ShopPage() {
         })}
         {COSMETIC_KINDS.filter((kind) => byKind.some((c) => c.kind === kind)).map((kind) => (
           <section key={kind}>
-            <h2 className="mb-3 text-lg font-bold">{KIND_LABELS[kind].many}</h2>
+            <SectionTitle title={KIND_LABELS[kind].many} fresh={byKind.filter((c) => c.kind === kind && isNew(c)).length} />
             <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4">
               {byKind.filter((c) => c.kind === kind).map((item) => (
                 <ShopItem
@@ -112,6 +119,7 @@ export default async function ShopPage() {
                   me={wearer}
                   owned={ownsItem(custom, item)}
                   balance={me.walletBalance}
+                  isNew={isNew(item)}
                 />
               ))}
             </div>
@@ -119,5 +127,19 @@ export default async function ShopPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+/** A section heading, with how many of its items are new to you. */
+function SectionTitle({ title, fresh }: { title: string; fresh: number }) {
+  return (
+    <h2 className="mb-3 flex items-baseline gap-2 text-lg font-bold">
+      {title}
+      {fresh > 0 ? (
+        <span className="text-primary text-sm font-semibold" data-numeric>
+          {fresh} new
+        </span>
+      ) : null}
+    </h2>
   );
 }

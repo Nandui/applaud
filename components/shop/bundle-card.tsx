@@ -62,7 +62,9 @@ export function BundleCard({
           className="border-border bg-surface flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-opacity active:opacity-70"
         >
           <span className="min-w-0">
-            <span className="block text-sm font-semibold">Buy all of {categoryName}</span>
+            <span className="block text-sm font-semibold">
+              {price === 0 ? "Get all of" : "Buy all of"} {categoryName}
+            </span>
             <span className="text-muted block text-xs" data-numeric>
               {items.length === total
                 ? `${items.length} ${items.length === 1 ? "item" : "items"}`
@@ -101,7 +103,15 @@ export function BundleCard({
             onClick={buy}
             className="bg-primary text-primary-fg h-12 w-full rounded-xl font-semibold transition-opacity active:opacity-80 disabled:opacity-40"
           >
-            {pending ? "Buying…" : short > 0 ? `You need ${pts(short)} more` : `Buy all for ${pts(price)}`}
+            {pending
+              ? price === 0
+                ? "Getting them…"
+                : "Buying…"
+              : price === 0
+                ? "Get them all free"
+                : short > 0
+                  ? `You need ${pts(short)} more`
+                  : `Buy all for ${pts(price)}`}
           </button>
           <p className="text-muted text-center text-xs" data-numeric>
             You have {formatNumber(balance)} pts

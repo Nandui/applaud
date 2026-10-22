@@ -476,7 +476,7 @@ function ItemDialog({
                 className="font-mono"
               />
               <p className="text-muted text-xs" data-numeric>
-                {points === 0 ? "Free: everyone owns it" : `${centsToEuros(pointsToCents(points, pointsPerEuro))} face value`}
+                {points === 0 ? "Free: staff claim it in the shop" : `${centsToEuros(pointsToCents(points, pointsPerEuro))} face value`}
               </p>
               {isDefault && <input type="hidden" name="price" value="0" />}
             </div>
@@ -1008,7 +1008,7 @@ export function StoreManager({
                 <span data-numeric>{formatNumber(Math.floor(typicalShoutout / cheapest))}</span> times over
               </>
             ) : null}
-            . Items priced 0 are free and everyone owns them.
+            . Items priced 0 are free, but staff still claim them in the shop.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={() => openItem(null)}>

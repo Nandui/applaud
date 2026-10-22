@@ -239,7 +239,11 @@ export async function updateReward(
   const err = validateReward(d);
   if (err) return { ok: false, error: err };
 
-  await prisma.reward.update({ where: { id }, data: rewardData(d) });
+  const before = await prisma.reward.findUnique({ where: { id }, select: { active: true } });
+  if (!before) return { ok: false, error: "That reward no longer exists." };
+  // Shown again after being hidden: it's new to everyone who hasn't seen it since.
+  const relisted = d.active && !before.active ? { listedAt: new Date() } : {};
+  await prisma.reward.update({ where: { id }, data: { ...rewardData(d), ...relisted } });
   await writeAudit({
     actor: admin,
     action: "reward.updated",
@@ -268,7 +272,10 @@ export async function setRewardActive(formData: FormData): Promise<ActionResult>
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return { ok: false, error: "Missing reward." };
-  const reward = await prisma.reward.update({ where: { id }, data: { active } });
+  const before = await prisma.reward.findUnique({ where: { id }, select: { active: true } });
+  if (!before) return { ok: false, error: "That reward no longer exists." };
+  const relisted = active && !before.active ? { listedAt: new Date() } : {};
+  const reward = await prisma.reward.update({ where: { id }, data: { active, ...relisted } });
   await writeAudit({
     actor: admin,
     action: active ? "reward.restored" : "reward.archived",

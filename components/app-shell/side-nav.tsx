@@ -9,6 +9,8 @@ import { UserAvatar } from "@/components/user-avatar";
 import { Brand } from "./brand";
 import { FULL_SCREEN } from "./bottom-nav";
 import type { SessionUser } from "@/lib/auth/types";
+import type { SeenArea } from "@/lib/seen";
+import { NewDot } from "./new-items";
 
 /**
  * Desktop navigation: a left rail like Threads / Instagram on the web. Same
@@ -21,12 +23,12 @@ export function SideNav({ user }: { user: SessionUser }) {
   const active = (href: string, exact = false) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 
-  const items: { href: string; label: string; icon: LucideIcon; on: boolean }[] = [
+  const items: { href: string; label: string; icon: LucideIcon; on: boolean; news?: SeenArea }[] = [
     { href: "/", label: "Home", icon: House, on: active("/", true) },
     { href: "/leaderboard", label: "Ranks", icon: Trophy, on: active("/leaderboard") },
     { href: "/awards", label: "Awards", icon: Award, on: active("/awards") },
-    { href: "/rewards", label: "Rewards", icon: Gift, on: active("/rewards") },
-    { href: "/shop", label: "Profile shop", icon: Sparkles, on: active("/shop") },
+    { href: "/rewards", label: "Rewards", icon: Gift, on: active("/rewards"), news: "rewards" },
+    { href: "/shop", label: "Profile shop", icon: Sparkles, on: active("/shop"), news: "shop" },
     { href: "/me", label: "Wallet", icon: Wallet, on: active("/me") },
   ];
   if (isAdmin(user)) {
@@ -50,6 +52,7 @@ export function SideNav({ user }: { user: SessionUser }) {
         >
           <item.icon className="size-5.5" strokeWidth={item.on ? 2.4 : 1.8} />
           {item.label}
+          {item.news ? <NewDot areas={[item.news]} className="ml-auto" /> : null}
         </Link>
       ))}
       <Link

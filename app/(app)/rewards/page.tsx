@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getEconomyStatus, getMonthlyClaimCounts } from "@/lib/budget";
 import { checkClaim } from "@/lib/economy";
+import { visibleRewardsWhere } from "@/lib/new-items";
+import { isNewSince, visitStamp } from "@/lib/seen";
+import { MarkSeen } from "@/components/app-shell/new-items";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
@@ -25,17 +28,15 @@ export default async function RewardsPage({
 }) {
   const { c: activeCategory } = await searchParams;
   const me = await requireUser();
+  const renderedAt = visitStamp();
 
   const [user, catalogue, claims, economy] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: me.id },
-      select: { walletBalance: true },
+      select: { walletBalance: true, rewardsSeenAt: true },
     }),
     prisma.reward.findMany({
-      where: {
-        active: true,
-        OR: [{ siteId: null }, { siteId: me.siteId }],
-      },
+      where: visibleRewardsWhere(me),
       orderBy: [{ sortOrder: "asc" }, { pointsCost: "asc" }, { name: "asc" }],
       select: {
         id: true,
@@ -47,6 +48,7 @@ export default async function RewardsPage({
         stock: true,
         euroCostCents: true,
         monthlyStock: true,
+        listedAt: true,
       },
     }),
     getMonthlyClaimCounts(),
@@ -54,7 +56,7 @@ export default async function RewardsPage({
   ]);
   // Monthly stock and the company budget decide what can be claimed right now.
   // Staff never see euros: a reward over budget just shows "All claimed".
-  const rewards = catalogue.map(({ euroCostCents, monthlyStock, ...r }) => {
+  const rewards = catalogue.map(({ euroCostCents, monthlyStock, listedAt, ...r }) => {
     const claimedThisMonth = claims.get(r.id) ?? 0;
     const check = checkClaim({
       euroCostCents,
@@ -67,6 +69,7 @@ export default async function RewardsPage({
       ...r,
       monthLeft: monthlyStock === null ? null : Math.max(0, monthlyStock - claimedThisMonth),
       backOn: check.ok ? null : economy.resetsOn,
+      isNew: isNewSince(listedAt, user.rewardsSeenAt),
     };
   });
   const balance = user.walletBalance;
@@ -80,7 +83,9 @@ export default async function RewardsPage({
     groups.set(key, list);
   }
   const categories = [...groups.keys()].sort();
-  const shown = activeCategory && groups.has(activeCategory) ? [activeCategory] : categories;
+  const filtered = Boolean(activeCategory && groups.has(activeCategory));
+  const shown = filtered ? [activeCategory!] : categories;
+  const freshIn = (cat: string) => groups.get(cat)!.some((r) => r.isNew);
 
   // The cheapest in-stock reward you can't afford yet: the "next unlock".
   const next = rewards
@@ -101,6 +106,8 @@ export default async function RewardsPage({
           </Link>
         }
       />
+      {/* A filtered view doesn't show everything, so only the full list counts as seen. */}
+      {!filtered ? <MarkSeen area="rewards" renderedAt={renderedAt} /> : null}
 
       {/* Balance hero */}
       <section className="bg-surface mt-4 rounded-2xl p-4">
@@ -156,6 +163,11 @@ export default async function RewardsPage({
                 )}
               >
                 {cat ?? "All"}
+                {cat && freshIn(cat) ? (
+                  <span className="bg-primary ml-1.5 size-1.5 rounded-full">
+                    <span className="sr-only">New</span>
+                  </span>
+                ) : null}
               </Link>
             );
           })}
@@ -172,7 +184,14 @@ export default async function RewardsPage({
         <div className="mt-5 space-y-7">
           {shown.map((category) => (
             <section key={category}>
-              <h2 className="mb-2 text-[0.95rem] font-bold">{category}</h2>
+              <h2 className="mb-2 flex items-baseline gap-2 text-[0.95rem] font-bold">
+                {category}
+                {freshIn(category) ? (
+                  <span className="text-primary text-xs font-semibold" data-numeric>
+                    {groups.get(category)!.filter((r) => r.isNew).length} new
+                  </span>
+                ) : null}
+              </h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {groups.get(category)!.map((reward) => (
                   <RewardCard key={reward.id} reward={reward} balance={balance} />
