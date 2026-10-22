@@ -3,7 +3,7 @@
  * The DB-backed OrgSettings.appName can override this at runtime for display;
  * APP_NAME is the build-time default and fallback.
  */
-export const APP_NAME = "Applaud";
+export const APP_NAME = "Yayup";
 
 export const APP_TAGLINE = "Recognise great work.";
 

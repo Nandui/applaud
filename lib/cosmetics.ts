@@ -1,6 +1,6 @@
 /**
  * The profile Store catalogue (Steam Points Shop style): avatar frames,
- * profile banners and accent themes people buy with their applaud points.
+ * profile banners and accent themes people buy with their points.
  *
  * The live catalogue is the `Cosmetic` table, managed in Admin > Store, where
  * admins add their own items with uploaded pictures. The built-in items below

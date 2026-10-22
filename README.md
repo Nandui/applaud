@@ -1,4 +1,4 @@
-# Applaud
+# Yayup
 
 Employee recognition & rewards platform for a multi-site leisure operator.
 Peer-to-peer recognition against company values, a points wallet backed by an

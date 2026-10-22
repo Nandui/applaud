@@ -56,7 +56,7 @@ export function SignInForm({ samples }: { samples: Sample[] }) {
               id="email"
               name="email"
               type="email"
-              placeholder="name@applaud.test"
+              placeholder="name@company.com"
               autoComplete="email"
               inputMode="email"
               autoCapitalize="none"

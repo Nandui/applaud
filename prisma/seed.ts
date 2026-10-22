@@ -1,5 +1,5 @@
 /**
- * Applaud seed — realistic dev data per build-spec §11.
+ * Yayup seed — realistic dev data per build-spec §11.
  *
  * Run with: npm run db:seed  (tsx prisma/seed.ts)
  *
@@ -100,7 +100,7 @@ async function main() {
   await prisma.orgSettings.create({
     data: {
       id: "singleton",
-      appName: "Applaud",
+      appName: "Yayup",
       monthlyAllowanceStaff: 400,
       monthlyAllowanceManager: 1200,
       pointsExpiryMonths: null,
