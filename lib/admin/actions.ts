@@ -278,7 +278,12 @@ export async function saveUser(
     if (id) {
       await prisma.user.update({
         where: { id },
-        data: { ...data, managers: { deleteMany: {}, create: managers } },
+        // Saving someone counts as having checked an auto-created account.
+        data: {
+          ...data,
+          needsReview: false,
+          managers: { deleteMany: {}, create: managers },
+        },
       });
     } else {
       const created = await prisma.user.create({

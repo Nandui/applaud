@@ -21,6 +21,7 @@ export default async function AdminSettingsPage() {
           appName: settings.appName,
           pointsExpiryMonths: settings.pointsExpiryMonths,
           allowSelfRecognition: settings.allowSelfRecognition,
+          autoCreateGoogleUsers: settings.autoCreateGoogleUsers,
         }}
       />
     </div>
