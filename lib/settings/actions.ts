@@ -22,6 +22,8 @@ export async function updateOrgSettings(
     expiryRaw === "" ? null : Math.max(1, Math.floor(Number(expiryRaw)));
   const allowSelfRecognition =
     String(formData.get("allowSelfRecognition") ?? "false") === "true";
+  const autoCreateGoogleUsers =
+    String(formData.get("autoCreateGoogleUsers") ?? "true") === "true";
 
   if (appName.length < 1) return { ok: false, error: "App name is required." };
   if (pointsExpiryMonths !== null && !Number.isFinite(pointsExpiryMonths)) {
@@ -32,6 +34,7 @@ export async function updateOrgSettings(
     appName,
     pointsExpiryMonths,
     allowSelfRecognition,
+    autoCreateGoogleUsers,
   };
   await prisma.orgSettings.upsert({
     where: { id: "singleton" },

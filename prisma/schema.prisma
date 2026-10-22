@@ -50,6 +50,10 @@ model User {
   // by lib/profile-custom.ts; null means "all defaults".
   profile   Json?
   active    Boolean       @default(true)
+  // Created automatically on their first company Google sign-in and not yet
+  // looked at by an admin (role and site were guessed). Cleared when an admin
+  // saves them in Admin > Users.
+  needsReview Boolean     @default(false)
   createdAt DateTime      @default(now())
 
   // Cached wallet balance. Always written inside the same transaction as the
@@ -363,6 +367,8 @@ model OrgSettings {
   monthlyBonusPool            Int     @default(4400)
   pointsExpiryMonths          Int? // null = never expire
   allowSelfRecognition        Boolean @default(false)
+  /// Create a staff account on the first Google sign-in from the company workspace.
+  autoCreateGoogleUsers       Boolean @default(true)
 }
 
 // ---------- next-auth (Auth.js Prisma adapter) ----------

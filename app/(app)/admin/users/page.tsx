@@ -17,7 +17,8 @@ export default async function AdminUsersPage() {
     prisma.user.findMany({
       // Removed people are detached from their site; they stay out of the list.
       where: { siteId: { not: null } },
-      orderBy: { name: "asc" },
+      // People created on their first Google sign-in come first until checked.
+      orderBy: [{ needsReview: "desc" }, { name: "asc" }],
       select: {
         id: true,
         name: true,
@@ -29,6 +30,7 @@ export default async function AdminUsersPage() {
         hireDate: true,
         birthday: true,
         active: true,
+        needsReview: true,
         site: { select: { name: true } },
         managers: {
           orderBy: { manager: { name: "asc" } },
@@ -57,6 +59,7 @@ export default async function AdminUsersPage() {
     hireDate: isoDate(u.hireDate),
     birthday: isoDate(u.birthday),
     active: u.active,
+    needsReview: u.needsReview,
   }));
 
   const managers = users.map((u) => ({ id: u.id, name: u.name }));

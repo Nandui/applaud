@@ -57,6 +57,8 @@ export type UserRow = {
   hireDate: string | null; // yyyy-MM-dd
   birthday: string | null;
   active: boolean;
+  /** Created on their first Google sign-in; role and site not checked yet. */
+  needsReview: boolean;
 };
 
 type Option = { id: string; name: string };
@@ -149,6 +151,12 @@ function UserFormDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit user" : "New user"}</DialogTitle>
+          {editing?.needsReview && (
+            <DialogDescription>
+              Created automatically when they first signed in with Google, as staff at{" "}
+              {editing.siteName}. Check their app role and site, then save.
+            </DialogDescription>
+          )}
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           {editing && <input type="hidden" name="id" value={editing.id} />}
@@ -429,12 +437,22 @@ export function UsersManager({
             className="size-8"
           />
           <div className="min-w-0">
-            <Link
-              href={`/profile/${row.original.id}`}
-              className="hover:text-primary block truncate font-medium"
-            >
-              {row.original.name}
-            </Link>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href={`/profile/${row.original.id}`}
+                className="hover:text-primary truncate font-medium"
+              >
+                {row.original.name}
+              </Link>
+              {row.original.needsReview && (
+                <span
+                  className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-px text-[10px] font-semibold uppercase"
+                  title="Created on their first Google sign-in. Edit to check role and site."
+                >
+                  New
+                </span>
+              )}
+            </div>
             <p className="text-muted truncate text-xs">{row.original.email}</p>
           </div>
         </div>
@@ -506,8 +524,19 @@ export function UsersManager({
     },
   ];
 
+  const toReview = rows.filter((r) => r.needsReview).length;
+
   return (
     <>
+      {toReview > 0 && (
+        <p className="border-primary/30 bg-primary/5 mb-4 rounded-lg border px-3 py-2 text-sm">
+          {toReview === 1
+            ? "1 person joined"
+            : `${toReview} people joined`}{" "}
+          by signing in with Google and {toReview === 1 ? "is" : "are"} marked New. They
+          start as staff at the busiest site; edit them to set the right app role and site.
+        </p>
+      )}
       <DataTable
         columns={columns}
         data={rows}

@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 const ERRORS: Record<string, string> = {
   NotInvited:
     "That Google account isn't on Yayup yet. Ask an admin to add you with this email.",
+  AccountDisabled:
+    "Your Yayup account has been switched off. Ask an admin if you think that's a mistake.",
   WrongDomain: "Use your work Google account to sign in.",
   GoogleUnverified: "Google couldn't confirm that email address. Try another account.",
 };

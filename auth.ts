@@ -11,13 +11,16 @@ import {
   googleSignInEnabled,
 } from "@/lib/auth/mode";
 import { syncGoogleAvatar } from "@/lib/google-avatar";
+import { normaliseEmail, resolveGoogleUser } from "@/lib/auth/google-account";
 
 /**
  * Full Auth.js config (Node runtime).
  *
- * Google (Workspace) is the real sign-in: only people an admin has already
- * added as active users get in, matched by email, and only from the
- * AUTH_GOOGLE_DOMAIN workspace(s). Nobody is created on first sign-in.
+ * Google (Workspace) is the real sign-in, only from the AUTH_GOOGLE_DOMAIN
+ * workspace(s). People are matched to their user by email; someone from the
+ * workspace with no user yet gets a staff account on their first sign-in
+ * unless an admin has switched that off (lib/auth/google-account.ts).
+ * Deactivated users stay out.
  *
  * The dev Credentials provider (any active user's email, no password) is only
  * registered off production — see lib/auth/mode.ts. The rest of the app reads
@@ -28,10 +31,20 @@ const providers: Provider[] = [];
 if (googleSignInEnabled) {
   providers.push(
     Google({
-      // Users are pre-created by admins (or the roster import) with their work
-      // email, so the first Google sign-in links to that row. Safe because the
-      // signIn callback only accepts verified emails from our own workspace.
+      // The signIn callback below makes sure a user row exists for the email
+      // (added by an admin, the roster import, or created there), so the first
+      // Google sign-in links to that row. Safe because it only accepts
+      // verified emails from our own workspace.
       allowDangerousEmailAccountLinking: true,
+      // Lower-case the email Auth.js matches users by, like every stored email.
+      profile(profile) {
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: normaliseEmail(profile.email),
+          image: profile.picture,
+        };
+      },
       authorization: {
         params: {
           prompt: "select_account",
@@ -81,7 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ account, profile }) {
       if (account?.provider !== "google") return true;
 
-      const email = String(profile?.email ?? "").trim().toLowerCase();
+      const email = normaliseEmail(profile?.email);
       const domain = email.split("@")[1] ?? "";
       if (!email || profile?.email_verified !== true) {
         return "/sign-in?error=GoogleUnverified";
@@ -89,13 +102,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (googleAllowedDomains.length > 0 && !googleAllowedDomains.includes(domain)) {
         return "/sign-in?error=WrongDomain";
       }
-      const user = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, active: true, avatarUrl: true },
+      const result = await resolveGoogleUser(email, profile ?? {}, {
+        // Without a workspace domain configured any Google account gets this
+        // far, so nobody is created then.
+        mayCreate: googleAllowedDomains.length > 0,
       });
-      if (!user || !user.active) return "/sign-in?error=NotInvited";
+      if (!result.ok) return `/sign-in?error=${result.error}`;
       // Their Google picture becomes their avatar unless they've set their own.
-      await syncGoogleAvatar(user, profile?.picture);
+      await syncGoogleAvatar(result.user, profile?.picture);
       return true;
     },
   },

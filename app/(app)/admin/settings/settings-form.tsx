@@ -14,6 +14,7 @@ export type SettingsData = {
   appName: string;
   pointsExpiryMonths: number | null;
   allowSelfRecognition: boolean;
+  autoCreateGoogleUsers: boolean;
 };
 
 export function SettingsForm({ settings }: { settings: SettingsData }) {
@@ -22,6 +23,7 @@ export function SettingsForm({ settings }: { settings: SettingsData }) {
     FormData
   >(updateOrgSettings, undefined);
   const [allowSelf, setAllowSelf] = useState(settings.allowSelfRecognition);
+  const [autoCreate, setAutoCreate] = useState(settings.autoCreateGoogleUsers);
 
   useEffect(() => {
     if (state?.ok) toast.success(state.message ?? "Saved.");
@@ -31,6 +33,7 @@ export function SettingsForm({ settings }: { settings: SettingsData }) {
   return (
     <form action={formAction} className="max-w-xl space-y-4">
       <input type="hidden" name="allowSelfRecognition" value={String(allowSelf)} />
+      <input type="hidden" name="autoCreateGoogleUsers" value={String(autoCreate)} />
 
       <Card>
         <CardContent className="space-y-4">
@@ -65,6 +68,23 @@ export function SettingsForm({ settings }: { settings: SettingsData }) {
               <p className="text-muted text-xs">Let people recognise themselves.</p>
             </div>
             <Switch checked={allowSelf} onCheckedChange={setAllowSelf} />
+          </div>
+          <div className="border-border flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium">
+                Create accounts automatically for company Google sign-ins
+              </p>
+              <p className="text-muted text-xs">
+                Someone signing in with a work Google account for the first time gets a
+                staff account straight away. They show as New in{" "}
+                <Link href="/admin/users" className="text-primary font-medium">
+                  Users
+                </Link>{" "}
+                so you can check their role and site. When off, only people already in
+                Users can sign in.
+              </p>
+            </div>
+            <Switch checked={autoCreate} onCheckedChange={setAutoCreate} />
           </div>
         </CardContent>
       </Card>
