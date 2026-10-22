@@ -5,10 +5,11 @@ import type { Role } from "@/lib/config";
  * Edge/proxy-safe Auth.js config: no providers, no Prisma adapter — just the
  * pages, JWT, and session callbacks. The proxy (middleware) instantiates
  * NextAuth with this to read the session token; the full config (with the
- * Credentials provider + Prisma adapter) lives in auth.ts for the Node runtime.
+ * providers + Prisma adapter) lives in auth.ts for the Node runtime.
  */
 export const authConfig = {
-  pages: { signIn: "/sign-in" },
+  // Auth errors (e.g. a refused Google sign-in) land back on the sign-in page.
+  pages: { signIn: "/sign-in", error: "/sign-in" },
   providers: [],
   callbacks: {
     jwt({ token, user }) {
