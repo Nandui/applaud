@@ -49,8 +49,14 @@ export default async function ProfilePage({
   const { id } = await params;
   const { tab: rawTab } = await searchParams;
   const tab: Tab = rawTab === "given" ? "given" : "received";
+  const profile = getProfileData(id);
   const viewer = await requireUser();
-  const data = await getProfileData(id);
+  // Profiles are linked by id, so the shout-out list can load alongside the
+  // header instead of after it (only pinned cards need the profile first).
+  const listFor = (userId: string) =>
+    tab === "given" ? getGivenCards(userId, viewer.id) : getReceivedCards(userId, viewer.id);
+  const early = listFor(id);
+  const data = await profile;
   if (!data) notFound();
 
   const { user, custom, look } = data;
@@ -63,7 +69,7 @@ export default async function ProfilePage({
   const rise = (i: number) => ({ "--rise": i }) as React.CSSProperties;
 
   const [cards, pinnedCards] = await Promise.all([
-    tab === "given" ? getGivenCards(user.id, viewer.id) : getReceivedCards(user.id, viewer.id),
+    user.id === id ? early : listFor(user.id),
     tab === "received" ? getCardsByIds(custom.pinned, viewer.id) : Promise.resolve([]),
   ]);
   const pinnedSet = new Set(custom.pinned);

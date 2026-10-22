@@ -21,12 +21,15 @@ export const metadata = { title: "Profile shop" };
  */
 export default async function ShopPage() {
   const viewer = await requireUser();
-  const me = await prisma.user.findUniqueOrThrow({
-    where: { id: viewer.id },
-    select: { name: true, avatarUrl: true, walletBalance: true, profile: true },
-  });
+  const [me, catalogue, allCategories] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: viewer.id },
+      select: { name: true, avatarUrl: true, walletBalance: true, profile: true },
+    }),
+    getCatalogue(),
+    getCategories(),
+  ]);
   const custom = parseProfile(me.profile);
-  const [catalogue, allCategories] = await Promise.all([getCatalogue(), getCategories()]);
   // Hidden items leave the shop, but anyone who owns one still sees it here.
   const shown = catalogue.filter((c) => c.active || ownsItem(custom, c));
   // Items in a hidden category are listed by kind like any other.

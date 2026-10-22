@@ -1,6 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { CATALOGUE_TAG } from "@/lib/catalogue";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
@@ -30,6 +31,7 @@ const NAME_MAX = 40;
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 function revalidateStore() {
+  updateTag(CATALOGUE_TAG);
   revalidatePath("/admin/store");
   revalidatePath("/shop");
   // Frames and banners show on the feed, profiles and people lists.

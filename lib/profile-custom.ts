@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BIO_MAX, MAX_PINNED, PRONOUNS_MAX } from "@/lib/profile-limits";
 import {
   bannerCss,
   defaultLook,
@@ -21,9 +22,8 @@ import {
  * real, owned or worn takes the catalogue as an argument.
  */
 
-export const BIO_MAX = 150;
-export const PRONOUNS_MAX = 24;
-export const MAX_PINNED = 3;
+export { BIO_MAX, PRONOUNS_MAX, MAX_PINNED } from "@/lib/profile-limits";
+export { isLight } from "@/lib/contrast";
 
 export type ProfileCustom = {
   pronouns: string;
@@ -146,14 +146,4 @@ export function withEquipped(custom: ProfileCustom, kind: CosmeticKind, item: Co
   if (item === null) return { ...custom, [kind]: null };
   if (item.kind !== kind || !ownsItem(custom, item)) return custom;
   return { ...custom, [kind]: item.id };
-}
-
-/** Relative luminance check so text on an accent colour stays readable. */
-export function isLight(hexColour: string): boolean {
-  const h = hexColour.replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return false;
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  return L > 0.45;
 }

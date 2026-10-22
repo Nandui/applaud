@@ -18,9 +18,8 @@ export const metadata = { title: "Awards" };
 
 export default async function AwardsPage() {
   const me = await requireUser();
-  const catalogue = await getCatalogue();
-
-  const [programs, colleagues, recentWins] = await Promise.all([
+  const [catalogue, programs, colleagues, recentWins, pending] = await Promise.all([
+    getCatalogue(),
     prisma.awardProgram.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
@@ -46,6 +45,25 @@ export default async function AwardsPage() {
         program: { select: { name: true } },
       },
     }),
+    // Review queue: admins see all pending; managers see the pending nominations
+    // of everyone who lists them as a manager. Someone with no managers at all
+    // only surfaces for admins.
+    isManager(me)
+      ? prisma.nomination.findMany({
+          where: {
+            status: "pending",
+            ...(isAdmin(me)
+              ? {}
+              : { nominee: { managers: { some: { managerId: me.id } } } }),
+          },
+          orderBy: { createdAt: "asc" },
+          include: {
+            program: { select: { name: true, points: true } },
+            nominator: { select: { name: true } },
+            nominee: { select: { id: true, name: true, avatarUrl: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
   const colleagueOpts = colleagues.map((c) => ({
@@ -55,26 +73,6 @@ export default async function AwardsPage() {
     avatarUrl: c.avatarUrl,
     siteCode: c.site?.code ?? "",
   }));
-
-  // Review queue: admins see all pending; managers see the pending nominations
-  // of everyone who lists them as a manager. Someone with no managers at all
-  // only surfaces for admins.
-  const pending = isManager(me)
-    ? await prisma.nomination.findMany({
-        where: {
-          status: "pending",
-          ...(isAdmin(me)
-            ? {}
-            : { nominee: { managers: { some: { managerId: me.id } } } }),
-        },
-        orderBy: { createdAt: "asc" },
-        include: {
-          program: { select: { name: true, points: true } },
-          nominator: { select: { name: true } },
-          nominee: { select: { id: true, name: true, avatarUrl: true } },
-        },
-      })
-    : [];
 
   return (
     <div className="mx-auto max-w-xl">

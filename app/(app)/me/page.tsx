@@ -16,14 +16,12 @@ export const metadata = { title: "My wallet" };
 
 export default async function MePage() {
   const me = await requireUser();
-  const settings = await getOrgSettings();
-
   const [user, allowance, ledger, receivedCount, givenCount] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: me.id },
       select: { walletBalance: true },
     }),
-    getAllowanceStatus(me, settings),
+    getOrgSettings().then((settings) => getAllowanceStatus(me, settings)),
     prisma.rewardLedger.findMany({
       where: { userId: me.id },
       orderBy: { createdAt: "desc" },

@@ -3,8 +3,11 @@
 // append-only RewardLedger as the wallet source of truth.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../lib/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../lib/generated/prisma"
+  // Load nested relations (feed cards, profiles) in one SQL query with JOINs
+  // instead of one round trip to the database per level.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -67,6 +70,8 @@ model User {
   // next-auth adapter relations
   accounts Account[]
   sessions Session[]
+
+  @@index([siteId])
 }
 
 /// Who manages whom. A person has zero or more managers, each a real user.
@@ -122,6 +127,7 @@ model Recognition {
   comments   Comment[]
 
   @@index([createdAt])
+  @@index([senderId, createdAt])
 }
 
 model RecognitionRecipient {
@@ -133,6 +139,7 @@ model RecognitionRecipient {
   points        Int         @default(0) // redeemable points granted to this recipient
 
   @@unique([recognitionId, userId])
+  @@index([userId])
 }
 
 model Reaction {
@@ -156,6 +163,8 @@ model Comment {
   user          User        @relation(fields: [userId], references: [id])
   body          String
   createdAt     DateTime    @default(now())
+
+  @@index([recognitionId, createdAt])
 }
 
 // ---------- Nomination awards ----------
@@ -185,6 +194,10 @@ model Nomination {
   reviewedAt    DateTime?
   pointsAwarded Int          @default(0)
   createdAt     DateTime     @default(now())
+
+  @@index([nomineeId, status])
+  @@index([nominatorId])
+  @@index([status, createdAt])
 }
 
 // ---------- Rewards & wallet ----------
@@ -227,6 +240,8 @@ model Redemption {
 
   @@index([status])
   @@index([createdAt])
+  @@index([userId])
+  @@index([rewardId])
 }
 
 /// Append-only. Wallet balance = SUM(amount) for a user. Never mutate/delete rows.
@@ -241,7 +256,8 @@ model RewardLedger {
   note       String?
   createdAt  DateTime @default(now())
 
-  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
 }
 
 /// Profile Store catalogue (Admin > Store). Built-in items keep fixed ids such
