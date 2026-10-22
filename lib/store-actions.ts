@@ -14,6 +14,7 @@ import {
   isRarity,
   type CosmeticKind,
 } from "@/lib/cosmetics";
+import { formatFit, parseFit } from "@/lib/frame-fit";
 
 /**
  * Admin > Store: manage the profile Store catalogue (the `Cosmetic` table).
@@ -66,6 +67,7 @@ export async function saveCosmetic(
   const price = parsePrice(formData.get("price"));
   const rarity = String(formData.get("rarity") ?? "common");
   const imageUrl = String(formData.get("imageUrl") ?? "").trim() || null;
+  const fit = parseFit(String(formData.get("frameFit") ?? ""));
   const colour = String(formData.get("colour") ?? "").trim();
   const active = String(formData.get("active") ?? "true") === "true";
   const categoryId = await parseCategory(formData.get("categoryId"));
@@ -97,7 +99,16 @@ export async function saveCosmetic(
     return { ok: false, error: "This is everyone's default, so it stays free and in the Store." };
   }
 
-  const data = { name, price, rarity, style, imageUrl: kind === "theme" ? null : imageUrl, active, categoryId };
+  const data = {
+    name,
+    price,
+    rarity,
+    style,
+    imageUrl: kind === "theme" ? null : imageUrl,
+    frameFit: kind === "frame" && imageUrl && fit ? formatFit(fit) : null,
+    active,
+    categoryId,
+  };
   let entityId = id;
   if (existing) {
     await prisma.cosmetic.update({ where: { id }, data });
@@ -113,7 +124,7 @@ export async function saveCosmetic(
     entityType: "cosmetic",
     entityId,
     summary: `${existing ? "Updated" : "Added"} Store ${KIND_LABELS[kind].one.toLowerCase()} ${name} (${price} pts)`,
-    metadata: { kind, price, rarity, active, imageUrl: data.imageUrl, categoryId },
+    metadata: { kind, price, rarity, active, imageUrl: data.imageUrl, frameFit: data.frameFit, categoryId },
   });
   revalidateStore();
   return { ok: true, message: existing ? "Item saved." : `${name} added to the Store.` };
@@ -128,7 +139,8 @@ export async function addCosmeticsInBulk(input: {
   price: number;
   active: boolean;
   categoryId?: string | null;
-  items: { name: string; imageUrl: string }[];
+  /** frameFit: how each frame picture sits on the avatar, measured in the browser. */
+  items: { name: string; imageUrl: string; frameFit?: string | null }[];
 }): Promise<ActionResult> {
   const admin = await requireAdmin();
   const { kind, price, active } = input;
@@ -139,7 +151,14 @@ export async function addCosmeticsInBulk(input: {
     return { ok: false, error: "Enter a whole number of points." };
   }
   const items = input.items
-    .map((i) => ({ name: i.name.trim().slice(0, NAME_MAX) || "New item", imageUrl: i.imageUrl.trim() }))
+    .map((i) => {
+      const fit = kind === "frame" ? parseFit(i.frameFit) : null;
+      return {
+        name: i.name.trim().slice(0, NAME_MAX) || "New item",
+        imageUrl: i.imageUrl.trim(),
+        frameFit: fit ? formatFit(fit) : null,
+      };
+    })
     .filter((i) => isProjectBlobUrl(i.imageUrl));
   if (items.length === 0) return { ok: false, error: "No pictures were uploaded." };
   if (items.length > 50) return { ok: false, error: "Add up to 50 at a time." };
@@ -147,7 +166,7 @@ export async function addCosmeticsInBulk(input: {
   let sortOrder = await nextSortOrder(kind);
   await prisma.cosmetic.createMany({
     data: items.map((i) => {
-      const row = { kind, name: i.name, price, rarity: "common", imageUrl: i.imageUrl, active, sortOrder, categoryId };
+      const row = { kind, name: i.name, price, rarity: "common", imageUrl: i.imageUrl, frameFit: i.frameFit, active, sortOrder, categoryId };
       sortOrder += 10;
       return row;
     }),
@@ -164,6 +183,36 @@ export async function addCosmeticsInBulk(input: {
     ok: true,
     message: `${items.length} ${items.length === 1 ? KIND_LABELS[kind].one.toLowerCase() : KIND_LABELS[kind].many.toLowerCase()} added${active ? " to the Store" : " (hidden)"}.`,
   };
+}
+
+/**
+ * Save auto-measured fits for uploaded frames (Admin > Store's "Auto-fit
+ * frames"). Only touches frames that have a picture.
+ */
+export async function saveFrameFits(updates: { id: string; frameFit: string }[]): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const valid = updates
+    .map((u) => ({ id: String(u.id), fit: parseFit(u.frameFit) }))
+    .filter((u): u is { id: string; fit: NonNullable<typeof u.fit> } => u.fit !== null)
+    .slice(0, 500);
+  let changed = 0;
+  for (const u of valid) {
+    const res = await prisma.cosmetic.updateMany({
+      where: { id: u.id, kind: "frame", imageUrl: { not: null } },
+      data: { frameFit: formatFit(u.fit) },
+    });
+    changed += res.count;
+  }
+  if (changed === 0) return { ok: false, error: "No frames were updated." };
+  await writeAudit({
+    actor: admin,
+    action: "cosmetic.updated",
+    entityType: "cosmetic",
+    summary: `Auto-fitted ${changed} Store ${changed === 1 ? "frame" : "frames"} to the avatar`,
+    metadata: { ids: valid.map((u) => u.id) },
+  });
+  revalidateStore();
+  return { ok: true, message: `${changed} ${changed === 1 ? "frame" : "frames"} fitted to the avatar.` };
 }
 
 /** Show or hide an item in the Store. People who own it keep wearing it. */

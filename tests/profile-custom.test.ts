@@ -130,6 +130,7 @@ test("uploaded frames and banners draw their picture", () => {
     rarity: "rare",
     style: null,
     imageUrl: UPLOAD,
+    frameFit: null,
     active: false, // hidden from the shop, but owners keep wearing it
     categoryId: null,
   };

@@ -257,6 +257,8 @@ model Cosmetic {
   style      String?
   /// Uploaded picture (Vercel Blob): a frame overlay or a banner image.
   imageUrl   String?
+  /// Uploaded frames: how the picture sits on the avatar, "size,x,y" (lib/frame-fit.ts).
+  frameFit   String?
   active     Boolean           @default(true)
   sortOrder  Int               @default(0)
   createdAt  DateTime          @default(now())

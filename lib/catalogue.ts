@@ -23,6 +23,7 @@ export const getCatalogue = cache(async (): Promise<Cosmetic[]> => {
       rarity: isRarity(r.rarity) ? r.rarity : "common",
       style: r.style,
       imageUrl: r.imageUrl,
+      frameFit: r.frameFit,
       active: r.active,
       categoryId: r.categoryId,
     }));
