@@ -10,6 +10,7 @@ import {
   googleAllowedDomains,
   googleSignInEnabled,
 } from "@/lib/auth/mode";
+import { syncGoogleAvatar } from "@/lib/google-avatar";
 
 /**
  * Full Auth.js config (Node runtime).
@@ -90,9 +91,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       const user = await prisma.user.findUnique({
         where: { email },
-        select: { active: true },
+        select: { id: true, active: true, avatarUrl: true },
       });
       if (!user || !user.active) return "/sign-in?error=NotInvited";
+      // Their Google picture becomes their avatar unless they've set their own.
+      await syncGoogleAvatar(user, profile?.picture);
       return true;
     },
   },
