@@ -10,6 +10,7 @@ import { writeAudit } from "@/lib/audit";
 import { getOrgSettings } from "@/lib/org-settings";
 import { checkClaim, economyMonth, parseEurosToCents, resetDateLabel, SUGGESTED_REWARDS } from "@/lib/economy";
 import { lockPool } from "@/lib/locks";
+import { isPromoTag, parseEndDate, promoState } from "@/lib/reward-promo";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -27,6 +28,10 @@ export async function redeemReward(
 ): Promise<ActionResult> {
   const me = await requireUser();
   const parsed = redeemSchema.safeParse({ rewardId: formData.get("rewardId") });
+  // The price on screen when they pressed Redeem: a sale that ended meanwhile
+  // must not charge them more than they agreed to.
+  const expectedRaw = formData.get("expectedCost");
+  const expectedCost = expectedRaw === null || expectedRaw === "" ? null : Number(expectedRaw);
   if (!parsed.success) return { ok: false, error: "Invalid reward." };
   const { rewardId } = parsed.data;
 
@@ -41,6 +46,15 @@ export async function redeemReward(
       if (reward.siteId && reward.siteId !== me.siteId) {
         throw new RedeemError("This reward isn't available at your site.");
       }
+      if (reward.kind === "discount") {
+        throw new RedeemError("Staff discounts are always on, there's nothing to redeem.");
+      }
+      const promo = promoState(reward);
+      if (promo.gone) throw new RedeemError("This offer has ended.");
+      const pointsCost = promo.pointsCost;
+      if (expectedCost !== null && expectedCost !== pointsCost) {
+        throw new RedeemError(`The price just changed to ${pointsCost} pts. Have another look.`);
+      }
 
       // Live balance from the ledger (source of truth), checked in-transaction.
       const agg = await tx.rewardLedger.aggregate({
@@ -48,7 +62,7 @@ export async function redeemReward(
         where: { userId: me.id },
       });
       const balance = agg._sum.amount ?? 0;
-      if (balance < reward.pointsCost) {
+      if (balance < pointsCost) {
         throw new RedeemError("You don't have enough points for this reward.");
       }
 
@@ -93,7 +107,7 @@ export async function redeemReward(
         data: {
           userId: me.id,
           rewardId,
-          pointsCost: reward.pointsCost, // captured at redemption time
+          pointsCost, // captured at redemption time
           euroCostCents: reward.euroCostCents,
           status: "requested",
         },
@@ -101,7 +115,7 @@ export async function redeemReward(
       await tx.rewardLedger.create({
         data: {
           userId: me.id,
-          amount: -reward.pointsCost,
+          amount: -pointsCost,
           type: "REDEMPTION",
           sourceType: "redemption",
           sourceId: redemption.id,
@@ -110,9 +124,9 @@ export async function redeemReward(
       });
       await tx.user.update({
         where: { id: me.id },
-        data: { walletBalance: { decrement: reward.pointsCost } },
+        data: { walletBalance: { decrement: pointsCost } },
       });
-      return { id: redemption.id, name: reward.name, pointsCost: reward.pointsCost };
+      return { id: redemption.id, name: reward.name, pointsCost };
     });
   } catch (error) {
     if (error instanceof RedeemError) return { ok: false, error: error.message };
@@ -155,7 +169,23 @@ function parseRewardForm(fd: FormData) {
   const monthlyStock = monthlyRaw === "" ? null : Math.max(0, Math.floor(Number(monthlyRaw)));
   const sortRaw = String(fd.get("sortOrder") ?? "").trim();
   const sortOrder = sortRaw === "" ? 0 : Math.floor(Number(sortRaw));
+  const kind = String(fd.get("kind") ?? "reward") === "discount" ? "discount" : "reward";
+  const discountText = String(fd.get("discountText") ?? "").trim();
+  const promoRaw = String(fd.get("promoTag") ?? "").trim();
+  const promoTag = promoRaw === "" ? null : promoRaw;
+  const promoText = String(fd.get("promoText") ?? "").trim();
+  const endsRaw = String(fd.get("promoEndsAt") ?? "").trim();
+  const promoEndsAt = endsRaw === "" ? null : parseEndDate(endsRaw);
+  const wasRaw = String(fd.get("wasPointsCost") ?? "").trim();
+  const wasPointsCost = wasRaw === "" ? null : Math.floor(Number(wasRaw));
   return {
+    kind,
+    discountText,
+    promoTag,
+    promoText,
+    endsRaw,
+    promoEndsAt,
+    wasPointsCost,
     name,
     description,
     category,
@@ -174,6 +204,16 @@ function parseRewardForm(fd: FormData) {
 
 function validateReward(d: ReturnType<typeof parseRewardForm>): string | null {
   if (d.name.length < 2) return "Name is too short.";
+  if (d.kind === "discount" && d.discountText.length === 0) return "Say what the discount is, e.g. 20% off.";
+  if (d.discountText.length > 24) return "Keep the discount short, e.g. 20% off.";
+  if (d.promoTag !== null && !isPromoTag(d.promoTag)) return "Pick a label from the list.";
+  if (d.promoText.length > 24) return "Keep the label wording to 24 characters.";
+  if (d.endsRaw && !d.promoEndsAt) return "Enter a valid end date.";
+  if (d.promoTag === "discounted" && d.kind === "reward") {
+    if (d.wasPointsCost === null || !Number.isFinite(d.wasPointsCost))
+      return "Enter the usual price so staff can see the saving.";
+    if (d.wasPointsCost <= d.pointsCost) return "The usual price must be higher than the sale price.";
+  }
   if (!Number.isFinite(d.pointsCost) || d.pointsCost < 0) return "Enter a valid points cost.";
   if (d.stock !== null && (!Number.isFinite(d.stock) || d.stock < 0))
     return "Enter a valid stock value.";
@@ -187,15 +227,24 @@ function validateReward(d: ReturnType<typeof parseRewardForm>): string | null {
 }
 
 function rewardData(d: ReturnType<typeof parseRewardForm>) {
+  const discount = d.kind === "discount";
+  const tag = d.promoTag;
   return {
+    kind: d.kind,
+    discountText: discount ? d.discountText : null,
+    promoTag: tag,
+    promoText: tag ? d.promoText || null : null,
+    promoEndsAt: tag ? d.promoEndsAt : null,
+    wasPointsCost: tag === "discounted" && !discount ? d.wasPointsCost : null,
     name: d.name,
     description: d.description || null,
     category: d.category || null,
     imageUrl: d.imageUrl || null,
-    pointsCost: d.pointsCost,
-    stock: d.stock,
-    euroCostCents: d.euroCostCents ?? 0,
-    monthlyStock: d.monthlyStock,
+    // A standing discount is never claimed, so it has no price or stock.
+    pointsCost: discount ? 0 : d.pointsCost,
+    stock: discount ? null : d.stock,
+    euroCostCents: discount ? 0 : (d.euroCostCents ?? 0),
+    monthlyStock: discount ? null : d.monthlyStock,
     siteId: d.siteId,
     active: d.active,
     fulfilment: d.fulfilment,
@@ -220,7 +269,7 @@ export async function createReward(
     entityType: "reward",
     entityId: created.id,
     summary: `Created reward ${d.name} (${d.pointsCost} pts)`,
-    metadata: { pointsCost: d.pointsCost, euroCostCents: d.euroCostCents, stock: d.stock, monthlyStock: d.monthlyStock, active: d.active, sortOrder: d.sortOrder },
+    metadata: { pointsCost: d.pointsCost, euroCostCents: d.euroCostCents, stock: d.stock, monthlyStock: d.monthlyStock, active: d.active, sortOrder: d.sortOrder, kind: d.kind, promoTag: d.promoTag, promoEndsAt: d.promoEndsAt, wasPointsCost: d.wasPointsCost },
     siteId: d.siteId,
   });
   revalidatePath("/admin/rewards");
@@ -250,7 +299,7 @@ export async function updateReward(
     entityType: "reward",
     entityId: id,
     summary: `Updated reward ${d.name}`,
-    metadata: { pointsCost: d.pointsCost, euroCostCents: d.euroCostCents, stock: d.stock, monthlyStock: d.monthlyStock, active: d.active, sortOrder: d.sortOrder },
+    metadata: { pointsCost: d.pointsCost, euroCostCents: d.euroCostCents, stock: d.stock, monthlyStock: d.monthlyStock, active: d.active, sortOrder: d.sortOrder, kind: d.kind, promoTag: d.promoTag, promoEndsAt: d.promoEndsAt, wasPointsCost: d.wasPointsCost },
     siteId: d.siteId,
   });
   revalidatePath("/admin/rewards");

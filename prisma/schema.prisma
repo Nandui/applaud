@@ -233,6 +233,20 @@ model Reward {
   /// When it went on show (created, or shown again after being hidden): newer
   /// than someone's User.rewardsSeenAt means "New" to them.
   listedAt      DateTime     @default(now())
+  /// "reward" (redeemed with points) | "discount" (standing staff discount:
+  /// always on, never claimed, no points or stock). See lib/reward-promo.ts.
+  kind          String       @default("reward")
+  /// Discounts: the headline on the card, e.g. "20% off".
+  discountText  String?
+  /// Shop label: featured | month_only | discounted | last_chance | limited.
+  promoTag      String?
+  /// Own wording for the label badge; blank uses the preset name.
+  promoText     String?
+  /// When the label ends (null = until removed). Ending "month_only" or
+  /// "last_chance" takes the reward out of the shop.
+  promoEndsAt   DateTime?
+  /// "Discounted": the usual price, struck through; it comes back when the label ends.
+  wasPointsCost Int?
   redemptions   Redemption[]
 }
 

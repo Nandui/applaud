@@ -31,7 +31,57 @@ export type RewardCardData = {
   backOn: string | null;
   /** Added since this person last looked at the rewards. */
   isNew?: boolean;
+  /** "Discounted": the usual price, struck through next to pointsCost. */
+  wasPointsCost?: number | null;
+  /** Shop label from Admin > Rewards, e.g. "Last chance", and when it ends ("3 days left"). */
+  promo?: { tag: string; label: string; ends: string | null } | null;
 };
+
+/** The label badge on a reward picture. */
+export function PromoBadge({
+  promo,
+  withEnds,
+  className,
+}: {
+  promo: NonNullable<RewardCardData["promo"]>;
+  /** Also say when it ends (sheets); cards say it under the price instead. */
+  withEnds?: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "bg-foreground text-background inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-1 text-[0.68rem] leading-none font-bold",
+        className,
+      )}
+    >
+      {promo.label}
+      {withEnds && promo.ends ? <span className="font-medium opacity-70">· {promo.ends}</span> : null}
+    </span>
+  );
+}
+
+function Price({ reward, highlight }: { reward: RewardCardData; highlight: boolean }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span
+        data-numeric
+        className={cn(
+          "shrink-0 rounded-full px-2 py-0.5 text-xs font-bold",
+          highlight ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
+        )}
+      >
+        ✦ {formatNumber(reward.pointsCost)}
+      </span>
+      {reward.wasPointsCost ? (
+        <s data-numeric className="text-muted text-xs font-medium">
+          <span className="sr-only">was </span>
+          {formatNumber(reward.wasPointsCost)}
+        </s>
+      ) : null}
+    </span>
+  );
+}
 
 // Placeholder art when a reward has no image: a gradient picked from the name.
 const ART = [
@@ -47,7 +97,13 @@ function artFor(name: string) {
   return ART[Math.abs(h) % ART.length];
 }
 
-function RewardArt({ reward, className }: { reward: RewardCardData; className?: string }) {
+export function RewardArt({
+  reward,
+  className,
+}: {
+  reward: Pick<RewardCardData, "name" | "imageUrl">;
+  className?: string;
+}) {
   return reward.imageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -109,11 +165,14 @@ export function RewardCard({
       <SheetTrigger asChild>
         <button
           type="button"
-          className="group flex flex-col overflow-hidden text-left active:opacity-80"
+          className="group flex w-full flex-col overflow-hidden text-left active:opacity-80"
         >
           <span className="relative block aspect-square w-full overflow-hidden rounded-xl">
             <RewardArt reward={reward} />
-            {reward.isNew ? <NewLabel className="absolute top-2 left-2 shadow-sm" /> : null}
+            <span className="absolute top-2 right-9 left-2 flex flex-wrap items-start gap-1">
+              {reward.promo ? <PromoBadge promo={reward.promo} className="shadow-sm" /> : null}
+              {reward.isNew ? <NewLabel className="shadow-sm" /> : null}
+            </span>
             {outOfStock ? (
               <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-bold text-white">
                 {reward.backOn ? "All claimed" : "Sold out"}
@@ -126,26 +185,20 @@ export function RewardCard({
           </span>
           <span className="flex flex-1 flex-col pt-2">
             <span className="line-clamp-2 text-sm leading-snug font-bold">{reward.name}</span>
-            <span className="mt-auto flex items-center justify-between gap-2 pt-2">
-              <span
-                data-numeric
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-xs font-bold",
-                  canAfford && !outOfStock ? "bg-primary text-primary-fg" : "bg-surface-2 text-foreground",
-                )}
-              >
-                ✦ {formatNumber(reward.pointsCost)}
-              </span>
-              <span className="text-muted truncate text-[11px] font-medium" data-numeric>
+            <span className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2">
+              <Price reward={reward} highlight={canAfford && !outOfStock} />
+              <span className="text-muted shrink truncate text-[11px] font-medium" data-numeric>
                 {outOfStock
                   ? reward.backOn
                     ? `Back ${reward.backOn}`
                     : "Out of stock"
-                  : !canAfford
-                    ? `${formatNumber(reward.pointsCost - balance)} to go`
-                    : left !== null
-                      ? `${left} left${reward.monthLeft !== null ? " this month" : ""}`
-                      : "Ready"}
+                  : reward.promo?.ends
+                    ? reward.promo.ends
+                    : !canAfford
+                      ? `${formatNumber(reward.pointsCost - balance)} to go`
+                      : left !== null
+                        ? `${left} left${reward.monthLeft !== null ? " this month" : ""}`
+                        : "Ready"}
               </span>
             </span>
             {!canAfford && !outOfStock ? (
@@ -161,6 +214,7 @@ export function RewardCard({
           <RewardArt reward={reward} />
         </div>
         <SheetHeader className="pt-4 text-left">
+          {reward.promo ? <PromoBadge promo={reward.promo} withEnds className="self-start" /> : null}
           {reward.category ? (
             <span className="text-muted text-xs font-bold tracking-wide uppercase">{reward.category}</span>
           ) : null}
@@ -170,7 +224,17 @@ export function RewardCard({
           </SheetDescription>
         </SheetHeader>
         <dl className="bg-surface-2 mx-4 space-y-2 rounded-2xl p-4 text-sm">
-          <Row label="Cost" value={pts(reward.pointsCost)} />
+          {reward.wasPointsCost ? (
+            <>
+              <Row label="Usual price" value={pts(reward.wasPointsCost)} struck />
+              <Row
+                label="Now"
+                value={`${pts(reward.pointsCost)}, save ${formatNumber(reward.wasPointsCost - reward.pointsCost)}`}
+              />
+            </>
+          ) : (
+            <Row label="Cost" value={pts(reward.pointsCost)} />
+          )}
           <Row label="Your balance" value={pts(balance)} />
           {left !== null && !outOfStock ? (
             <Row label={reward.monthLeft !== null ? "Left this month" : "Left"} value={formatNumber(left)} />
@@ -181,11 +245,8 @@ export function RewardCard({
         </dl>
         <form action={formAction} className="pb-safe mt-4 flex gap-2 px-4 pb-4">
           <input type="hidden" name="rewardId" value={reward.id} />
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="bg-surface-2 h-12 rounded-xl px-5 font-bold"
-          >
+          <input type="hidden" name="expectedCost" value={reward.pointsCost} />
+          <button type="button" onClick={() => setOpen(false)} className="bg-surface-2 h-12 rounded-xl px-5 font-bold">
             Cancel
           </button>
           <button
@@ -209,19 +270,11 @@ export function RewardCard({
   );
 }
 
-function Row({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
+function Row({ label, value, strong, struck }: { label: string; value: string; strong?: boolean; struck?: boolean }) {
   return (
     <div className="flex items-center justify-between">
       <dt className="text-muted">{label}</dt>
-      <dd data-numeric className={strong ? "font-bold" : "font-medium"}>
+      <dd data-numeric className={cn(strong ? "font-bold" : "font-medium", struck && "text-muted line-through")}>
         {value}
       </dd>
     </div>

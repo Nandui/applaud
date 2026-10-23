@@ -34,6 +34,12 @@ export default async function AdminRewardsPage() {
         fulfilment: true,
         type: true,
         sortOrder: true,
+        kind: true,
+        discountText: true,
+        promoTag: true,
+        promoText: true,
+        promoEndsAt: true,
+        wasPointsCost: true,
       },
     }),
     prisma.site.findMany({
@@ -54,7 +60,7 @@ export default async function AdminRewardsPage() {
     <div>
       <PageHeader
         title="Rewards"
-        description="Create and edit what staff can redeem. Set the conversion and budget in Economy. Claims stop for the month once the rewards budget is used, and per-month stock refills on the 1st. Hide an offering instead of deleting it."
+        description="Create and edit what staff can redeem, plus standing staff discounts. Labels such as Featured or Last chance put a reward in the Featured row of the shop. Set the conversion and budget in Economy. Claims stop for the month once the rewards budget is used, and per-month stock refills on the 1st. Hide an offering instead of deleting it."
       />
       <div className="mb-6">
         <BudgetCard status={status} />
