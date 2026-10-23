@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import type { Role } from "@/lib/config";
+import { IDLE_TIMEOUT_SECONDS } from "@/lib/auth/idle";
 
 /**
  * Edge/proxy-safe Auth.js config: no providers, no Prisma adapter — just the
@@ -10,6 +11,10 @@ import type { Role } from "@/lib/config";
 export const authConfig = {
   // Auth errors (e.g. a refused Google sign-in) land back on the sign-in page.
   pages: { signIn: "/sign-in", error: "/sign-in" },
+  // Sign out after 30 minutes idle: the JWT and its cookie expire that long
+  // after they were last issued, and Auth.js re-issues them on every request
+  // the proxy sees, so using the app keeps the session going.
+  session: { strategy: "jwt", maxAge: IDLE_TIMEOUT_SECONDS },
   providers: [],
   callbacks: {
     jwt({ token, user }) {
