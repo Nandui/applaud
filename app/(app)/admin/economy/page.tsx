@@ -30,7 +30,8 @@ export default async function AdminEconomyPage() {
       where: { active: true, siteId: { not: null } },
     }),
     prisma.reward.findMany({
-      where: { active: true },
+      // Standing discounts cost nothing and are never claimed.
+      where: { active: true, kind: "reward" },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, name: true, pointsCost: true, euroCostCents: true, monthlyStock: true },
     }),

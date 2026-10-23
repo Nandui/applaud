@@ -91,7 +91,12 @@ function tzOffsetMinutes(at: Date, tz: string): number {
 
 /** The UTC instant of local midnight on the 1st of (year, month0) in `tz`. */
 function zonedMonthStart(year: number, month0: number, tz: string): Date {
-  const guess = new Date(Date.UTC(year, month0, 1));
+  return zonedDayStart(year, month0, 1, tz);
+}
+
+/** The UTC instant of local midnight on (year, month0, day) in `tz`; days past the month's end roll over. */
+export function zonedDayStart(year: number, month0: number, day: number, tz: string = ECONOMY_TIMEZONE): Date {
+  const guess = new Date(Date.UTC(year, month0, day));
   // Midnight local is `offset` minutes before midnight UTC. Re-check once in
   // case the offset differs on either side of the guess (DST never changes at
   // midnight in Dublin, but this keeps the helper honest for any zone).

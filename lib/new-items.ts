@@ -3,11 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { getCatalogue } from "@/lib/catalogue";
 import { ownsItem, parseProfile } from "@/lib/profile-custom";
 import { isNewSince, type NewCounts } from "@/lib/seen";
+import { notGoneWhere } from "@/lib/reward-promo";
 import type { SessionUser } from "@/lib/auth/types";
 
-/** Rewards this person can see: shown, and for every site or theirs. */
-export function visibleRewardsWhere(user: Pick<SessionUser, "siteId">) {
-  return { active: true, OR: [{ siteId: null }, { siteId: user.siteId }] };
+/** Rewards this person can see: shown, for every site or theirs, and not an offer that has ended. */
+export function visibleRewardsWhere(user: Pick<SessionUser, "siteId">, now: Date = new Date()) {
+  return {
+    active: true,
+    AND: [{ OR: [{ siteId: null }, { siteId: user.siteId }] }, notGoneWhere(now)],
+  };
 }
 
 /**

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
 import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { RewardCard } from "@/components/rewards/reward-card";
+import { DiscountCard } from "@/components/rewards/discount-card";
+import { endsLabel, promoRank, promoState } from "@/lib/reward-promo";
 import { StoreTabs } from "@/components/shop/store-tabs";
 import { cn } from "@/lib/utils";
 import { getOrgSettings } from "@/lib/org-settings";
@@ -18,8 +20,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
 
 /**
- * Rewards store: your balance with the next thing you can unlock, category
- * filters, then a grid of rewards with "N to go" progress bars.
+ * Rewards store: your balance with the next thing you can unlock, standing
+ * staff discounts, a Featured row of labelled offers, category filters, then a
+ * grid of rewards with "N to go" progress bars.
  */
 export default async function RewardsPage({
   searchParams,
@@ -49,6 +52,12 @@ export default async function RewardsPage({
         euroCostCents: true,
         monthlyStock: true,
         listedAt: true,
+        kind: true,
+        discountText: true,
+        promoTag: true,
+        promoText: true,
+        promoEndsAt: true,
+        wasPointsCost: true,
       },
     }),
     getMonthlyClaimCounts(),
@@ -56,23 +65,41 @@ export default async function RewardsPage({
   ]);
   // Monthly stock and the company budget decide what can be claimed right now.
   // Staff never see euros: a reward over budget just shows "All claimed".
-  const rewards = catalogue.map(({ euroCostCents, monthlyStock, listedAt, ...r }) => {
-    const claimedThisMonth = claims.get(r.id) ?? 0;
-    const check = checkClaim({
-      euroCostCents,
-      monthlyStock,
-      claimedThisMonth,
-      spentCents: economy.spentCents,
-      budgetCents: economy.budgetCents,
-    });
-    return {
-      ...r,
-      monthLeft: monthlyStock === null ? null : Math.max(0, monthlyStock - claimedThisMonth),
-      backOn: check.ok ? null : economy.resetsOn,
-      isNew: isNewSince(listedAt, user.rewardsSeenAt),
-    };
-  });
+  const now = new Date(renderedAt);
+  const all = catalogue.map(
+    ({ euroCostCents, monthlyStock, listedAt, promoTag, promoText, promoEndsAt, wasPointsCost, ...r }) => {
+      const promo = promoState({ ...r, promoTag, promoText, promoEndsAt, wasPointsCost }, now);
+      const claimedThisMonth = claims.get(r.id) ?? 0;
+      const check = checkClaim({
+        euroCostCents,
+        monthlyStock,
+        claimedThisMonth,
+        spentCents: economy.spentCents,
+        budgetCents: economy.budgetCents,
+      });
+      return {
+        ...r,
+        pointsCost: promo.pointsCost,
+        wasPointsCost: promo.wasPointsCost,
+        promo: promo.tag
+          ? {
+              tag: promo.tag,
+              label: promo.label!,
+              ends: promo.endsAt ? endsLabel(promo.endsAt, now) : null,
+            }
+          : null,
+        rank: promoRank(promo),
+        monthLeft: monthlyStock === null ? null : Math.max(0, monthlyStock - claimedThisMonth),
+        backOn: check.ok ? null : economy.resetsOn,
+        isNew: isNewSince(listedAt, user.rewardsSeenAt),
+      };
+    },
+  );
   const balance = user.walletBalance;
+  // Standing staff discounts get their own section; everything else is claimed with points.
+  const discounts = all.filter((r) => r.kind === "discount");
+  const rewards = all.filter((r) => r.kind !== "discount");
+  const featured = rewards.filter((r) => r.promo).sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1]);
 
   // Group by category for display.
   const groups = new Map<string, typeof rewards>();
@@ -139,13 +166,44 @@ export default async function RewardsPage({
               <div className="bg-surface-3 mt-2 h-2 overflow-hidden rounded-full">
                 <div
                   className="bg-primary h-full rounded-full"
-                  style={{ width: `${Math.max(4, Math.round((balance / next.pointsCost) * 100))}%` }}
+                  style={{
+                    width: `${Math.max(4, Math.round((balance / next.pointsCost) * 100))}%`,
+                  }}
                 />
               </div>
             </div>
           ) : null}
         </div>
       </section>
+
+      {!filtered && discounts.length > 0 ? (
+        <section className="mt-6" aria-labelledby="discounts-heading">
+          <h2 id="discounts-heading" className="mb-2 flex items-baseline gap-2 text-[0.95rem] font-bold">
+            Staff discounts
+            <span className="text-muted text-xs font-medium">Always on, no points needed</span>
+          </h2>
+          <div className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">
+            {discounts.map((d) => (
+              <DiscountCard key={d.id} discount={d} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {!filtered && featured.length > 0 ? (
+        <section className="mt-6" aria-labelledby="featured-heading">
+          <h2 id="featured-heading" className="mb-2 text-[0.95rem] font-bold">
+            Featured
+          </h2>
+          <div className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">
+            {featured.map((reward) => (
+              <div key={reward.id} className="w-[46%] shrink-0 snap-start sm:w-56">
+                <RewardCard reward={reward} balance={balance} />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {categories.length > 1 ? (
         <nav className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4" aria-label="Categories">
@@ -174,14 +232,14 @@ export default async function RewardsPage({
         </nav>
       ) : null}
 
-      {rewards.length === 0 ? (
+      {rewards.length === 0 && discounts.length === 0 ? (
         <div className="text-muted flex flex-col items-center gap-2 py-16 text-center">
           <span className="text-4xl">🎁</span>
           <p className="text-foreground font-bold">No rewards right now</p>
           <p className="text-sm">Check back soon, new perks get added regularly.</p>
         </div>
-      ) : (
-        <div className="mt-5 space-y-7">
+      ) : rewards.length === 0 ? null : (
+        <div className="mt-6 space-y-7">
           {shown.map((category) => (
             <section key={category}>
               <h2 className="mb-2 flex items-baseline gap-2 text-[0.95rem] font-bold">

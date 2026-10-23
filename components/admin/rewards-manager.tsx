@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import {
   centsToEuros,
   parseEurosToCents,
@@ -44,6 +45,16 @@ import {
   suggestMonthlyStock,
   suggestPointsPrice,
 } from "@/lib/economy";
+import {
+  LEAVES_WHEN_ENDED,
+  PROMO_LABELS,
+  PROMO_TAGS,
+  endDateInput,
+  isPromoTag,
+  monthEndInput,
+  promoState,
+  type PromoTag,
+} from "@/lib/reward-promo";
 
 export type RewardRow = {
   id: string;
@@ -62,6 +73,12 @@ export type RewardRow = {
   fulfilment: string;
   type: string;
   sortOrder: number;
+  kind: string;
+  discountText: string | null;
+  promoTag: string | null;
+  promoText: string | null;
+  promoEndsAt: Date | null;
+  wasPointsCost: number | null;
 };
 
 type SiteOption = { id: string; name: string };
@@ -70,6 +87,8 @@ type SiteOption = { id: string; name: string };
 export type EconomyContext = { pointsPerEuro: number; monthlyRewardBudgetCents: number };
 
 const ALL_SITES = "__all__";
+const NO_LABEL = "__none__";
+const KIND_LABELS = { reward: "Reward, redeemed with points", discount: "Staff discount, always on" };
 
 function RewardFormDialog({
   open,
@@ -95,6 +114,10 @@ function RewardFormDialog({
   const [uploading, setUploading] = useState(false);
   const [pointsCost, setPointsCost] = useState(String(editing?.pointsCost ?? 0));
   const [euroCost, setEuroCost] = useState(editing ? String(editing.euroCostCents / 100) : "");
+  const [kind, setKind] = useState(editing?.kind === "discount" ? "discount" : "reward");
+  const isDiscount = kind === "discount";
+  const [promoTag, setPromoTag] = useState<PromoTag | "">(isPromoTag(editing?.promoTag) ? editing.promoTag : "");
+  const [promoEnds, setPromoEnds] = useState(endDateInput(editing?.promoEndsAt ?? null));
   const [monthlyStock, setMonthlyStock] = useState(
     editing?.monthlyStock === null || editing?.monthlyStock === undefined ? "" : String(editing.monthlyStock),
   );
@@ -156,6 +179,27 @@ function RewardFormDialog({
           <input type="hidden" name="imageUrl" value={imageUrl} />
           <input type="hidden" name="fulfilment" value="manual" />
           <input type="hidden" name="type" value="internal" />
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="promoTag" value={promoTag} />
+          {isDiscount ? <input type="hidden" name="pointsCost" value="0" /> : null}
+
+          <div className="space-y-1.5">
+            <Label>Type</Label>
+            <Select value={kind} onValueChange={setKind} items={KIND_LABELS}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="reward">Reward, redeemed with points</SelectItem>
+                <SelectItem value="discount">Staff discount, always on</SelectItem>
+              </SelectContent>
+            </Select>
+            {isDiscount ? (
+              <p className="text-muted text-xs">
+                Shows in Staff discounts at the top of the Rewards shop. No points, stock or budget: staff just use it.
+              </p>
+            ) : null}
+          </div>
 
           <div className="space-y-1.5">
             <Label>Image</Label>
@@ -213,6 +257,19 @@ function RewardFormDialog({
             <Label htmlFor="name">Name</Label>
             <Input id="name" name="name" defaultValue={editing?.name ?? ""} required />
           </div>
+          {isDiscount ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="discountText">Discount</Label>
+              <Input
+                id="discountText"
+                name="discountText"
+                defaultValue={editing?.discountText ?? ""}
+                placeholder="e.g. 20% off"
+                maxLength={24}
+                required
+              />
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -220,7 +277,7 @@ function RewardFormDialog({
               name="description"
               defaultValue={editing?.description ?? ""}
               rows={2}
-              placeholder="What staff will see on the store"
+              placeholder={isDiscount ? "Where it applies and how to use it" : "What staff will see on the store"}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -233,7 +290,7 @@ function RewardFormDialog({
                 placeholder="e.g. Merch"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className={cn("space-y-1.5", isDiscount && "hidden")}>
               <Label htmlFor="euroCost">Our cost (€, if any)</Label>
               <Input
                 id="euroCost"
@@ -253,107 +310,116 @@ function RewardFormDialog({
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="pointsCost">Points price</Label>
-              <Input
-                id="pointsCost"
-                name="pointsCost"
-                type="number"
-                min={0}
-                value={pointsCost}
-                onChange={(e) => {
-                  setPointsCost(e.target.value);
-                  setPointsTouched(true);
-                }}
-                className="font-mono"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="monthlyStock">Per month</Label>
-              <Input
-                id="monthlyStock"
-                name="monthlyStock"
-                type="number"
-                min={0}
-                value={monthlyStock}
-                onChange={(e) => setMonthlyStock(e.target.value)}
-                placeholder="No monthly limit"
-                className="font-mono"
-              />
-            </div>
-          </div>
-          <div className="bg-secondary space-y-2 rounded-lg p-3 text-xs" data-numeric>
-            {suggested !== null ? (
-              <div className="flex items-center justify-between gap-3">
-                <p>
-                  <span className="text-muted">Advised price: </span>
-                  <b>{formatNumber(suggested)} pts</b>
-                  <span className="text-muted">
-                    {" "}
-                    ({centsToEuros(cashCents)} at {formatNumber(economy.pointsPerEuro)} pts per €1, rounded up)
-                  </span>
-                </p>
-                {Number(pointsCost) !== suggested ? (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={() => {
-                      setPointsCost(String(suggested));
+          {isDiscount ? null : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="pointsCost">Points price</Label>
+                  <Input
+                    id="pointsCost"
+                    name="pointsCost"
+                    type="number"
+                    min={0}
+                    value={pointsCost}
+                    onChange={(e) => {
+                      setPointsCost(e.target.value);
                       setPointsTouched(true);
                     }}
-                  >
-                    Use
-                  </Button>
+                    className="font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="monthlyStock">Per month</Label>
+                  <Input
+                    id="monthlyStock"
+                    name="monthlyStock"
+                    type="number"
+                    min={0}
+                    value={monthlyStock}
+                    onChange={(e) => setMonthlyStock(e.target.value)}
+                    placeholder="No monthly limit"
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+              <div className="bg-secondary space-y-2 rounded-lg p-3 text-xs" data-numeric>
+                {suggested !== null ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p>
+                      <span className="text-muted">Advised price: </span>
+                      <b>{formatNumber(suggested)} pts</b>
+                      <span className="text-muted">
+                        {" "}
+                        ({centsToEuros(cashCents)} at {formatNumber(economy.pointsPerEuro)} pts per €1, rounded up)
+                      </span>
+                    </p>
+                    {Number(pointsCost) !== suggested ? (
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="outline"
+                        onClick={() => {
+                          setPointsCost(String(suggested));
+                          setPointsTouched(true);
+                        }}
+                      >
+                        Use
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-muted">
+                    No cost to us, so no advised price: price it by how special it feels (similar perks cost 600 to
+                    6,000 pts). Monthly stock keeps it in check.
+                  </p>
+                )}
+                {cashCents > faceCents ? (
+                  <p className="text-warning">
+                    {formatNumber(Number(pointsCost) || 0)} pts is only worth {centsToEuros(faceCents)}, less than it
+                    costs us. Staff get a bargain and the budget pays the difference.
+                  </p>
                 ) : null}
-              </div>
-            ) : (
-              <p className="text-muted">
-                No cost to us, so no advised price: price it by how special it feels (similar perks
-                cost 600 to 6,000 pts). Monthly stock keeps it in check.
-              </p>
-            )}
-            {cashCents > faceCents ? (
-              <p className="text-warning">
-                {formatNumber(Number(pointsCost) || 0)} pts is only worth {centsToEuros(faceCents)}, less than it costs us.
-                Staff get a bargain and the budget pays the difference.
-              </p>
-            ) : null}
-            <p>
-              <span className="text-muted">Most per month: </span>
-              {cashCents === 0 ? (
-                <b>€0 (perk, held in check by stock)</b>
-              ) : perMonth === null ? (
-                <b>no limit, only the {centsToEuros(economy.monthlyRewardBudgetCents)} budget</b>
-              ) : (
-                <>
-                  <b>{centsToEuros(perMonth * cashCents)}</b>
-                  <span className="text-muted">
-                    {" "}
-                    = {Math.round(((perMonth * cashCents) / Math.max(1, economy.monthlyRewardBudgetCents)) * 100)}% of
-                    the {centsToEuros(economy.monthlyRewardBudgetCents)} budget
-                  </span>
-                </>
-              )}
-            </p>
-            {stockAdvice !== null && (perMonth === null || perMonth > stockAdvice) ? (
-              <div className="flex items-center justify-between gap-3">
                 <p>
-                  <span className="text-muted">Advised stock: </span>
-                  <b>{formatNumber(stockAdvice)} a month</b>
-                  <span className="text-muted"> keeps it to a quarter of the budget</span>
+                  <span className="text-muted">Most per month: </span>
+                  {cashCents === 0 ? (
+                    <b>€0 (perk, held in check by stock)</b>
+                  ) : perMonth === null ? (
+                    <b>no limit, only the {centsToEuros(economy.monthlyRewardBudgetCents)} budget</b>
+                  ) : (
+                    <>
+                      <b>{centsToEuros(perMonth * cashCents)}</b>
+                      <span className="text-muted">
+                        {" "}
+                        = {Math.round(((perMonth * cashCents) / Math.max(1, economy.monthlyRewardBudgetCents)) * 100)}%
+                        of the {centsToEuros(economy.monthlyRewardBudgetCents)} budget
+                      </span>
+                    </>
+                  )}
                 </p>
-                <Button type="button" size="xs" variant="outline" onClick={() => setMonthlyStock(String(stockAdvice))}>
-                  Use
-                </Button>
+                {stockAdvice !== null && (perMonth === null || perMonth > stockAdvice) ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p>
+                      <span className="text-muted">Advised stock: </span>
+                      <b>{formatNumber(stockAdvice)} a month</b>
+                      <span className="text-muted"> keeps it to a quarter of the budget</span>
+                    </p>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() => setMonthlyStock(String(stockAdvice))}
+                    >
+                      Use
+                    </Button>
+                  </div>
+                ) : null}
+                <p className="text-muted">Our cost counts against the monthly budget. Per month refills on the 1st.</p>
               </div>
-            ) : null}
-            <p className="text-muted">Our cost counts against the monthly budget. Per month refills on the 1st.</p>
-          </div>
+            </>
+          )}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+            <div className={cn("space-y-1.5", isDiscount && "hidden")}>
               <Label htmlFor="stock">Stock</Label>
               <Input
                 id="stock"
@@ -370,6 +436,7 @@ function RewardFormDialog({
               <Select
                 value={siteId === "" ? ALL_SITES : siteId}
                 onValueChange={(v) => setSiteId(v === ALL_SITES ? "" : v)}
+                items={{ [ALL_SITES]: "All sites", ...Object.fromEntries(sites.map((s) => [s.id, s.name])) }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -384,6 +451,91 @@ function RewardFormDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="border-border space-y-3 rounded-lg border p-3">
+            <div className="space-y-1.5">
+              <Label>Shop label</Label>
+              <Select
+                value={promoTag === "" ? NO_LABEL : promoTag}
+                items={{ [NO_LABEL]: "No label", ...PROMO_LABELS }}
+                onValueChange={(v) => {
+                  const next = v === NO_LABEL ? "" : (v as PromoTag);
+                  setPromoTag(next);
+                  // "This month only" runs to the end of this month unless told otherwise.
+                  if (next === "month_only" && promoEnds === "") setPromoEnds(monthEndInput());
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_LABEL}>No label</SelectItem>
+                  {PROMO_TAGS.filter((t) => !(isDiscount && t === "discounted")).map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {PROMO_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted text-xs">
+                Labelled{" "}
+                {isDiscount
+                  ? "discounts get a badge"
+                  : "rewards get a badge and go in the Featured row at the top of the shop"}
+                .
+              </p>
+            </div>
+            {promoTag ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="promoText">Badge wording</Label>
+                    <Input
+                      id="promoText"
+                      name="promoText"
+                      defaultValue={editing?.promoText ?? ""}
+                      placeholder={PROMO_LABELS[promoTag]}
+                      maxLength={24}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="promoEndsAt">Last day</Label>
+                    <Input
+                      id="promoEndsAt"
+                      name="promoEndsAt"
+                      type="date"
+                      value={promoEnds}
+                      onChange={(e) => setPromoEnds(e.target.value)}
+                    />
+                  </div>
+                </div>
+                {promoTag === "discounted" && !isDiscount ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="wasPointsCost">Usual price (pts)</Label>
+                    <Input
+                      id="wasPointsCost"
+                      name="wasPointsCost"
+                      type="number"
+                      min={1}
+                      defaultValue={editing?.wasPointsCost ?? ""}
+                      placeholder="Shown struck through"
+                      className="font-mono"
+                      required
+                    />
+                    <p className="text-muted text-xs">
+                      Points price above is the sale price. When the last day passes, the usual price comes back.
+                    </p>
+                  </div>
+                ) : null}
+                <p className="text-muted text-xs">
+                  {promoEnds === ""
+                    ? "No last day: the label stays until you remove it."
+                    : LEAVES_WHEN_ENDED.includes(promoTag)
+                      ? `After the last day (Irish time) the ${isDiscount ? "discount" : "reward"} leaves the shop.`
+                      : "After the last day (Irish time) the label comes off."}
+                </p>
+              </>
+            ) : null}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -531,11 +683,41 @@ export function RewardsManager({
       cell: ({ row }) => row.original.category ?? "—",
     },
     {
+      id: "label",
+      header: "Label",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const r = row.original;
+        const live = promoState(r);
+        if (!isPromoTag(r.promoTag)) return <span className="text-muted">—</span>;
+        return (
+          <span className={cn("whitespace-nowrap", !live.tag && "text-muted line-through")}>
+            {r.promoText || PROMO_LABELS[r.promoTag]}
+            {r.promoEndsAt ? (
+              <span className="text-muted block text-xs no-underline">
+                {live.tag ? "until " : live.gone ? "ended, off the shop " : "ended "}
+                {endDateInput(r.promoEndsAt)}
+              </span>
+            ) : null}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: "pointsCost",
       header: "Cost",
-      cell: ({ row }) => (
-        <span data-numeric>{formatNumber(row.original.pointsCost)}</span>
-      ),
+      cell: ({ row }) =>
+        row.original.kind === "discount" ? (
+          <span className="text-primary font-semibold whitespace-nowrap">{row.original.discountText}</span>
+        ) : (
+          <span data-numeric className="whitespace-nowrap">
+            {/* What staff pay today: a finished sale is back at the usual price. */}
+            {formatNumber(promoState(row.original).pointsCost)}
+            {row.original.wasPointsCost && promoState(row.original).wasPointsCost ? (
+              <s className="text-muted ml-1 text-xs">{formatNumber(row.original.wasPointsCost)}</s>
+            ) : null}
+          </span>
+        ),
     },
     {
       accessorKey: "euroCostCents",
