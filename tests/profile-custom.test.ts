@@ -26,6 +26,7 @@ import {
   type Cosmetic,
 } from "../lib/cosmetics";
 import { daysLeft } from "../lib/periods";
+import { isNewSince, seenAtFor } from "../lib/seen";
 
 const catalogue = builtinCatalogue();
 const item = (id: string) => itemById(catalogue, id)!;
@@ -79,7 +80,7 @@ test("you can only wear what you own, in the right slot", () => {
     owned: ["frame-neon"],
     frame: "frame-gold", // not owned
     banner: "frame-neon", // wrong kind
-    theme: "theme-violet", // free, always owned
+    theme: "theme-violet", // the default theme, always owned
   });
   assert.equal(wornItem(p, "frame", catalogue), null);
   assert.equal(wornItem(p, "banner", catalogue), null);
@@ -133,6 +134,7 @@ test("uploaded frames and banners draw their picture", () => {
     frameFit: null,
     active: false, // hidden from the shop, but owners keep wearing it
     categoryId: null,
+    listedAt: 0,
   };
   const wide: Cosmetic = { ...halo, id: "c2", kind: "banner", name: "Beach" };
   const withUploads = [...catalogue, halo, wide];
@@ -186,8 +188,8 @@ test("a category bundle is the plain sum of what you don't own yet", () => {
     flags("f-hidden", 5, { active: false }),
   ];
   const all = bundleFor(parseProfile({}), withFlags, "flags");
-  // Free items are already everyone's; hidden ones aren't for sale.
-  assert.deepEqual(all.items.map((i) => i.id), ["f-ie", "f-pride", "f-trans"]);
+  // Free items still have to be claimed, so the bundle includes them; hidden ones aren't for sale.
+  assert.deepEqual(all.items.map((i) => i.id), ["f-ie", "f-pride", "f-trans", "f-free"]);
   assert.equal(all.price, 9);
 
   const some = bundleFor(parseProfile({ owned: ["f-pride"] }), withFlags, "flags");
@@ -195,7 +197,34 @@ test("a category bundle is the plain sum of what you don't own yet", () => {
   assert.equal(bundleFor(parseProfile({}), withFlags, "nope").items.length, 0);
 
   const after = withOwned(parseProfile({ owned: ["f-pride"], banner: "banner-ocean" }), some.items);
-  assert.deepEqual(after.owned, ["f-pride", "f-ie", "f-trans"]);
+  assert.deepEqual(after.owned, ["f-pride", "f-ie", "f-trans", "f-free"]);
   assert.equal(after.banner, "banner-ocean"); // buying a bundle doesn't change what you wear
   assert.equal(bundleFor(after, withFlags, "flags").items.length, 0);
+});
+
+test("free items must be claimed in the shop; only the defaults are everyone's", () => {
+  const free: Cosmetic = { ...item("frame-neon"), id: "frame-free", price: 0 };
+  const withFree = [...catalogue, free];
+  const fresh = parseProfile({ frame: "frame-free" });
+  assert.equal(ownsItem(fresh, free), false);
+  assert.equal(wornItem(fresh, "frame", withFree), null); // can't wear it unclaimed
+  assert.equal(withEquipped(fresh, "frame", free).frame, "frame-free"); // unchanged: still not worn
+  assert.equal(ownsItem(fresh, item(DEFAULT_BANNER)), true);
+  assert.equal(ownsItem(fresh, item(DEFAULT_THEME)), true);
+  const claimed = withPurchase(fresh, free);
+  assert.deepEqual(claimed.owned, ["frame-free"]);
+  assert.equal(wornItem(claimed, "frame", withFree)?.id, "frame-free");
+});
+
+test("items listed since your last visit are new", () => {
+  const seen = new Date("2026-10-22T10:00:00Z");
+  assert.equal(isNewSince(Date.parse("2026-10-22T10:00:01Z"), seen), true);
+  assert.equal(isNewSince(Date.parse("2026-10-22T09:59:59Z"), seen), false);
+  assert.equal(isNewSince(seen, seen), false);
+  assert.equal(isNewSince(0, null), true); // never looked: everything is new
+  const now = Date.parse("2026-10-22T12:00:00Z");
+  assert.equal(seenAtFor(now - 1000, now)?.getTime(), now - 1000);
+  assert.equal(seenAtFor(now + 60_000, now)?.getTime(), now); // never in the future
+  assert.equal(seenAtFor("soon", now), null);
+  assert.equal(seenAtFor(Number.NaN, now), null);
 });

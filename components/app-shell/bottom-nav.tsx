@@ -6,6 +6,7 @@ import { House, Trophy, ShoppingBag, SquarePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
 import type { SessionUser } from "@/lib/auth/types";
+import { NewDot } from "./new-items";
 
 /** Routes that take over the whole screen (no tab bar), like a native modal. */
 export const FULL_SCREEN = ["/recognize", "/profile/edit"];
@@ -40,7 +41,10 @@ export function BottomNav({ user }: { user: SessionUser }) {
           <SquarePlus className="size-6" />
         </Tab>
         <Tab href="/rewards" label="Store" active={onStore}>
-          <ShoppingBag className="size-6" />
+          <span className="relative">
+            <ShoppingBag className="size-6" />
+            <NewDot areas={["shop", "rewards"]} className="ring-background absolute -top-0.5 -right-0.5 ring-2" />
+          </span>
         </Tab>
         <Tab href={`/profile/${user.id}`} label="Profile" active={onProfile}>
           <UserAvatar

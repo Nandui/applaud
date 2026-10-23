@@ -60,6 +60,11 @@ model User {
   // ledger row; RewardLedger SUM remains the source of truth (recompute action exists).
   walletBalance Int @default(0)
 
+  // When this person last opened the profile shop / the rewards list. Items
+  // listed after that show as "New" (null: they have never looked).
+  shopSeenAt    DateTime?
+  rewardsSeenAt DateTime?
+
   sentRecognitions     Recognition[]          @relation("Sender")
   receivedRecognitions RecognitionRecipient[]
   reactions            Reaction[]
@@ -225,6 +230,9 @@ model Reward {
   active        Boolean      @default(true)
   sortOrder     Int          @default(0)
   createdAt     DateTime     @default(now())
+  /// When it went on show (created, or shown again after being hidden): newer
+  /// than someone's User.rewardsSeenAt means "New" to them.
+  listedAt      DateTime     @default(now())
   redemptions   Redemption[]
 }
 
@@ -271,7 +279,7 @@ model Cosmetic {
   id         String            @id @default(cuid())
   kind       String // "frame" | "banner" | "theme"
   name       String
-  price      Int               @default(1) // points; 0 = free starter everyone owns
+  price      Int               @default(1) // points; 0 = free, but still claimed in the shop
   rarity     String            @default("common") // common | rare | epic | legendary
   /// Frame: built-in CSS class. Banner: CSS background. Theme: #rrggbb.
   style      String?
@@ -282,6 +290,9 @@ model Cosmetic {
   active     Boolean           @default(true)
   sortOrder  Int               @default(0)
   createdAt  DateTime          @default(now())
+  /// When it went on sale (created, or shown again after being hidden): newer
+  /// than someone's User.shopSeenAt means "New" to them.
+  listedAt   DateTime          @default(now())
   /// Optional Store category (e.g. "Flags"); each category sells as a bundle.
   categoryId String?
   category   CosmeticCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)

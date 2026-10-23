@@ -25,7 +25,10 @@ export type Cosmetic = {
   id: string;
   kind: CosmeticKind;
   name: string;
-  /** Points. 0 means a free starter that everyone owns. */
+  /**
+   * Points. 0 means free, but it's still claimed in the shop like any other
+   * item (only the default banner and theme are everyone's from the start).
+   */
   price: number;
   rarity: Rarity;
   /**
@@ -41,6 +44,8 @@ export type Cosmetic = {
   active: boolean;
   /** The Store category it's grouped under (e.g. "Flags"), if any. */
   categoryId: string | null;
+  /** When it went on sale, in ms since 1970: newer than someone's last shop visit is "New". */
+  listedAt: number;
 };
 
 /**
@@ -180,7 +185,7 @@ const FALLBACK_THEME = BUILTIN_COSMETICS.find((c) => c.id === DEFAULT_THEME)!.st
 
 /** The built-in items as full catalogue rows (used when the table is empty). */
 export function builtinCatalogue(): Cosmetic[] {
-  return BUILTIN_COSMETICS.map((c) => ({ ...c, imageUrl: null, frameFit: null, active: true, categoryId: null }));
+  return BUILTIN_COSMETICS.map((c) => ({ ...c, imageUrl: null, frameFit: null, active: true, categoryId: null, listedAt: 0 }));
 }
 
 export function isKind(value: unknown): value is CosmeticKind {
