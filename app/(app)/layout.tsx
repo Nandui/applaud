@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth/guards";
 import { SideNav } from "@/components/app-shell/side-nav";
 import { BottomNav } from "@/components/app-shell/bottom-nav";
 import { NewItemsProvider } from "@/components/app-shell/new-items";
+import { IdleSignOut } from "@/components/app-shell/idle-sign-out";
 import { getNewCounts } from "@/lib/new-items";
 
 export default async function AppLayout({
@@ -20,6 +21,7 @@ export default async function AppLayout({
         <main className="pb-tabbar min-w-0 flex-1 px-4 md:px-8 md:pb-12">{children}</main>
         <BottomNav user={user} />
       </div>
+      <IdleSignOut />
     </NewItemsProvider>
   );
 }

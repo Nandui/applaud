@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Wordmark } from "@/components/app-shell/brand";
 import { devSignInEnabled, googleSignInEnabled } from "@/lib/auth/mode";
+import { IDLE_TIMEOUT_MINUTES } from "@/lib/auth/idle";
 import { SignInForm } from "./sign-in-form";
 
 export const metadata = { title: "Sign in" };
@@ -13,6 +14,7 @@ const ERRORS: Record<string, string> = {
     "Your Yayup account has been switched off. Ask an admin if you think that's a mistake.",
   WrongDomain: "Use your work Google account to sign in.",
   GoogleUnverified: "Google couldn't confirm that email address. Try another account.",
+  Idle: `You were signed out after ${IDLE_TIMEOUT_MINUTES} minutes without activity. Sign in again to carry on.`,
 };
 
 export default async function SignInPage({
