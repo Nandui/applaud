@@ -115,6 +115,10 @@ model Value {
 
 model Recognition {
   id         String    @id @default(cuid())
+  /// "recognition" (a shout-out: recipients, a value, maybe points) | "post"
+  /// (an ordinary feed post by senderId: text and/or pictures, no recipients,
+  /// no value, no points). Shout-out counts and analytics only count recognitions.
+  kind       String    @default("recognition")
   senderId   String
   sender     User      @relation("Sender", fields: [senderId], references: [id])
   valueId    String?

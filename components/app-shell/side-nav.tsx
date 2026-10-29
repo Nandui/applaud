@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, Trophy, Gift, Wallet, Award, Shield, Plus, Sparkles, type LucideIcon } from "lucide-react";
+import { House, Trophy, Gift, Wallet, Award, Shield, Plus, Sparkles, SquarePen, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAdmin } from "@/lib/auth/types";
 import { UserAvatar } from "@/components/user-avatar";
@@ -60,6 +60,12 @@ export function SideNav({ user }: { user: SessionUser }) {
         className="bg-primary text-primary-fg mt-4 flex h-11 items-center justify-center gap-2 rounded-xl font-semibold transition-opacity active:opacity-80"
       >
         <Plus className="size-5" strokeWidth={2.6} /> Send a shout-out
+      </Link>
+      <Link
+        href="/post"
+        className="bg-surface-2 mt-2 flex h-11 items-center justify-center gap-2 rounded-xl font-semibold transition-opacity active:opacity-80"
+      >
+        <SquarePen className="size-4.5" strokeWidth={2.2} /> New post
       </Link>
       <Link
         href={`/profile/${user.id}`}

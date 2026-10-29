@@ -66,6 +66,7 @@ export async function getLeaderboard({
     prisma.recognition.findMany({
       where: {
         system: false,
+        kind: "recognition",
         ...(createdAt ? { createdAt } : {}),
         ...(userFilter ? { sender: userFilter } : {}),
       },

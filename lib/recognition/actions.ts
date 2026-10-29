@@ -4,11 +4,13 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
+import { isAdmin } from "@/lib/auth/types";
 import { getOrgSettings } from "@/lib/org-settings";
 import { allowanceForRole, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
 import { maxPointsPerShoutout } from "@/lib/economy";
 import {
   MAX_RECOGNITION_IMAGES,
+  MAX_POST_LENGTH,
   REACTION_EMOJIS,
   BOOSTS,
   BOOST_TYPES,
@@ -167,6 +169,83 @@ export async function createRecognition(
   revalidatePath("/");
   revalidatePath("/me");
   return { ok: true, message: "Recognition posted!" };
+}
+
+const postSchema = z
+  .object({
+    message: z.string().trim().max(MAX_POST_LENGTH, `Keep it under ${MAX_POST_LENGTH} characters.`),
+    imageUrls: z
+      .array(attachmentUrl)
+      .max(MAX_RECOGNITION_IMAGES, `Attach at most ${MAX_RECOGNITION_IMAGES} images.`)
+      .default([]),
+  })
+  .refine((p) => p.message.length > 0 || p.imageUrls.length > 0, "Write something or add a photo.");
+
+/**
+ * Share an ordinary post in the feed: text and/or photos and GIFs, from the
+ * signed-in person to everyone. No recipients, value or points, so nothing
+ * touches the ledger. Stored as a Recognition row with kind "post" so likes,
+ * reactions and comments work the same as on shout-outs.
+ */
+export async function createPost(
+  _prev: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  const me = await requireUser();
+  const parsed = postSchema.safeParse({
+    message: formData.get("message") ?? "",
+    imageUrls: formData.getAll("imageUrls").map(String),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid post." };
+  }
+  const { message, imageUrls } = parsed.data;
+
+  const post = await prisma.recognition.create({
+    data: { kind: "post", senderId: me.id, message, imageUrls, visibility: "public" },
+  });
+  await writeAudit({
+    actor: me,
+    action: "post.created",
+    entityType: "recognition",
+    entityId: post.id,
+    summary: `Shared a post${imageUrls.length ? ` with ${imageUrls.length} picture${imageUrls.length === 1 ? "" : "s"}` : ""}`,
+    metadata: { imageCount: imageUrls.length },
+    siteId: me.siteId,
+  });
+  revalidatePath("/");
+  revalidatePath("/profile/[id]", "page");
+  return { ok: true, message: "Posted" };
+}
+
+/**
+ * Delete an ordinary post, with its likes and comments. Its author can delete
+ * it, and so can admins (moderation; the audit log keeps what it said).
+ * Shout-outs can't be deleted here: they carry points on the ledger.
+ */
+export async function deletePost(postId: string): Promise<ActionResult> {
+  const me = await requireUser();
+  const post = await prisma.recognition.findUnique({
+    where: { id: postId },
+    select: { id: true, kind: true, senderId: true, message: true, imageUrls: true, sender: { select: { name: true } } },
+  });
+  if (!post || post.kind !== "post") return { ok: false, error: "That post no longer exists." };
+  const own = post.senderId === me.id;
+  if (!own && !isAdmin(me)) return { ok: false, error: "You can only delete your own posts." };
+
+  await prisma.recognition.delete({ where: { id: post.id } });
+  await writeAudit({
+    actor: me,
+    action: "post.deleted",
+    entityType: "recognition",
+    entityId: post.id,
+    summary: own ? "Deleted their post" : `Removed a post by ${post.sender.name}`,
+    metadata: { authorId: post.senderId, message: post.message, imageUrls: post.imageUrls },
+    siteId: me.siteId,
+  });
+  revalidatePath("/");
+  revalidatePath("/profile/[id]", "page");
+  return { ok: true, message: "Post deleted" };
 }
 
 const reactionSchema = z.object({
