@@ -10,7 +10,7 @@ async function rateFor(
   where: object,
 ) {
   const senders = await prisma.recognition.findMany({
-    where: { system: false, ...where },
+    where: { system: false, kind: "recognition", ...where },
     select: { senderId: true },
   });
   const recips = await prisma.recognitionRecipient.findMany({

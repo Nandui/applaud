@@ -50,7 +50,7 @@ export const getProfileData = cache(async (userId: string) => {
       prisma.recognitionRecipient.count({
         where: { userId: id, recognition: { system: false } },
       }),
-      prisma.recognition.count({ where: { senderId: id, system: false } }),
+      prisma.recognition.count({ where: { senderId: id, system: false, kind: "recognition" } }),
       prisma.rewardLedger.aggregate({
         _sum: { amount: true },
         where: { userId: id, type: { in: ["RECOGNITION", "AWARD"] } },

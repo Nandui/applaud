@@ -9,7 +9,7 @@ import type { SessionUser } from "@/lib/auth/types";
 import { NewDot } from "./new-items";
 
 /** Routes that take over the whole screen (no tab bar), like a native modal. */
-export const FULL_SCREEN = ["/recognize", "/profile/edit"];
+export const FULL_SCREEN = ["/recognize", "/post", "/profile/edit"];
 
 /**
  * Phone tab bar, the plain Instagram one: full width, hairline on top, five

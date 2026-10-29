@@ -28,7 +28,7 @@ export default async function MePage() {
       take: 20,
     }),
     prisma.recognitionRecipient.count({ where: { userId: me.id } }),
-    prisma.recognition.count({ where: { senderId: me.id, system: false } }),
+    prisma.recognition.count({ where: { senderId: me.id, system: false, kind: "recognition" } }),
   ]);
 
   const usedPct =

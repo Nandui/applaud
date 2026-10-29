@@ -46,7 +46,7 @@ export async function getAnalytics({
     }),
     prisma.site.findMany({ select: { id: true, name: true } }),
     prisma.recognition.findMany({
-      where: { system: false, ...(createdAt ? { createdAt } : {}) },
+      where: { system: false, kind: "recognition", ...(createdAt ? { createdAt } : {}) },
       select: {
         id: true,
         createdAt: true,

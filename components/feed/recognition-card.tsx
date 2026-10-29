@@ -18,9 +18,10 @@ import {
   Ellipsis,
   Pin,
   PinOff,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { toggleReaction, addComment, toggleBoost } from "@/lib/recognition/actions";
+import { toggleReaction, addComment, toggleBoost, deletePost } from "@/lib/recognition/actions";
 import { togglePin } from "@/lib/profile-actions";
 import {
   REACTION_EMOJIS,
@@ -35,6 +36,7 @@ import { DEFAULT_LOOK } from "@/lib/cosmetics";
 import { isLight } from "@/lib/contrast";
 import { optimizedImage } from "@/lib/image-url";
 import { ValueSeal } from "@/components/value-seal";
+import { PostBanner } from "@/components/feed/post-banner";
 import { tint } from "@/components/value-chip";
 import {
   Popover,
@@ -239,6 +241,9 @@ export function RecognitionCard({
   const [, startComment] = useTransition();
   const [boostPending, startBoost] = useTransition();
   const [pinPending, startPin] = useTransition();
+  const [deletePending, startDelete] = useTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [body, setBody] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reactorsOpen, setReactorsOpen] = useState(false);
@@ -347,6 +352,21 @@ export function RecognitionCard({
     });
   }
 
+  function onDelete() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    startDelete(async () => {
+      const res = await deletePost(card.id);
+      if (res.ok) {
+        setMenuOpen(false);
+        setDeleted(true);
+        toast.success(res.message);
+      } else toast.error(res.error);
+    });
+  }
+
   function openComments(focus = false) {
     setCommentsOpen(true);
     if (focus) setTimeout(() => commentInputRef.current?.focus(), 350);
@@ -403,12 +423,19 @@ export function RecognitionCard({
   const leadReactor =
     allReactors.find((u) => u.id !== viewer.id) ?? allReactors[0] ?? null;
 
+  const isPost = card.kind === "post";
   const canPin =
     pinned !== undefined && !card.system && card.recipients.some((r) => r.id === viewer.id);
+  // Posts can be deleted by whoever wrote them, and by admins (moderation).
+  const canDelete = isPost && (card.sender.id === viewer.id || viewer.role === "admin");
 
   const people = card.recipients.slice(0, 3);
   const accent = card.recipients[0]?.look.theme ?? DEFAULT_LOOK.theme;
   const hasMedia = card.imageUrls.length > 0;
+  // Who the post is about: the recipients of a shout-out, the author of a post.
+  const subjectName = isPost ? card.sender.name : card.recipients[0]?.name;
+
+  if (deleted) return null;
 
   return (
     <article
@@ -417,7 +444,16 @@ export function RecognitionCard({
     >
       {/* Header: who it's for, big; who sent it underneath. */}
       <header className="flex items-center gap-3">
-        {people.length > 0 ? (
+        {isPost ? (
+          <Link href={`/profile/${card.sender.id}`} className="shrink-0">
+            <FramedAvatar
+              name={card.sender.name}
+              avatarUrl={card.sender.avatarUrl}
+              frame={card.sender.look.frame}
+              className="size-11 text-sm"
+            />
+          </Link>
+        ) : people.length > 0 ? (
           <div className="flex shrink-0 items-center">
             {people.map((r, i) => (
               <Link
@@ -442,15 +478,21 @@ export function RecognitionCard({
         )}
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-[1.05rem] font-bold tracking-tight">
-            {card.recipients.map((r, i) => (
-              <Fragment key={r.id}>
-                {i > 0 && (i === card.recipients.length - 1 ? " & " : ", ")}
-                <Link href={`/profile/${r.id}`}>{r.name}</Link>
-              </Fragment>
-            ))}
+            {isPost ? (
+              <Link href={`/profile/${card.sender.id}`}>{card.sender.name}</Link>
+            ) : (
+              card.recipients.map((r, i) => (
+                <Fragment key={r.id}>
+                  {i > 0 && (i === card.recipients.length - 1 ? " & " : ", ")}
+                  <Link href={`/profile/${r.id}`}>{r.name}</Link>
+                </Fragment>
+              ))
+            )}
           </p>
           <p className="text-muted mt-0.5 flex items-center gap-1 truncate text-[0.82rem]">
-            {card.system ? (
+            {isPost ? (
+              card.sender.jobTitle && <span className="truncate">{card.sender.jobTitle}</span>
+            ) : card.system ? (
               <span>{card.sender.name}</span>
             ) : (
               <>
@@ -460,12 +502,21 @@ export function RecognitionCard({
                 </Link>
               </>
             )}
-            <time title={card.createdAtFull}>· {card.createdAtLabel}</time>
+            <time title={card.createdAtFull}>
+              {isPost && !card.sender.jobTitle ? "" : "· "}
+              {card.createdAtLabel}
+            </time>
             {card.visibility === "private" && <Lock className="size-3.5 shrink-0" aria-label="Private" />}
           </p>
         </div>
-        {canPin && (
-          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        {(canPin || canDelete) && (
+          <Popover
+            open={menuOpen}
+            onOpenChange={(open) => {
+              setMenuOpen(open);
+              if (!open) setConfirmDelete(false);
+            }}
+          >
             <PopoverTrigger asChild>
               <button
                 type="button"
@@ -476,15 +527,31 @@ export function RecognitionCard({
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-56 rounded-2xl p-1.5">
-              <button
-                type="button"
-                onClick={onPin}
-                disabled={pinPending}
-                className="hover:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold"
-              >
-                {pinned ? <PinOff className="size-4.5" /> : <Pin className="size-4.5" />}
-                {pinned ? "Unpin from profile" : "Pin to profile"}
-              </button>
+              {canPin && (
+                <button
+                  type="button"
+                  onClick={onPin}
+                  disabled={pinPending}
+                  className="hover:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold"
+                >
+                  {pinned ? <PinOff className="size-4.5" /> : <Pin className="size-4.5" />}
+                  {pinned ? "Unpin from profile" : "Pin to profile"}
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={deletePending}
+                  className={cn(
+                    "text-danger flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold disabled:opacity-50",
+                    confirmDelete ? "bg-danger/10" : "hover:bg-surface-2",
+                  )}
+                >
+                  <Trash2 className="size-4.5" />
+                  {confirmDelete ? "Tap again to delete" : "Delete post"}
+                </button>
+              )}
             </PopoverContent>
           </Popover>
         )}
@@ -493,10 +560,20 @@ export function RecognitionCard({
       {/* The picture: their photo/GIF, or the recipient's own banner and frame.
           Double-tap applauds. */}
       <div
-        className="relative -mx-4 mt-3 overflow-hidden select-none md:mx-0 md:rounded-t-2xl"
+        className={cn(
+          "relative -mx-4 mt-3 overflow-hidden select-none md:mx-0",
+          // Posts have no "Recognised for" band underneath to round off.
+          isPost ? "md:rounded-2xl" : "md:rounded-t-2xl",
+        )}
         onClick={onBodyTap}
       >
-        {hasMedia ? <MediaHero urls={card.imageUrls} /> : <BannerHero card={card} />}
+        {hasMedia ? (
+          <MediaHero urls={card.imageUrls} />
+        ) : isPost ? (
+          <PostBanner banner={card.sender.look.banner} message={card.message} />
+        ) : (
+          <BannerHero card={card} />
+        )}
 
         {/* Applause burst on double-tap / clap */}
         {burst > 0 && (
@@ -695,7 +772,7 @@ export function RecognitionCard({
           <SheetHeader className="border-b pt-1 pb-3 text-center">
             <SheetTitle className="text-center text-base">Comments</SheetTitle>
             <SheetDescription className="sr-only">
-              Comments on {card.sender.name}&apos;s shout-out
+              Comments on {card.sender.name}&apos;s {isPost ? "post" : "shout-out"}
             </SheetDescription>
           </SheetHeader>
           <div className="max-h-[55svh] min-h-[30svh] space-y-4 overflow-y-auto px-4 py-4">
@@ -704,7 +781,7 @@ export function RecognitionCard({
                 <p className="text-foreground font-display text-lg font-semibold">
                   No comments yet
                 </p>
-                <p className="text-sm">Be the first to hype them up 🙌</p>
+                <p className="text-sm">{isPost ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}</p>
               </div>
             ) : (
               comments.map((c) => (
@@ -764,7 +841,7 @@ export function RecognitionCard({
                   ref={commentInputRef}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  placeholder={`Add a comment for ${card.recipients[0]?.name.split(" ")[0] ?? "them"}…`}
+                  placeholder={`Add a comment for ${subjectName?.split(" ")[0] ?? "them"}…`}
                   maxLength={500}
                   enterKeyHint="send"
                   className="placeholder:text-muted h-11 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
@@ -789,7 +866,7 @@ export function RecognitionCard({
           <SheetHeader className="border-b pt-1 pb-3">
             <SheetTitle className="text-center text-base">Reactions</SheetTitle>
             <SheetDescription className="sr-only">
-              People who reacted to this shout-out
+              People who reacted to this {isPost ? "post" : "shout-out"}
             </SheetDescription>
           </SheetHeader>
           <ul className="max-h-[60svh] overflow-y-auto py-2">

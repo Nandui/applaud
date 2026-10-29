@@ -25,6 +25,8 @@ export type { Look };
 
 export type FeedCard = {
   id: string;
+  /** "recognition" (a shout-out) or "post" (an ordinary post by the sender). */
+  kind: "recognition" | "post";
   message: string;
   imageUrls: string[];
   boostType: string | null;
@@ -95,6 +97,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
 
   return {
     id: r.id,
+    kind: r.kind === "post" ? "post" : "recognition",
     message: r.message,
     imageUrls: r.imageUrls,
     boostType: r.boostType,
@@ -174,12 +177,29 @@ export async function getGivenCards(
     where: {
       senderId: userId,
       system: false,
+      kind: "recognition",
       OR: [
         { visibility: "public" },
         { senderId: viewerId },
         { recipients: { some: { userId: viewerId } } },
       ],
     },
+    orderBy: { createdAt: "desc" },
+    take,
+    include: feedInclude,
+  });
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
+}
+
+/** Ordinary posts a user has written, newest first (posts are always public). */
+export async function getPostCards(
+  userId: string,
+  viewerId: string,
+  take = 20,
+): Promise<FeedCard[]> {
+  const catalogue = await getCatalogue();
+  const rows = await prisma.recognition.findMany({
+    where: { senderId: userId, kind: "post" },
     orderBy: { createdAt: "desc" },
     take,
     include: feedInclude,
@@ -212,7 +232,7 @@ export async function getCardsByIds(ids: string[], viewerId: string): Promise<Fe
     .map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
-/** Feed visible to a viewer: public posts + their own sent/received private posts. */
+/** Feed visible to a viewer: public shout-outs and posts + their own sent/received private shout-outs. */
 export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
   const catalogue = await getCatalogue();
   const rows = await prisma.recognition.findMany({

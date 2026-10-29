@@ -87,5 +87,8 @@ export const ALLOWED_IMAGE_TYPES = [
 ] as const;
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB per file
 
+/** Longest ordinary feed post (text, no recipients), in characters. */
+export const MAX_POST_LENGTH = 1000;
+
 /** How many GIFs the GIPHY search route returns per query. */
 export const GIF_SEARCH_LIMIT = 24;

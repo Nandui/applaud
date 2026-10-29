@@ -4,7 +4,7 @@ import { Pin } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
 import { getProfileData } from "@/lib/profile";
-import { getCardsByIds, getGivenCards, getReceivedCards } from "@/lib/recognition/queries";
+import { getCardsByIds, getGivenCards, getPostCards, getReceivedCards } from "@/lib/recognition/queries";
 import { isLight, wornItem } from "@/lib/profile-custom";
 import { FramedAvatar } from "@/components/user-avatar";
 import { RecognitionCard } from "@/components/feed/recognition-card";
@@ -27,7 +27,7 @@ export async function generateMetadata({
   return { title: data ? data.user.name : "Profile" };
 }
 
-type Tab = "received" | "given";
+type Tab = "received" | "given" | "posts";
 
 const secondaryButton =
   "bg-surface-2 flex h-9 flex-1 items-center justify-center rounded-lg text-sm font-semibold transition-opacity active:opacity-70";
@@ -48,13 +48,17 @@ export default async function ProfilePage({
 }) {
   const { id } = await params;
   const { tab: rawTab } = await searchParams;
-  const tab: Tab = rawTab === "given" ? "given" : "received";
+  const tab: Tab = rawTab === "given" || rawTab === "posts" ? rawTab : "received";
   const profile = getProfileData(id);
   const viewer = await requireUser();
   // Profiles are linked by id, so the shout-out list can load alongside the
   // header instead of after it (only pinned cards need the profile first).
   const listFor = (userId: string) =>
-    tab === "given" ? getGivenCards(userId, viewer.id) : getReceivedCards(userId, viewer.id);
+    tab === "given"
+      ? getGivenCards(userId, viewer.id)
+      : tab === "posts"
+        ? getPostCards(userId, viewer.id)
+        : getReceivedCards(userId, viewer.id);
   const early = listFor(id);
   const data = await profile;
   if (!data) notFound();
@@ -150,6 +154,7 @@ export default async function ProfilePage({
         tabs={[
           { key: "received", label: "Received", href: `/profile/${user.id}` },
           { key: "given", label: "Given", href: `/profile/${user.id}?tab=given` },
+          { key: "posts", label: "Posts", href: `/profile/${user.id}?tab=posts` },
         ]}
       />
 
@@ -168,9 +173,13 @@ export default async function ProfilePage({
 
       {listed.length === 0 && pinnedCards.length === 0 ? (
         <div className="text-muted flex flex-col items-center gap-2 px-6 py-16 text-center">
-          <p className="text-foreground font-bold">No shout-outs yet</p>
+          <p className="text-foreground font-bold">{tab === "posts" ? "No posts yet" : "No shout-outs yet"}</p>
           <p className="max-w-xs text-sm">
-            {tab === "given"
+            {tab === "posts"
+              ? isMe
+                ? "Posts you share in the feed will show up here."
+                : `${firstName} hasn't posted anything yet.`
+              : tab === "given"
               ? isMe
                 ? "Shout-outs you send will show up here."
                 : `${firstName} hasn't sent any shout-outs yet.`

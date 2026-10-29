@@ -43,7 +43,7 @@ export async function getPointsMonth(settings: OrgSettings, ref: Date) {
       orderBy: { name: "asc" },
     }),
     prisma.recognition.findMany({
-      where: { createdAt: month, system: false },
+      where: { createdAt: month, system: false, kind: "recognition" },
       select: { senderId: true, createdAt: true, recipients: { select: { points: true } } },
     }),
     prisma.nomination.findMany({

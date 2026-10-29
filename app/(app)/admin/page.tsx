@@ -25,7 +25,7 @@ export default async function AdminOverviewPage() {
   const [users, recognitions, pendingNominations, openRedemptions, rewards, economy] =
     await Promise.all([
       prisma.user.count({ where: { active: true } }),
-      prisma.recognition.count({ where: { system: false } }),
+      prisma.recognition.count({ where: { system: false, kind: "recognition" } }),
       prisma.nomination.count({ where: { status: "pending" } }),
       prisma.redemption.count({
         where: { status: { in: ["requested", "approved"] } },
