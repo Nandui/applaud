@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { toggleReaction, addComment, toggleBoost, deletePost } from "@/lib/recognition/actions";
 import { togglePin } from "@/lib/profile-actions";
+import { useLiveComments, TypingLine } from "@/components/feed/live-comments";
 import {
   REACTION_EMOJIS,
   BOOSTS,
@@ -38,7 +39,6 @@ import { isLight } from "@/lib/contrast";
 import { optimizedImage } from "@/lib/image-url";
 import { ValueSeal } from "@/components/value-seal";
 import { PostBanner } from "@/components/feed/post-banner";
-import { useLiveComments, TypingLine } from "@/components/feed/live-comments";
 import { tint } from "@/components/value-chip";
 import {
   Popover,
@@ -296,6 +296,8 @@ export function RecognitionCard({
     shown: shownComments,
     open: commentsOpen,
   });
+  // Whatever changes the draft (typing, an emoji, Reply) counts as typing.
+  useEffect(() => onDraftChange(body), [body, onDraftChange]);
   const commentListRef = useRef<HTMLDivElement>(null);
   const commentCount = comments.length;
   // Keep the open sheet scrolled to the newest comment, unless the reader has
@@ -872,10 +874,7 @@ export function RecognitionCard({
                 <input
                   ref={commentInputRef}
                   value={body}
-                  onChange={(e) => {
-                    setBody(e.target.value);
-                    onDraftChange(e.target.value);
-                  }}
+                  onChange={(e) => setBody(e.target.value)}
                   placeholder={`Add a comment for ${subjectName?.split(" ")[0] ?? "them"}…`}
                   maxLength={500}
                   enterKeyHint="send"
