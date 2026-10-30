@@ -7,6 +7,7 @@ import {
   Menu,
   Sparkles,
   Wallet,
+  PackageOpen,
   Gift,
   Award,
   Trophy,
@@ -93,6 +94,7 @@ export function AccountSheet({
             <Item href="/me" icon={Wallet} label="Wallet & allowance" onClick={close} />
             <Item href="/shop" icon={Sparkles} label="Profile shop" onClick={close} />
             <Item href="/rewards" icon={Gift} label="Rewards" onClick={close} />
+            <Item href="/rewards/claimed" icon={PackageOpen} label="My rewards" onClick={close} />
             <Item href="/awards" icon={Award} label="Awards & nominations" onClick={close} />
             <Item href="/leaderboard" icon={Trophy} label="Ranks" onClick={close} />
             {admin && <Item href="/admin" icon={Shield} label="Admin" onClick={close} />}

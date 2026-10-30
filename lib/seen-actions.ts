@@ -23,5 +23,10 @@ export async function markSeen(area: SeenArea, renderedAt: number): Promise<void
       where: { id: me.id, OR: [{ rewardsSeenAt: null }, { rewardsSeenAt: { lt: at } }] },
       data: { rewardsSeenAt: at },
     });
+  } else if (area === "claims") {
+    await prisma.user.updateMany({
+      where: { id: me.id, OR: [{ claimsSeenAt: null }, { claimsSeenAt: { lt: at } }] },
+      data: { claimsSeenAt: at },
+    });
   }
 }

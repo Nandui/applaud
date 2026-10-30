@@ -64,6 +64,8 @@ model User {
   // listed after that show as "New" (null: they have never looked).
   shopSeenAt    DateTime?
   rewardsSeenAt DateTime?
+  /// When they last opened My rewards (claim updates after it get a dot).
+  claimsSeenAt  DateTime?
 
   sentRecognitions     Recognition[]          @relation("Sender")
   receivedRecognitions RecognitionRecipient[]
@@ -315,6 +317,9 @@ model Redemption {
   expectedBy      DateTime?
   /// What the admin tells the person, e.g. "Collect it from reception". Shown in My rewards.
   staffNote       String?
+  /// Last time an admin moved it on or changed the note; newer than the
+  /// person\'s User.claimsSeenAt puts a dot on My rewards.
+  statusChangedAt DateTime?
   createdAt       DateTime  @default(now())
 
   @@index([status])

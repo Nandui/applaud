@@ -43,7 +43,7 @@ export function BottomNav({ user }: { user: SessionUser }) {
         <Tab href="/rewards" label="Store" active={onStore}>
           <span className="relative">
             <ShoppingBag className="size-6" />
-            <NewDot areas={["shop", "rewards"]} className="ring-background absolute -top-0.5 -right-0.5 ring-2" />
+            <NewDot areas={["shop", "rewards", "claims"]} className="ring-background absolute -top-0.5 -right-0.5 ring-2" />
           </span>
         </Tab>
         <Tab href={`/profile/${user.id}`} label="Profile" active={onProfile}>

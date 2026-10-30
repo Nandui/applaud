@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, History, PackageOpen } from "lucide-react";
+import { History } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
@@ -16,6 +16,8 @@ import { visibleRewardsWhere } from "@/lib/new-items";
 import { isNewSince, visitStamp } from "@/lib/seen";
 import { MarkSeen } from "@/components/app-shell/new-items";
 import { fulfilmentLabel } from "@/lib/fulfilment";
+import { getActiveClaims } from "@/lib/claims";
+import { ClaimsStrip } from "@/components/rewards/active-claims";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
@@ -34,7 +36,7 @@ export default async function RewardsPage({
   const me = await requireUser();
   const renderedAt = visitStamp();
 
-  const [user, catalogue, claims, economy, myOpen] = await Promise.all([
+  const [user, catalogue, claims, economy, myClaims] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: me.id },
       select: { walletBalance: true, rewardsSeenAt: true },
@@ -65,7 +67,7 @@ export default async function RewardsPage({
     }),
     getMonthlyClaimCounts(),
     getOrgSettings().then(getEconomyStatus),
-    prisma.redemption.count({ where: { userId: me.id, status: { in: ["requested", "approved"] } } }),
+    getActiveClaims(me.id),
   ]);
   // Monthly stock and the company budget decide what can be claimed right now.
   // Staff never see euros: a reward over budget just shows "All claimed".
@@ -154,18 +156,9 @@ export default async function RewardsPage({
               : "Keep collecting shout-outs to unlock your first reward."}
           </p>
         </div>
-        <Link
-          href="/rewards/claimed"
-          className="border-border mt-4 -mb-1 flex items-center gap-3 border-t pt-3 active:opacity-70"
-        >
-          <PackageOpen className="text-primary size-5 shrink-0" aria-hidden />
-          <span className="flex-1 text-sm font-semibold">My rewards</span>
-          <span className="text-muted text-sm" data-numeric>
-            {myOpen > 0 ? `${myOpen} on the way` : "Claims and status"}
-          </span>
-          <ChevronRight className="text-muted size-4" aria-hidden />
-        </Link>
       </section>
+
+      {!filtered ? <ClaimsStrip claims={myClaims} /> : null}
 
       {!filtered && discounts.length > 0 ? (
         <section className="mt-6" aria-labelledby="discounts-heading">

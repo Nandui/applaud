@@ -10,18 +10,21 @@ import { AppBar } from "@/components/app-shell/app-bar";
 import { Wordmark } from "@/components/app-shell/brand";
 import { RecognitionCard } from "@/components/feed/recognition-card";
 import { FramedAvatar } from "@/components/user-avatar";
+import { getActiveClaims } from "@/lib/claims";
+import { ClaimsHomeRow } from "@/components/rewards/active-claims";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const me = await requireUser();
-  const [cards, wallet, catalogue] = await Promise.all([
+  const [cards, wallet, catalogue, myClaims] = await Promise.all([
     getFeedCards(me.id),
     prisma.user.findUnique({
       where: { id: me.id },
       select: { walletBalance: true, profile: true },
     }),
     getCatalogue(),
+    getActiveClaims(me.id),
   ]);
   const myFrame = lookOf(wallet?.profile, catalogue).frame;
   const viewer = {
@@ -78,6 +81,8 @@ export default async function FeedPage() {
           <span aria-hidden>👏</span> Shout-out
         </Link>
       </div>
+
+      <ClaimsHomeRow claims={myClaims} />
 
       {cards.length === 0 ? (
         <div className="flex flex-col items-center gap-4 px-6 py-20 text-center">

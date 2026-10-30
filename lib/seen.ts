@@ -5,12 +5,13 @@
  * functions only, shared by the server, the client and the unit tests.
  */
 
-export type SeenArea = "shop" | "rewards";
+/** "claims": admin updates to their own claimed rewards (My rewards). */
+export type SeenArea = "shop" | "rewards" | "claims";
 
-/** How many unseen items each Store half has for someone. */
+/** How many unseen items (or claim updates) each Store tab has for someone. */
 export type NewCounts = Record<SeenArea, number>;
 
-export const NO_NEW: NewCounts = { shop: 0, rewards: 0 };
+export const NO_NEW: NewCounts = { shop: 0, rewards: 0, claims: 0 };
 
 /** Listed after the person last looked (never looked: everything is new). */
 export function isNewSince(listedAt: Date | number, seenAt: Date | null): boolean {
