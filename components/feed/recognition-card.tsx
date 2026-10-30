@@ -19,6 +19,7 @@ import {
   Pin,
   PinOff,
   Trash2,
+  Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { toggleReaction, addComment, toggleBoost, deletePost } from "@/lib/recognition/actions";
@@ -37,6 +38,7 @@ import { isLight } from "@/lib/contrast";
 import { optimizedImage } from "@/lib/image-url";
 import { ValueSeal } from "@/components/value-seal";
 import { PostBanner } from "@/components/feed/post-banner";
+import { VotePanel } from "@/components/feed/vote-panel";
 import { tint } from "@/components/value-chip";
 import {
   Popover,
@@ -424,6 +426,8 @@ export function RecognitionCard({
     allReactors.find((u) => u.id !== viewer.id) ?? allReactors[0] ?? null;
 
   const isPost = card.kind === "post";
+  // An award vote: the ballot takes the picture's place; likes and comments work as usual.
+  const vote = card.kind === "vote" ? card.vote : null;
   const canPin =
     pinned !== undefined && !card.system && card.recipients.some((r) => r.id === viewer.id);
   // Posts can be deleted by whoever wrote them, and by admins (moderation).
@@ -439,12 +443,17 @@ export function RecognitionCard({
 
   return (
     <article
-      className="card-in pt-3 pb-6"
+      id={`post-${card.id}`}
+      className="card-in scroll-mt-16 pt-3 pb-6"
       style={{ "--card": Math.min(index, 6) } as React.CSSProperties}
     >
       {/* Header: who it's for, big; who sent it underneath. */}
       <header className="flex items-center gap-3">
-        {isPost ? (
+        {vote ? (
+          <span className="bg-primary/12 text-primary flex size-11 shrink-0 items-center justify-center rounded-full">
+            <Trophy className="size-5" />
+          </span>
+        ) : isPost ? (
           <Link href={`/profile/${card.sender.id}`} className="shrink-0">
             <FramedAvatar
               name={card.sender.name}
@@ -478,7 +487,9 @@ export function RecognitionCard({
         )}
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-[1.05rem] font-bold tracking-tight">
-            {isPost ? (
+            {vote ? (
+              <Link href="/awards">{vote.programName}</Link>
+            ) : isPost ? (
               <Link href={`/profile/${card.sender.id}`}>{card.sender.name}</Link>
             ) : (
               card.recipients.map((r, i) => (
@@ -490,7 +501,9 @@ export function RecognitionCard({
             )}
           </p>
           <p className="text-muted mt-0.5 flex items-center gap-1 truncate text-[0.82rem]">
-            {isPost ? (
+            {vote ? (
+              <span>{vote.status === "closed" ? "Vote results" : "Staff vote"}</span>
+            ) : isPost ? (
               card.sender.jobTitle && <span className="truncate">{card.sender.jobTitle}</span>
             ) : card.system ? (
               <span>{card.sender.name}</span>
@@ -562,12 +575,14 @@ export function RecognitionCard({
       <div
         className={cn(
           "relative -mx-4 mt-3 overflow-hidden select-none md:mx-0",
-          // Posts have no "Recognised for" band underneath to round off.
-          isPost ? "md:rounded-2xl" : "md:rounded-t-2xl",
+          // Posts and votes have no "Recognised for" band underneath to round off.
+          isPost || vote ? "md:rounded-2xl" : "md:rounded-t-2xl",
         )}
         onClick={onBodyTap}
       >
-        {hasMedia ? (
+        {vote ? (
+          <VotePanel vote={vote} />
+        ) : hasMedia ? (
           <MediaHero urls={card.imageUrls} />
         ) : isPost ? (
           <PostBanner banner={card.sender.look.banner} message={card.message} />
@@ -772,7 +787,7 @@ export function RecognitionCard({
           <SheetHeader className="border-b pt-1 pb-3 text-center">
             <SheetTitle className="text-center text-base">Comments</SheetTitle>
             <SheetDescription className="sr-only">
-              Comments on {card.sender.name}&apos;s {isPost ? "post" : "shout-out"}
+              {vote ? <>Comments on the {vote.programName} vote</> : <>Comments on {card.sender.name}&apos;s {isPost ? "post" : "shout-out"}</>}
             </SheetDescription>
           </SheetHeader>
           <div className="max-h-[55svh] min-h-[30svh] space-y-4 overflow-y-auto px-4 py-4">
@@ -781,7 +796,7 @@ export function RecognitionCard({
                 <p className="text-foreground font-display text-lg font-semibold">
                   No comments yet
                 </p>
-                <p className="text-sm">{isPost ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}</p>
+                <p className="text-sm">{isPost || vote ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}</p>
               </div>
             ) : (
               comments.map((c) => (
@@ -841,7 +856,7 @@ export function RecognitionCard({
                   ref={commentInputRef}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  placeholder={`Add a comment for ${subjectName?.split(" ")[0] ?? "them"}…`}
+                  placeholder={vote ? "Add a comment…" : `Add a comment for ${subjectName?.split(" ")[0] ?? "them"}…`}
                   maxLength={500}
                   enterKeyHint="send"
                   className="placeholder:text-muted h-11 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
@@ -866,7 +881,7 @@ export function RecognitionCard({
           <SheetHeader className="border-b pt-1 pb-3">
             <SheetTitle className="text-center text-base">Reactions</SheetTitle>
             <SheetDescription className="sr-only">
-              People who reacted to this {isPost ? "post" : "shout-out"}
+              People who reacted to this {isPost ? "post" : vote ? "vote" : "shout-out"}
             </SheetDescription>
           </SheetHeader>
           <ul className="max-h-[60svh] overflow-y-auto py-2">

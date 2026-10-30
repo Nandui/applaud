@@ -22,16 +22,23 @@ export default async function AdminAwardsPage() {
       cadence: true,
       requiresApproval: true,
       active: true,
+      voteEvery: true,
+      voteDays: true,
+      voteRole: true,
+      nextVoteAt: true,
     },
   });
 
-  const rows: ProgramRow[] = programs;
+  const rows: ProgramRow[] = programs.map((p) => ({
+    ...p,
+    nextVoteAt: p.nextVoteAt?.toISOString() ?? null,
+  }));
 
   return (
     <div>
       <PageHeader
         title="Award programs"
-        description="Configure nomination-based award programs."
+        description="Awards won by nomination, or put to a staff vote on a schedule."
       />
       <AwardProgramsManager rows={rows} />
     </div>

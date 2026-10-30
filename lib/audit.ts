@@ -37,6 +37,9 @@ export const AUDIT_ACTIONS = [
   "value.updated",
   "award.created",
   "award.updated",
+  "vote.scheduled",
+  "vote.opened",
+  "vote.closed",
   "milestone.updated",
   "settings.updated",
 ] as const;
@@ -118,6 +121,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   "value.updated": "Value updated",
   "award.created": "Award program created",
   "award.updated": "Award program updated",
+  "vote.scheduled": "Award vote schedule changed",
+  "vote.opened": "Award vote opened",
+  "vote.closed": "Award vote closed",
   "milestone.updated": "Milestone updated",
   "settings.updated": "Settings updated",
 };

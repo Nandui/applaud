@@ -31,6 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { VoteScheduleFields } from "@/components/awards/vote-settings";
+import { VOTE_ROLE_LABELS, isVoteRole, scheduleSummary } from "@/lib/votes/schedule";
 
 export type ProgramRow = {
   id: string;
@@ -40,6 +42,10 @@ export type ProgramRow = {
   cadence: string | null;
   requiresApproval: boolean;
   active: boolean;
+  voteEvery: string | null;
+  voteDays: number;
+  voteRole: string;
+  nextVoteAt: string | null;
 };
 
 const ADHOC = "adhoc";
@@ -78,7 +84,7 @@ function ProgramFormDialog({
         <DialogHeader>
           <DialogTitle>{editing ? "Edit program" : "New award program"}</DialogTitle>
           <DialogDescription>
-            Nomination-based awards that grant points to winners.
+            Won by nomination, or by a staff vote. Winners get the points.
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
@@ -139,6 +145,17 @@ function ProgramFormDialog({
               onCheckedChange={setRequiresApproval}
             />
           </div>
+          <div className="border-border rounded-lg border p-3">
+            <VoteScheduleFields
+              withRole
+              initial={{
+                voteEvery: editing?.voteEvery ?? null,
+                voteDays: editing?.voteDays ?? 7,
+                nextVoteAt: editing?.nextVoteAt ?? null,
+                voteRole: editing?.voteRole ?? "admin",
+              }}
+            />
+          </div>
           <div className="border-border flex items-center justify-between rounded-lg border p-3">
             <Label htmlFor="active-switch">Active</Label>
             <Switch id="active-switch" checked={active} onCheckedChange={setActive} />
@@ -193,6 +210,24 @@ export function AwardProgramsManager({ rows }: { rows: ProgramRow[] }) {
       cell: ({ row }) => (
         <span className="capitalize">{row.original.cadence ?? "Ad hoc"}</span>
       ),
+    },
+    {
+      id: "vote",
+      header: "Staff vote",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const r = row.original;
+        const summary = scheduleSummary(r.voteEvery, r.nextVoteAt);
+        if (!summary) return <span className="text-muted">Off</span>;
+        return (
+          <span className="block max-w-56 text-xs leading-snug">
+            {summary}
+            <span className="text-muted block">
+              Run by {isVoteRole(r.voteRole) ? VOTE_ROLE_LABELS[r.voteRole].toLowerCase() : "admins"}
+            </span>
+          </span>
+        );
+      },
     },
     {
       accessorKey: "requiresApproval",

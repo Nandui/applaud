@@ -3,6 +3,7 @@ import { ImagePlus, Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getFeedCards } from "@/lib/recognition/queries";
+import { syncAwardVotesAfterResponse } from "@/lib/votes/run";
 import { lookOf, parseProfile } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import { formatNumber } from "@/lib/format";
@@ -15,6 +16,8 @@ export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const me = await requireUser();
+  // Open and close any award votes that are due, without slowing the feed.
+  syncAwardVotesAfterResponse();
   const [cards, wallet, catalogue] = await Promise.all([
     getFeedCards(me.id),
     prisma.user.findUnique({

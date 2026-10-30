@@ -75,6 +75,8 @@ model User {
   redemptions          Redemption[]
   celebrations         Celebration[]
   auditEvents          AuditEvent[]
+  votesCast            AwardBallot[]          @relation("Voter")
+  votesReceived        AwardBallot[]          @relation("VoteNominee")
 
   // next-auth adapter relations
   accounts Account[]
@@ -117,7 +119,8 @@ model Recognition {
   id         String    @id @default(cuid())
   /// "recognition" (a shout-out: recipients, a value, maybe points) | "post"
   /// (an ordinary feed post by senderId: text and/or pictures, no recipients,
-  /// no value, no points). Shout-out counts and analytics only count recognitions.
+  /// no value, no points) | "vote" (an award vote opening, system: true; see
+  /// AwardVoteRound). Shout-out counts and analytics only count recognitions.
   kind       String    @default("recognition")
   senderId   String
   sender     User      @relation("Sender", fields: [senderId], references: [id])
@@ -138,6 +141,7 @@ model Recognition {
   recipients RecognitionRecipient[]
   reactions  Reaction[]
   comments   Comment[]
+  voteRound  AwardVoteRound?
 
   @@index([createdAt])
   @@index([senderId, createdAt])
@@ -191,6 +195,63 @@ model AwardProgram {
   requiresApproval Boolean      @default(true)
   active           Boolean      @default(true)
   nominations      Nomination[]
+
+  /// Staff vote: how often a vote opens ("week" | "month" | "quarter"); null
+  /// means this award is never put to a vote. See lib/votes/schedule.ts.
+  voteEvery   String?
+  /// How many days each vote stays open.
+  voteDays    Int              @default(7)
+  /// The role that sets this award's vote schedule and can open or close a
+  /// vote early ("admin" | "manager" | "operations" | "ceo"). Admins always can.
+  voteRole    String           @default("admin")
+  /// When the next vote opens (09:00 Irish time); moves on by voteEvery each time.
+  nextVoteAt  DateTime?
+  /// Who last saved the schedule: scheduled vote posts go out under their name.
+  voteSetById String?
+  voteRounds  AwardVoteRound[]
+}
+
+/// One vote on an award: opened on schedule (or by hand), announced by a
+/// feed post of kind "vote", closed after AwardProgram.voteDays. Closing picks
+/// the most-voted colleague(s), pays the award's points from the monthly bonus
+/// pool and posts the winner.
+model AwardVoteRound {
+  id         String        @id @default(cuid())
+  programId  String
+  program    AwardProgram  @relation(fields: [programId], references: [id])
+  /// "November 2026", "Week of 3 Nov", "Q4 2026".
+  label      String
+  opensAt    DateTime      @default(now())
+  closesAt   DateTime
+  status     String        @default("open") // open | closed
+  closedAt   DateTime?
+  postId     String?       @unique
+  post       Recognition?  @relation(fields: [postId], references: [id], onDelete: SetNull)
+  /// Set on close: [{ userId, votes }], most votes first.
+  results    Json?
+  winnerIds  String[]
+  /// Points each winner got (0 when the award has none or the pool ran out).
+  pointsEach Int           @default(0)
+  ballots    AwardBallot[]
+
+  @@index([status, closesAt])
+  @@index([programId, status])
+}
+
+/// One person's vote in a round; they can change it until the vote closes.
+model AwardBallot {
+  id        String         @id @default(cuid())
+  roundId   String
+  round     AwardVoteRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  voterId   String
+  voter     User           @relation("Voter", fields: [voterId], references: [id], onDelete: Cascade)
+  nomineeId String
+  nominee   User           @relation("VoteNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([roundId, voterId])
+  @@index([roundId, nomineeId])
 }
 
 model Nomination {

@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/milestones",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/award-votes",
+      "schedule": "5 9 * * *"
     }
   ]
 }
