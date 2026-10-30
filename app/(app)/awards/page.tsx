@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Trophy } from "lucide-react";
+import { Trophy, Vote } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { isManager, isAdmin } from "@/lib/auth/types";
@@ -12,17 +12,28 @@ import { cn } from "@/lib/utils";
 import { FramedAvatar, UserAvatar } from "@/components/user-avatar";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
+import { VoteSettingsSheet } from "@/components/awards/vote-settings";
+import { syncAwardVotesAfterResponse } from "@/lib/votes/run";
+import { canRunVote, scheduleSummary, voteTimeLabel } from "@/lib/votes/schedule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Awards" };
 
 export default async function AwardsPage() {
   const me = await requireUser();
-  const [catalogue, programs, colleagues, recentWins, pending] = await Promise.all([
+  syncAwardVotesAfterResponse();
+  const [catalogue, programs, colleagues, recentWins, voteWins, pending] = await Promise.all([
     getCatalogue(),
     prisma.awardProgram.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
+      include: {
+        voteRounds: {
+          where: { status: "open" },
+          take: 1,
+          select: { id: true, closesAt: true, postId: true, _count: { select: { ballots: true } } },
+        },
+      },
     }),
     prisma.user.findMany({
       where: { active: true, id: { not: me.id } },
@@ -43,7 +54,14 @@ export default async function AwardsPage() {
         id: true,
         nominee: { select: { id: true, name: true, avatarUrl: true, profile: true } },
         program: { select: { name: true } },
+        reviewedAt: true,
       },
+    }),
+    prisma.awardVoteRound.findMany({
+      where: { status: "closed", NOT: { winnerIds: { isEmpty: true } } },
+      orderBy: { closedAt: "desc" },
+      take: 6,
+      select: { id: true, winnerIds: true, closedAt: true, program: { select: { name: true } } },
     }),
     // Review queue: admins see all pending; managers see the pending nominations
     // of everyone who lists them as a manager. Someone with no managers at all
@@ -65,6 +83,26 @@ export default async function AwardsPage() {
         })
       : Promise.resolve([]),
   ]);
+
+  // Winners from nominations and from votes, newest first.
+  const voteWinnerIds = [...new Set(voteWins.flatMap((v) => v.winnerIds))];
+  const voteWinners = voteWinnerIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: voteWinnerIds } },
+        select: { id: true, name: true, avatarUrl: true, profile: true },
+      })
+    : [];
+  const winners = [
+    ...recentWins.map((w) => ({ key: w.id, at: w.reviewedAt, nominee: w.nominee, program: w.program.name })),
+    ...voteWins.flatMap((v) =>
+      v.winnerIds.flatMap((id) => {
+        const nominee = voteWinners.find((u) => u.id === id);
+        return nominee ? [{ key: `${v.id}-${id}`, at: v.closedAt, nominee, program: v.program.name }] : [];
+      }),
+    ),
+  ]
+    .sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0))
+    .slice(0, 8);
 
   const colleagueOpts = colleagues.map((c) => ({
     id: c.id,
@@ -113,12 +151,12 @@ export default async function AwardsPage() {
         </section>
       )}
 
-      {recentWins.length > 0 && (
+      {winners.length > 0 && (
         <section className="mb-6 pt-4">
           <h2 className="mb-2 text-[0.95rem] font-bold">Recent winners</h2>
           <ul className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4">
-            {recentWins.map((w) => (
-              <li key={w.id} className="w-20 shrink-0 text-center">
+            {winners.map((w) => (
+              <li key={w.key} className="w-20 shrink-0 text-center">
                 <Link href={`/profile/${w.nominee.id}`} className="flex flex-col items-center gap-1.5">
                   <span className="relative">
                     <FramedAvatar
@@ -130,7 +168,7 @@ export default async function AwardsPage() {
                     <span className="absolute -right-1 -bottom-1 text-xl">🏆</span>
                   </span>
                   <span className="w-full truncate text-xs font-semibold">{w.nominee.name.split(" ")[0]}</span>
-                  <span className="text-muted -mt-1 w-full truncate text-[0.65rem]">{w.program.name}</span>
+                  <span className="text-muted -mt-1 w-full truncate text-[0.65rem]">{w.program}</span>
                 </Link>
               </li>
             ))}
@@ -138,11 +176,15 @@ export default async function AwardsPage() {
         </section>
       )}
 
-      <h2 className={cn("mb-2 text-[0.95rem] font-bold", recentWins.length === 0 && pending.length === 0 && "pt-4")}>
+      <h2 className={cn("mb-2 text-[0.95rem] font-bold", winners.length === 0 && pending.length === 0 && "pt-4")}>
         Award programs
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        {programs.map((p) => (
+        {programs.map((p) => {
+          const openRound = p.voteRounds[0] ?? null;
+          const schedule = scheduleSummary(p.voteEvery, p.nextVoteAt);
+          const voted = Boolean(p.voteEvery) || Boolean(openRound);
+          return (
           <article key={p.id} className="border-border flex flex-col gap-3 rounded-xl border p-4">
             <div className="flex items-start gap-3">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
@@ -151,8 +193,14 @@ export default async function AwardsPage() {
               <div className="min-w-0 flex-1">
                 <h3 className="text-[1.05rem] leading-tight font-bold">{p.name}</h3>
                 <p className="text-muted mt-0.5 text-[0.82rem]">
-                  <span className="capitalize">{p.cadence ?? "Any time"}</span> ·{" "}
-                  {p.requiresApproval ? "needs approval" : "instant, from your points to give"}
+                  {voted ? (
+                    "Won by staff vote"
+                  ) : (
+                    <>
+                      <span className="capitalize">{p.cadence ?? "Any time"}</span> ·{" "}
+                      {p.requiresApproval ? "needs approval" : "instant, from your points to give"}
+                    </>
+                  )}
                 </p>
               </div>
               <span data-numeric className="text-primary shrink-0 text-sm font-bold">
@@ -160,17 +208,53 @@ export default async function AwardsPage() {
               </span>
             </div>
             {p.description && <p className="text-muted flex-1 text-[0.9rem] leading-relaxed">{p.description}</p>}
-            <NominateDialog
-              program={{
-                id: p.id,
-                name: p.name,
-                points: p.points,
-                requiresApproval: p.requiresApproval,
-              }}
-              colleagues={colleagueOpts}
-            />
+            {openRound ? (
+              <Link
+                href={openRound.postId ? `/#post-${openRound.postId}` : "/"}
+                className="bg-primary/8 text-primary flex items-center gap-2 rounded-xl px-3 py-2.5 text-[0.85rem] font-semibold"
+              >
+                <Vote className="size-4 shrink-0" />
+                <span className="min-w-0 flex-1">Voting open until {voteTimeLabel(openRound.closesAt)}</span>
+                <span className="shrink-0">Vote ›</span>
+              </Link>
+            ) : (
+              schedule && (
+                <p className="text-muted flex items-center gap-2 text-[0.82rem]">
+                  <Vote className="size-4 shrink-0" /> {schedule}
+                </p>
+              )
+            )}
+            {voted ? null : (
+              <NominateDialog
+                program={{
+                  id: p.id,
+                  name: p.name,
+                  points: p.points,
+                  requiresApproval: p.requiresApproval,
+                }}
+                colleagues={colleagueOpts}
+              />
+            )}
+            {canRunVote(me.role, p.voteRole) && (
+              <VoteSettingsSheet
+                program={{
+                  id: p.id,
+                  name: p.name,
+                  voteEvery: p.voteEvery,
+                  voteDays: p.voteDays,
+                  nextVoteAt: p.nextVoteAt?.toISOString() ?? null,
+                  voteRole: p.voteRole,
+                }}
+                openRound={
+                  openRound
+                    ? { closesAt: openRound.closesAt.toISOString(), totalVotes: openRound._count.ballots }
+                    : null
+                }
+              />
+            )}
           </article>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

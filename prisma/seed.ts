@@ -46,6 +46,8 @@ function monthDayInYear(year: number, ref: Date) {
 
 async function wipe() {
   // Delete in FK-dependency order.
+  await prisma.awardBallot.deleteMany();
+  await prisma.awardVoteRound.deleteMany();
   await prisma.reaction.deleteMany();
   await prisma.comment.deleteMany();
   await prisma.recognitionRecipient.deleteMany();

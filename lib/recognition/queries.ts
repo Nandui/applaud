@@ -4,6 +4,7 @@ import { shortTime, fullTimestamp } from "@/lib/datetime";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import type { Cosmetic, FrameArt, Look } from "@/lib/cosmetics";
+import { getVoteInfo, type VoteInfo } from "@/lib/votes/queries";
 
 export type ReactionUser = { id: string; name: string; avatarUrl: string | null; frame: FrameArt | null };
 export type ReactionSummary = {
@@ -25,8 +26,12 @@ export type { Look };
 
 export type FeedCard = {
   id: string;
-  /** "recognition" (a shout-out) or "post" (an ordinary post by the sender). */
-  kind: "recognition" | "post";
+  /**
+   * "recognition" (a shout-out), "post" (an ordinary post by the sender) or
+   * "vote" (an award vote opening; `vote` holds the ballot).
+   */
+  kind: "recognition" | "post" | "vote";
+  vote: VoteInfo | null;
   message: string;
   imageUrls: string[];
   boostType: string | null;
@@ -97,7 +102,8 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
 
   return {
     id: r.id,
-    kind: r.kind === "post" ? "post" : "recognition",
+    kind: r.kind === "post" || r.kind === "vote" ? r.kind : "recognition",
+    vote: null,
     message: r.message,
     imageUrls: r.imageUrls,
     boostType: r.boostType,
@@ -141,6 +147,17 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
       },
     })),
   };
+}
+
+/** Fill in the ballot on any vote cards (one extra query, only when there are some). */
+async function withVotes(cards: FeedCard[], viewerId: string, catalogue: Cosmetic[]): Promise<FeedCard[]> {
+  const ids = cards.filter((c) => c.kind === "vote").map((c) => c.id);
+  if (ids.length === 0) return cards;
+  const info = await getVoteInfo(ids, viewerId, catalogue);
+  return cards
+    .map((c) => (c.kind === "vote" ? { ...c, vote: info.get(c.id) ?? null } : c))
+    // A vote post whose round is gone has nothing to show.
+    .filter((c) => c.kind !== "vote" || c.vote);
 }
 
 /** Recognitions a given user has received, respecting the viewer's visibility. */
@@ -226,13 +243,14 @@ export async function getCardsByIds(ids: string[], viewerId: string): Promise<Fe
     include: feedInclude,
   });
   const byId = new Map(rows.map((r) => [r.id, r]));
-  return ids
+  const cards = ids
     .map((id) => byId.get(id))
     .filter((r): r is RawRecognition => Boolean(r))
     .map((r) => toFeedCard(r, viewerId, catalogue));
+  return withVotes(cards, viewerId, catalogue);
 }
 
-/** Feed visible to a viewer: public shout-outs and posts + their own sent/received private shout-outs. */
+/** Feed visible to a viewer: public shout-outs, posts and award votes + their own sent/received private shout-outs. */
 export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
   const catalogue = await getCatalogue();
   const rows = await prisma.recognition.findMany({
@@ -247,5 +265,9 @@ export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCar
     take,
     include: feedInclude,
   });
-  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
+  return withVotes(
+    rows.map((r) => toFeedCard(r, viewerId, catalogue)),
+    viewerId,
+    catalogue,
+  );
 }

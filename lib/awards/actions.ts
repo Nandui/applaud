@@ -10,6 +10,8 @@ import { writeAudit } from "@/lib/audit";
 import { getOrgSettings } from "@/lib/org-settings";
 import { allowanceForRole, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
 import { lockPool } from "@/lib/locks";
+import { parseVoteSchedule } from "@/lib/votes/form";
+import { isVoteRole } from "@/lib/votes/schedule";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -299,6 +301,9 @@ export async function saveAwardProgram(
   if (!Number.isFinite(d.points) || d.points < 0) {
     return { ok: false, error: "Enter a valid points value." };
   }
+  const vote = parseVoteSchedule(formData);
+  if (!vote.ok) return vote;
+  const voteRoleRaw = String(formData.get("voteRole") ?? "admin");
 
   const data = {
     name: d.name,
@@ -307,6 +312,9 @@ export async function saveAwardProgram(
     cadence: d.cadence,
     requiresApproval: d.requiresApproval,
     active: d.active,
+    ...vote.data,
+    voteRole: isVoteRole(voteRoleRaw) ? voteRoleRaw : "admin",
+    voteSetById: admin.id,
   };
   let entityId = id;
   if (id) await prisma.awardProgram.update({ where: { id }, data });
@@ -320,7 +328,14 @@ export async function saveAwardProgram(
     entityType: "award_program",
     entityId,
     summary: id ? `Updated award program ${d.name}` : `Created award program ${d.name}`,
-    metadata: { points: d.points, active: d.active, cadence: d.cadence },
+    metadata: {
+      points: d.points,
+      active: d.active,
+      cadence: d.cadence,
+      voteEvery: data.voteEvery,
+      voteDays: data.voteDays,
+      voteRole: data.voteRole,
+    },
   });
   revalidatePath("/admin/awards");
   revalidatePath("/awards");
