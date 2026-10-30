@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { relativeTime } from "@/lib/datetime";
+import { expectedByLabel, isOverdue } from "@/lib/fulfilment";
 import { PageHeader } from "@/components/page-header";
 import {
   RedemptionsManager,
@@ -17,7 +18,7 @@ export default async function AdminRedemptionsPage() {
     orderBy: { createdAt: "desc" },
     include: {
       user: { select: { id: true, name: true } },
-      reward: { select: { name: true } },
+      reward: { select: { name: true, fulfilmentUnit: true } },
     },
   });
 
@@ -33,6 +34,7 @@ export default async function AdminRedemptionsPage() {
     : [];
   const fulfillerMap = new Map(fulfillers.map((u) => [u.id, u.name]));
 
+  const now = new Date();
   const rows: RedemptionRow[] = redemptions.map((r) => ({
     id: r.id,
     status: r.status,
@@ -41,6 +43,10 @@ export default async function AdminRedemptionsPage() {
     userId: r.user.id,
     userName: r.user.name,
     rewardName: r.reward.name,
+    expectedAt: r.expectedBy?.getTime() ?? null,
+    expectedLabel: r.expectedBy ? expectedByLabel(r.expectedBy, r.reward.fulfilmentUnit === "hours") : null,
+    overdue: isOverdue(r, now),
+    staffNote: r.staffNote,
     fulfilledByName: r.fulfilledById
       ? (fulfillerMap.get(r.fulfilledById) ?? null)
       : null,
@@ -50,7 +56,7 @@ export default async function AdminRedemptionsPage() {
     <div>
       <PageHeader
         title="Redemptions"
-        description="Fulfilment queue — move requests through approved to fulfilled."
+        description="Fulfilment queue. Move each claim from Requested to In progress to Fulfilled; staff follow it in My rewards. Add a note to tell them how or where to collect it. Cancelling refunds the points."
       />
       <RedemptionsManager rows={rows} />
     </div>

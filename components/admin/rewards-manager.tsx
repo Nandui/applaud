@@ -55,6 +55,13 @@ import {
   promoState,
   type PromoTag,
 } from "@/lib/reward-promo";
+import {
+  FULFILMENT_UNITS,
+  FULFILMENT_UNIT_LABELS,
+  fulfilmentLabel,
+  isFulfilmentUnit,
+  type FulfilmentUnit,
+} from "@/lib/fulfilment";
 
 export type RewardRow = {
   id: string;
@@ -79,6 +86,8 @@ export type RewardRow = {
   promoText: string | null;
   promoEndsAt: Date | null;
   wasPointsCost: number | null;
+  fulfilmentAmount: number | null;
+  fulfilmentUnit: string | null;
 };
 
 type SiteOption = { id: string; name: string };
@@ -118,6 +127,13 @@ function RewardFormDialog({
   const isDiscount = kind === "discount";
   const [promoTag, setPromoTag] = useState<PromoTag | "">(isPromoTag(editing?.promoTag) ? editing.promoTag : "");
   const [promoEnds, setPromoEnds] = useState(endDateInput(editing?.promoEndsAt ?? null));
+  const [waitAmount, setWaitAmount] = useState(
+    editing?.fulfilmentAmount === null || editing?.fulfilmentAmount === undefined ? "" : String(editing.fulfilmentAmount),
+  );
+  const [waitUnit, setWaitUnit] = useState<FulfilmentUnit>(
+    isFulfilmentUnit(editing?.fulfilmentUnit) ? editing.fulfilmentUnit : "working_days",
+  );
+  const waitPreview = waitAmount.trim() === "" ? null : fulfilmentLabel(Math.floor(Number(waitAmount)), waitUnit);
   const [monthlyStock, setMonthlyStock] = useState(
     editing?.monthlyStock === null || editing?.monthlyStock === undefined ? "" : String(editing.monthlyStock),
   );
@@ -537,25 +553,55 @@ function RewardFormDialog({
               </>
             ) : null}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="sortOrder">Sort order</Label>
-              <Input
-                id="sortOrder"
-                name="sortOrder"
-                type="number"
-                defaultValue={editing?.sortOrder ?? 0}
-                className="font-mono"
-              />
-              <p className="text-muted text-xs">Lower numbers appear first on the store.</p>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Fulfilment</Label>
-              <Input value="Manual" disabled />
+          {!isDiscount ? (
+            <div className="border-border space-y-1.5 rounded-lg border p-3">
+              <Label htmlFor="fulfilmentAmount">How long it takes to fulfil</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  id="fulfilmentAmount"
+                  name="fulfilmentAmount"
+                  type="number"
+                  min={0}
+                  value={waitAmount}
+                  onChange={(e) => setWaitAmount(e.target.value)}
+                  placeholder="Not set"
+                  className="font-mono"
+                />
+                <input type="hidden" name="fulfilmentUnit" value={waitUnit} />
+                <Select
+                  value={waitUnit}
+                  items={FULFILMENT_UNIT_LABELS}
+                  onValueChange={(v) => isFulfilmentUnit(v) && setWaitUnit(v)}
+                >
+                  <SelectTrigger aria-label="Unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FULFILMENT_UNITS.map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {FULFILMENT_UNIT_LABELS[u]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-muted text-xs">
-                Redemptions appear in the Redemptions queue. Gift-card auto-fulfilment is not enabled.
+                {waitPreview
+                  ? `Staff see "${waitPreview}" before claiming, and an expected date on their claim. Working days skip weekends but not bank holidays.`
+                  : "Leave blank if it varies. Staff then see no expected date. Claims go to the Redemptions queue."}
               </p>
             </div>
+          ) : null}
+          <div className="space-y-1.5">
+            <Label htmlFor="sortOrder">Sort order</Label>
+            <Input
+              id="sortOrder"
+              name="sortOrder"
+              type="number"
+              defaultValue={editing?.sortOrder ?? 0}
+              className="w-1/2 font-mono"
+            />
+            <p className="text-muted text-xs">Lower numbers appear first on the store.</p>
           </div>
           <div className="border-border flex items-center justify-between rounded-lg border p-3">
             <div>
@@ -751,6 +797,19 @@ export function RewardsManager({
         ) : (
           <span data-numeric>{formatNumber(row.original.stock)}</span>
         ),
+    },
+    {
+      id: "wait",
+      header: "Takes",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const label = fulfilmentLabel(row.original.fulfilmentAmount, row.original.fulfilmentUnit);
+        return row.original.kind === "discount" ? null : label ? (
+          <span className="whitespace-nowrap">{label.replace(/^Within /, "")}</span>
+        ) : (
+          <span className="text-muted">Not set</span>
+        );
+      },
     },
     {
       id: "scope",

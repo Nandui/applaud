@@ -27,34 +27,34 @@ model Site {
 }
 
 model User {
-  id        String        @id @default(cuid())
-  email     String        @unique
-  name      String
-  avatarUrl String?
-  jobTitle  String? // the job in the company, e.g. "Duty Manager", "Lifeguard"
-  role      String        @default("staff") // app permission: "staff" | "manager" | "admin" | "operations" | "ceo"
+  id          String        @id @default(cuid())
+  email       String        @unique
+  name        String
+  avatarUrl   String?
+  jobTitle    String? // the job in the company, e.g. "Duty Manager", "Lifeguard"
+  role        String        @default("staff") // app permission: "staff" | "manager" | "admin" | "operations" | "ceo"
   // Nullable so a removed person can be detached from their site: hard-delete
   // is refused by the content FKs below, and a site with users assigned can't
   // be deleted. Detached users are treated as removed everywhere.
-  siteId    String?
-  site      Site?         @relation(fields: [siteId], references: [id])
+  siteId      String?
+  site        Site?         @relation(fields: [siteId], references: [id])
   // A person can have several managers, and every one of them is a real user.
   // The UserManager join below is the only source of truth: `managers` are the
   // people who manage this user, `reports` the people this user manages.
-  managers  UserManager[] @relation("ManagedUser")
-  reports   UserManager[] @relation("ManagerUser")
-  hireDate  DateTime?
-  birthday  DateTime? // store full date; celebrate on month/day
+  managers    UserManager[] @relation("ManagedUser")
+  reports     UserManager[] @relation("ManagerUser")
+  hireDate    DateTime?
+  birthday    DateTime? // store full date; celebrate on month/day
   // Self-service profile customization (bio, status, pronouns, theme colours,
   // earned avatar decoration, pinned recognitions). Free-form JSON validated
   // by lib/profile-custom.ts; null means "all defaults".
-  profile   Json?
-  active    Boolean       @default(true)
+  profile     Json?
+  active      Boolean       @default(true)
   // Created automatically on their first company Google sign-in and not yet
   // looked at by an admin (role and site were guessed). Cleared when an admin
   // saves them in Admin > Users.
-  needsReview Boolean     @default(false)
-  createdAt DateTime      @default(now())
+  needsReview Boolean       @default(false)
+  createdAt   DateTime      @default(now())
 
   // Cached wallet balance. Always written inside the same transaction as the
   // ledger row; RewardLedger SUM remains the source of truth (recompute action exists).
@@ -170,20 +170,20 @@ model Reaction {
 }
 
 model Comment {
-  id            String      @id @default(cuid())
+  id            String            @id @default(cuid())
   recognitionId String
-  recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
+  recognition   Recognition       @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
   userId        String
-  user          User        @relation(fields: [userId], references: [id])
+  user          User              @relation(fields: [userId], references: [id])
   body          String // may be empty when the comment is just a GIF
   gifUrl        String? // a GIPHY GIF picked in the comment box
   // The comment this one replies to. Replies are one level deep, like
   // Instagram: replying to a reply attaches to the same top-level comment.
   parentId      String?
-  parent        Comment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies       Comment[]   @relation("CommentReplies")
+  parent        Comment?          @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Comment[]         @relation("CommentReplies")
   reactions     CommentReaction[]
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime          @default(now())
 
   @@index([recognitionId, createdAt])
   @@index([parentId])
@@ -252,57 +252,70 @@ model Nomination {
 // ---------- Rewards & wallet ----------
 
 model Reward {
-  id            String       @id @default(cuid())
-  name          String
-  description   String?
-  imageUrl      String?
-  category      String?
-  pointsCost    Int
-  type          String       @default("internal") // "internal" | "giftcard" (future adapter)
-  fulfilment    String       @default("manual") // "manual" | "auto"
-  stock         Int? // null = unlimited
+  id               String       @id @default(cuid())
+  name             String
+  description      String?
+  imageUrl         String?
+  category         String?
+  pointsCost       Int
+  type             String       @default("internal") // "internal" | "giftcard" (future adapter)
+  fulfilment       String       @default("manual") // "manual" | "auto"
+  stock            Int? // null = unlimited
   /// Real cash cost in euro cents (0 for in-house perks). Claims draw on the
   /// company-wide OrgSettings.monthlyRewardBudgetCents.
-  euroCostCents Int          @default(0)
+  euroCostCents    Int          @default(0)
   /// Claims allowed per calendar month (Irish time); null = no monthly limit.
-  monthlyStock  Int?
-  siteId        String? // null = all sites
-  active        Boolean      @default(true)
-  sortOrder     Int          @default(0)
-  createdAt     DateTime     @default(now())
+  monthlyStock     Int?
+  siteId           String? // null = all sites
+  active           Boolean      @default(true)
+  sortOrder        Int          @default(0)
+  createdAt        DateTime     @default(now())
   /// When it went on show (created, or shown again after being hidden): newer
   /// than someone's User.rewardsSeenAt means "New" to them.
-  listedAt      DateTime     @default(now())
+  listedAt         DateTime     @default(now())
   /// "reward" (redeemed with points) | "discount" (standing staff discount:
   /// always on, never claimed, no points or stock). See lib/reward-promo.ts.
-  kind          String       @default("reward")
+  kind             String       @default("reward")
   /// Discounts: the headline on the card, e.g. "20% off".
-  discountText  String?
+  discountText     String?
   /// Shop label: featured | month_only | discounted | last_chance | limited.
-  promoTag      String?
+  promoTag         String?
   /// Own wording for the label badge; blank uses the preset name.
-  promoText     String?
+  promoText        String?
   /// When the label ends (null = until removed). Ending "month_only" or
   /// "last_chance" takes the reward out of the shop.
-  promoEndsAt   DateTime?
+  promoEndsAt      DateTime?
   /// "Discounted": the usual price, struck through; it comes back when the label ends.
-  wasPointsCost Int?
-  redemptions   Redemption[]
+  wasPointsCost    Int?
+  /// How long fulfilment takes, shown to staff before claiming, e.g. 5 +
+  /// "working_days". Units: hours | days | working_days | weeks. Null = not said.
+  /// See lib/fulfilment.ts.
+  fulfilmentAmount Int?
+  fulfilmentUnit   String?
+  redemptions      Redemption[]
 }
 
 model Redemption {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id])
-  rewardId      String
-  reward        Reward    @relation(fields: [rewardId], references: [id])
-  pointsCost    Int // captured at redemption time
-  euroCostCents Int       @default(0) // captured at redemption time; counts against the monthly budget
-  status        String    @default("requested") // requested | approved | fulfilled | cancelled
-  fulfilledById String?
-  fulfilledAt   DateTime?
-  notes         String?
-  createdAt     DateTime  @default(now())
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  rewardId        String
+  reward          Reward    @relation(fields: [rewardId], references: [id])
+  pointsCost      Int // captured at redemption time
+  euroCostCents   Int       @default(0) // captured at redemption time; counts against the monthly budget
+  status          String    @default("requested") // requested | approved ("In progress") | fulfilled | cancelled
+  fulfilledById   String?
+  fulfilledAt     DateTime?
+  notes           String?
+  /// When an admin marked it In progress.
+  approvedAt      DateTime?
+  /// The promise made at claim time ("Within 5 working days") and the moment
+  /// it falls due. Kept on the claim so editing the reward doesn't move it.
+  fulfilmentLabel String?
+  expectedBy      DateTime?
+  /// What the admin tells the person, e.g. "Collect it from reception". Shown in My rewards.
+  staffNote       String?
+  createdAt       DateTime  @default(now())
 
   @@index([status])
   @@index([createdAt])
