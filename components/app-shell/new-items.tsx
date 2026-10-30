@@ -20,7 +20,7 @@ export function NewItemsProvider({ counts, children }: { counts: NewCounts; chil
   const [state, setState] = useState(counts);
   // A fresh count from the server (a refresh or full load) replaces ours.
   const [fromServer, setFromServer] = useState(counts);
-  if (fromServer.shop !== counts.shop || fromServer.rewards !== counts.rewards) {
+  if (fromServer.shop !== counts.shop || fromServer.rewards !== counts.rewards || fromServer.claims !== counts.claims) {
     setFromServer(counts);
     setState(counts);
   }
@@ -32,7 +32,7 @@ export function useNewItems(): NewCounts {
   return useContext(NewItemsContext).counts;
 }
 
-/** A small violet dot, shown when the given Store halves have unseen items. */
+/** A small violet dot, shown when the given Store tabs have unseen items or claim updates. */
 export function NewDot({ areas, className }: { areas: SeenArea[]; className?: string }) {
   const counts = useNewItems();
   if (!areas.some((a) => counts[a] > 0)) return null;
@@ -44,7 +44,7 @@ export function NewDot({ areas, className }: { areas: SeenArea[]; className?: st
 }
 
 /** The "New" tag on a shop tile or reward card. */
-export function NewLabel({ className }: { className?: string }) {
+export function NewLabel({ className, children = "New" }: { className?: string; children?: React.ReactNode }) {
   return (
     <span
       className={cn(
@@ -52,7 +52,7 @@ export function NewLabel({ className }: { className?: string }) {
         className,
       )}
     >
-      New
+      {children}
     </span>
   );
 }

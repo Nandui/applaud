@@ -21,10 +21,10 @@ export function visibleRewardsWhere(user: Pick<SessionUser, "siteId">, now: Date
 export const getNewCounts = cache(async (user: SessionUser): Promise<NewCounts> => {
   const row = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { shopSeenAt: true, rewardsSeenAt: true, profile: true },
+    select: { shopSeenAt: true, rewardsSeenAt: true, claimsSeenAt: true, profile: true },
   });
-  if (!row) return { shop: 0, rewards: 0 };
-  const [catalogue, rewards] = await Promise.all([
+  if (!row) return { shop: 0, rewards: 0, claims: 0 };
+  const [catalogue, rewards, claims] = await Promise.all([
     getCatalogue(),
     prisma.reward.count({
       where: {
@@ -32,8 +32,15 @@ export const getNewCounts = cache(async (user: SessionUser): Promise<NewCounts> 
         ...(row.rewardsSeenAt ? { listedAt: { gt: row.rewardsSeenAt } } : {}),
       },
     }),
+    // Claims an admin moved on (or messaged about) since they last opened My rewards.
+    prisma.redemption.count({
+      where: {
+        userId: user.id,
+        statusChangedAt: row.claimsSeenAt ? { gt: row.claimsSeenAt } : { not: null },
+      },
+    }),
   ]);
   const custom = parseProfile(row.profile);
   const shop = catalogue.filter((c) => c.active && !ownsItem(custom, c) && isNewSince(c.listedAt, row.shopSeenAt)).length;
-  return { shop, rewards };
+  return { shop, rewards, claims };
 });

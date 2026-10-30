@@ -2,7 +2,9 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { AppBar } from "@/components/app-shell/app-bar";
-import { BackButton } from "@/components/app-shell/back-button";
+import { StoreTabs } from "@/components/shop/store-tabs";
+import { MarkSeen } from "@/components/app-shell/new-items";
+import { visitStamp } from "@/lib/seen";
 import { ClaimCard, type ClaimCardData } from "@/components/rewards/claim-card";
 import { isOpenClaim, isOverdue } from "@/lib/fulfilment";
 
@@ -15,23 +17,30 @@ export const metadata = { title: "My rewards" };
  */
 export default async function ClaimedRewardsPage() {
   const me = await requireUser();
-  const redemptions = await prisma.redemption.findMany({
-    where: { userId: me.id },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      status: true,
-      pointsCost: true,
-      createdAt: true,
-      approvedAt: true,
-      fulfilledAt: true,
-      expectedBy: true,
-      fulfilmentLabel: true,
-      staffNote: true,
-      reward: { select: { name: true, imageUrl: true, fulfilmentUnit: true } },
-    },
-  });
+  const renderedAt = visitStamp();
+  const [viewer, redemptions] = await Promise.all([
+    prisma.user.findUnique({ where: { id: me.id }, select: { claimsSeenAt: true } }),
+    prisma.redemption.findMany({
+      where: { userId: me.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        status: true,
+        pointsCost: true,
+        createdAt: true,
+        approvedAt: true,
+        fulfilledAt: true,
+        expectedBy: true,
+        fulfilmentLabel: true,
+        staffNote: true,
+        statusChangedAt: true,
+        reward: { select: { name: true, imageUrl: true, fulfilmentUnit: true } },
+      },
+    }),
+  ]);
+  // Seen as of the previous visit, so this one still shows what changed.
+  const seenAt = viewer?.claimsSeenAt ?? null;
 
   const now = new Date();
   const claims: ClaimCardData[] = redemptions.map((r) => ({
@@ -46,6 +55,7 @@ export default async function ClaimedRewardsPage() {
     fulfilmentLabel: r.fulfilmentLabel,
     overdue: isOverdue(r, now),
     staffNote: r.staffNote,
+    updated: r.statusChangedAt !== null && (!seenAt || r.statusChangedAt > seenAt),
     reward: { name: r.reward.name, imageUrl: r.reward.imageUrl },
   }));
   const open = claims.filter((c) => isOpenClaim(c.status));
@@ -53,7 +63,8 @@ export default async function ClaimedRewardsPage() {
 
   return (
     <div className="mx-auto max-w-xl">
-      <AppBar title="My rewards" center leading={<BackButton fallback="/rewards" />} />
+      <AppBar title="Store" tabs={<StoreTabs active="claims" />} />
+      <MarkSeen area="claims" renderedAt={renderedAt} />
 
       {claims.length === 0 ? (
         <div className="text-muted flex flex-col items-center gap-2 py-16 text-center">

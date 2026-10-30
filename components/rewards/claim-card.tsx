@@ -3,6 +3,7 @@ import { RewardArt } from "@/components/rewards/reward-card";
 import { claimStatusLabel, expectedByLabel } from "@/lib/fulfilment";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { NewLabel } from "@/components/app-shell/new-items";
 
 export type ClaimCardData = {
   id: string;
@@ -20,6 +21,8 @@ export type ClaimCardData = {
   overdue: boolean;
   /** The admin's message, e.g. "Collect it from reception". */
   staffNote: string | null;
+  /** An admin moved it on or left a note since they last opened My rewards. */
+  updated?: boolean;
   reward: { name: string; imageUrl: string | null };
 };
 
@@ -113,7 +116,10 @@ export function ClaimCard({ claim }: { claim: ClaimCardData }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-2 leading-snug font-bold">{claim.reward.name}</h3>
+            <h3 className="line-clamp-2 leading-snug font-bold">
+              {claim.reward.name}
+              {claim.updated ? <NewLabel className="ml-1.5 align-middle">Updated</NewLabel> : null}
+            </h3>
             <ClaimStatusBadge status={claim.status} />
           </div>
           <p className="text-muted mt-0.5 text-xs" data-numeric>

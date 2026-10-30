@@ -450,7 +450,7 @@ export async function approveRedemption(formData: FormData): Promise<ActionResul
   if (!r || r.status !== "requested") {
     return { ok: false, error: "This redemption can't be approved." };
   }
-  await prisma.redemption.update({ where: { id }, data: { status: "approved", approvedAt: new Date() } });
+  await prisma.redemption.update({ where: { id }, data: { status: "approved", approvedAt: new Date(), statusChangedAt: new Date() } });
   await writeAudit({
     actor: admin,
     action: "redemption.approved",
@@ -490,6 +490,7 @@ export async function fulfilRedemption(formData: FormData): Promise<ActionResult
       status: "fulfilled",
       fulfilledById: admin.id,
       fulfilledAt: new Date(),
+      statusChangedAt: new Date(),
       notes: result.reference ? `Ref: ${result.reference}` : r.notes,
     },
   });
@@ -548,6 +549,7 @@ export async function cancelRedemption(formData: FormData): Promise<ActionResult
           status: "cancelled",
           fulfilledById: admin.id,
           fulfilledAt: new Date(),
+          statusChangedAt: new Date(),
         },
       });
     });
@@ -576,9 +578,14 @@ export async function setRedemptionNote(formData: FormData): Promise<ActionResul
   const id = String(formData.get("id") ?? "");
   const note = String(formData.get("staffNote") ?? "").trim();
   if (note.length > 280) return { ok: false, error: "Keep the note to 280 characters." };
-  const r = await prisma.redemption.findUnique({ where: { id }, select: { id: true, userId: true, rewardId: true } });
+  const r = await prisma.redemption.findUnique({
+    where: { id },
+    select: { id: true, userId: true, rewardId: true, staffNote: true },
+  });
   if (!r) return { ok: false, error: "Redemption not found." };
-  await prisma.redemption.update({ where: { id }, data: { staffNote: note || null } });
+  // A new or changed message is news to them; clearing one isn't.
+  const news = note !== "" && note !== (r.staffNote ?? "") ? { statusChangedAt: new Date() } : {};
+  await prisma.redemption.update({ where: { id }, data: { staffNote: note || null, ...news } });
   await writeAudit({
     actor: admin,
     action: "redemption.noted",

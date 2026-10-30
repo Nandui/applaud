@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, Trophy, Gift, Wallet, Award, Shield, Plus, Sparkles, SquarePen, type LucideIcon } from "lucide-react";
+import { House, Trophy, Gift, Wallet, Award, Shield, Plus, Sparkles, SquarePen, PackageOpen, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAdmin } from "@/lib/auth/types";
 import { UserAvatar } from "@/components/user-avatar";
@@ -27,7 +27,8 @@ export function SideNav({ user }: { user: SessionUser }) {
     { href: "/", label: "Home", icon: House, on: active("/", true) },
     { href: "/leaderboard", label: "Ranks", icon: Trophy, on: active("/leaderboard") },
     { href: "/awards", label: "Awards", icon: Award, on: active("/awards") },
-    { href: "/rewards", label: "Rewards", icon: Gift, on: active("/rewards"), news: "rewards" },
+    { href: "/rewards", label: "Rewards", icon: Gift, on: active("/rewards") && !active("/rewards/claimed"), news: "rewards" },
+    { href: "/rewards/claimed", label: "My rewards", icon: PackageOpen, on: active("/rewards/claimed"), news: "claims" },
     { href: "/shop", label: "Profile shop", icon: Sparkles, on: active("/shop"), news: "shop" },
     { href: "/me", label: "Wallet", icon: Wallet, on: active("/me") },
   ];
