@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, Loader2, Film } from "lucide-react";
+import { Search, Loader2, Film, Sticker } from "lucide-react";
 import type { GifResult } from "@/lib/recognition/gif";
 import {
   Dialog,
@@ -22,15 +22,18 @@ type SearchResponse = {
  * "Add a GIF" tile + dialog. Searches GIPHY (via our proxy route so the API key
  * stays server-side) and hands the picked GIF up to the composer, which stores
  * its URL in the same `imageUrls` set as uploaded photos. Empty query shows
- * trending. Disabled once the attachment cap is reached.
+ * trending. Disabled once the attachment cap is reached. With
+ * `kind="stickers"` it searches GIPHY stickers instead (comments use both).
  */
 export function GifPicker({
   onSelect,
   disabled,
   triggerClassName,
+  kind = "gifs",
 }: {
   onSelect: (gif: GifResult) => void;
   disabled?: boolean;
+  kind?: "gifs" | "stickers";
   /** Replaces the default tile styling (the composer uses a toolbar icon). */
   triggerClassName?: string;
 }) {
@@ -51,7 +54,8 @@ export function GifPicker({
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/gifs/search?q=${encodeURIComponent(query)}`);
+        const type = kind === "stickers" ? "&type=stickers" : "";
+        const res = await fetch(`/api/gifs/search?q=${encodeURIComponent(query)}${type}`);
         const data = (await res.json()) as SearchResponse;
         if (id !== reqId.current) return;
         if (data.configured === false) {
@@ -69,7 +73,7 @@ export function GifPicker({
       }
     }, debounce);
     return () => clearTimeout(timer);
-  }, [open, query]);
+  }, [open, query, kind]);
 
   function pick(gif: GifResult) {
     onSelect(gif);
@@ -77,19 +81,23 @@ export function GifPicker({
     setQuery("");
   }
 
+  const stickers = kind === "stickers";
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
           type="button"
           disabled={disabled}
-          aria-label="Add a GIF"
+          aria-label={stickers ? "Add a sticker" : "Add a GIF"}
           className={
             triggerClassName ??
             "bg-secondary text-foreground flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl transition-transform active:scale-95 disabled:opacity-50"
           }
         >
-          {triggerClassName ? (
+          {triggerClassName && stickers ? (
+            <Sticker className="size-5" />
+          ) : triggerClassName ? (
             <span className="rounded-md border-2 border-current px-1 text-[0.6rem] leading-tight font-black">
               GIF
             </span>
@@ -103,7 +111,7 @@ export function GifPicker({
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add a GIF</DialogTitle>
+          <DialogTitle>{stickers ? "Add a sticker" : "Add a GIF"}</DialogTitle>
         </DialogHeader>
 
         <div className="relative">
@@ -131,7 +139,7 @@ export function GifPicker({
             <p className="text-muted py-10 text-center text-sm">{error}</p>
           ) : gifs.length === 0 ? (
             <p className="text-muted py-10 text-center text-sm">
-              No GIFs found. Try another search.
+              No {stickers ? "stickers" : "GIFs"} found. Try another search.
             </p>
           ) : (
             <div className="columns-2 gap-2 sm:columns-3">

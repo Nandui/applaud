@@ -252,7 +252,7 @@ export function RecognitionCard({
   const lastTap = useRef(0);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
-  const commentInputRef = useRef<HTMLInputElement>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Optimistic state so claps and comments land instantly, then reconcile with
   // the server's revalidated data — the snappy feel of a social app.
@@ -399,7 +399,6 @@ export function RecognitionCard({
   const accent = card.recipients[0]?.look.theme ?? DEFAULT_LOOK.theme;
   const hasMedia = card.imageUrls.length > 0;
   // Who the post is about: the recipients of a shout-out, the author of a post.
-  const subjectName = isPost ? card.sender.name : card.recipients[0]?.name;
   // Under the post: the last two comments, not replies (those need the sheet).
   const previewComments = comments.filter((c) => !c.parentId).slice(-2);
 
@@ -753,7 +752,6 @@ export function RecognitionCard({
         viewer={viewer}
         description={`Comments on ${card.sender.name}'s ${isPost ? "post" : "shout-out"}`}
         emptyHint={isPost ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}
-        placeholderName={subjectName ?? "them"}
         inputRef={commentInputRef}
       />
 
