@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { toggleReaction, addComment, toggleBoost, deletePost } from "@/lib/recognition/actions";
 import { togglePin } from "@/lib/profile-actions";
 import { useLiveComments, TypingLine } from "@/components/feed/live-comments";
+import { GifPicker } from "@/components/recognize/gif-picker";
 import {
   REACTION_EMOJIS,
   BOOSTS,
@@ -266,11 +267,12 @@ export function RecognitionCard({
   );
   const [shownComments, addOptimisticComment] = useOptimistic(
     card.comments,
-    (state: FeedCard["comments"], text: string) => [
+    (state: FeedCard["comments"], sent: { body: string; gifUrl: string | null }) => [
       ...state,
       {
         id: `optimistic-${state.length}`,
-        body: text,
+        body: sent.body,
+        gifUrl: sent.gifUrl,
         createdAtLabel: "Just now",
         user: {
           id: viewer.id,
@@ -407,19 +409,27 @@ export function RecognitionCard({
     commentInputRef.current?.focus();
   }
 
-  function submitComment(e: React.FormEvent) {
-    e.preventDefault();
+  // Sends the typed text, plus a GIF when one was just picked (picking a GIF
+  // sends straight away, with whatever was typed as its caption).
+  function sendComment(gifUrl: string | null = null) {
     const value = body.trim();
-    if (!value) return;
+    if (!value && !gifUrl) return;
     const fd = new FormData();
     fd.set("recognitionId", card.id);
     fd.set("body", value);
+    if (gifUrl) fd.set("gifUrl", gifUrl);
     setBody("");
     stopTyping();
     startComment(async () => {
-      addOptimisticComment(value);
-      await addComment(fd);
+      addOptimisticComment({ body: value, gifUrl });
+      const res = await addComment(fd);
+      if (!res.ok) toast.error(res.error);
     });
+  }
+
+  function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    sendComment();
   }
 
   // Point-multiplier boost display + the current viewer's ability to change it.
@@ -794,7 +804,7 @@ export function RecognitionCard({
           className="mt-0.5 block w-full truncate text-left text-[0.9rem]"
         >
           <span className="mr-1.5 font-semibold">{c.user.name}</span>
-          {c.body}
+          {c.body || (c.gifUrl && <span className="text-muted">sent a GIF</span>)}
         </button>
       ))}
       {!commentsOpen && <TypingLine users={typing} className="mt-1" />}
@@ -834,7 +844,16 @@ export function RecognitionCard({
                       </Link>
                       <span className="text-muted text-xs">{c.createdAtLabel}</span>
                     </p>
-                    <p className="mt-0.5 break-words whitespace-pre-line">{c.body}</p>
+                    {c.body && <p className="mt-0.5 break-words whitespace-pre-line">{c.body}</p>}
+                    {c.gifUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={c.gifUrl}
+                        alt="GIF"
+                        loading="lazy"
+                        className="bg-surface-2 mt-1.5 max-h-48 max-w-[12rem] rounded-xl"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => replyTo(c.user.name)}
@@ -879,6 +898,10 @@ export function RecognitionCard({
                   maxLength={500}
                   enterKeyHint="send"
                   className="placeholder:text-muted h-11 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
+                />
+                <GifPicker
+                  onSelect={(gif) => sendComment(gif.url)}
+                  triggerClassName="text-muted hover:text-foreground flex size-9 shrink-0 items-center justify-center transition-colors"
                 />
                 <button
                   type="submit"

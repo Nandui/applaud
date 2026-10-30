@@ -16,6 +16,8 @@ export type ReactionSummary = {
 export type FeedCardComment = {
   id: string;
   body: string;
+  /** A GIPHY GIF sent with (or instead of) the text. */
+  gifUrl: string | null;
   createdAtLabel: string;
   user: { id: string; name: string; avatarUrl: string | null; frame: FrameArt | null };
 };
@@ -132,6 +134,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
     comments: r.comments.map((c) => ({
       id: c.id,
       body: c.body,
+    gifUrl: c.gifUrl,
       createdAtLabel: shortTime(c.createdAt),
       user: {
         id: c.user.id,

@@ -308,16 +308,24 @@ export async function toggleReaction(formData: FormData): Promise<ActionResult> 
   return { ok: true };
 }
 
-const commentSchema = z.object({
-  recognitionId: z.string().min(1),
-  body: z.string().trim().min(1, "Write a comment.").max(500),
-});
+const commentSchema = z
+  .object({
+    recognitionId: z.string().min(1),
+    body: z.string().trim().max(500),
+    // Only GIFs from our GIPHY search, never arbitrary remote images.
+    gifUrl: z
+      .string()
+      .refine(isGiphyMediaUrl, "That GIF can't be used.")
+      .nullable(),
+  })
+  .refine((c) => Boolean(c.body || c.gifUrl), "Write a comment.");
 
 export async function addComment(formData: FormData): Promise<ActionResult> {
   const me = await requireUser();
   const parsed = commentSchema.safeParse({
     recognitionId: formData.get("recognitionId"),
-    body: formData.get("body"),
+    body: formData.get("body") ?? "",
+    gifUrl: formData.get("gifUrl") || null,
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid comment." };
@@ -327,6 +335,7 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
       recognitionId: parsed.data.recognitionId,
       userId: me.id,
       body: parsed.data.body,
+      gifUrl: parsed.data.gifUrl,
     },
   });
   await writeAudit({
@@ -335,7 +344,7 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
     entityType: "recognition",
     entityId: parsed.data.recognitionId,
     summary: "Commented on a recognition",
-    metadata: { commentId: comment.id },
+    metadata: { commentId: comment.id, gif: Boolean(comment.gifUrl) },
     siteId: me.siteId,
   });
   revalidatePath("/");

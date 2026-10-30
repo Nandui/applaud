@@ -50,6 +50,7 @@ export async function commentsAfter(
   return rows.map((c) => ({
     id: c.id,
     body: c.body,
+    gifUrl: c.gifUrl,
     createdAtLabel: shortTime(c.createdAt),
     user: {
       id: c.user.id,

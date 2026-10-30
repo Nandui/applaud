@@ -14,6 +14,11 @@ import { cn } from "@/lib/utils";
 const OPTIMISTIC = "optimistic-";
 const NOBODY: TypingUser[] = [];
 
+/** What a pending comment and its saved copy have in common. */
+function sameAs(c: FeedCardComment) {
+  return `${c.body}\n${c.gifUrl ?? ""}`;
+}
+
 /** True while the element is on (or about to scroll onto) the screen. */
 function useOnScreen<T extends Element>() {
   const [el, setEl] = useState<T | null>(null);
@@ -71,10 +76,10 @@ export function useLiveComments({
     const extra = live.filter((c) => !known.has(c.id));
     // My own comments that polling already brought back, so their pending
     // copies can go.
-    const arrived = extra.filter((c) => c.user.id === viewerId).map((c) => c.body);
+    const arrived = extra.filter((c) => c.user.id === viewerId).map(sameAs);
     const pending = shown.filter((c) => {
       if (!c.id.startsWith(OPTIMISTIC)) return false;
-      const i = arrived.indexOf(c.body);
+      const i = arrived.indexOf(sameAs(c));
       if (i === -1) return true;
       arrived.splice(i, 1);
       return false;
