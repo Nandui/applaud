@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Gift, Lock } from "lucide-react";
+import { Clock, Gift, Lock } from "lucide-react";
 import { redeemReward, type ActionResult } from "@/lib/rewards/actions";
 import {
   Sheet,
@@ -35,6 +36,8 @@ export type RewardCardData = {
   wasPointsCost?: number | null;
   /** Shop label from Admin > Rewards, e.g. "Last chance", and when it ends ("3 days left"). */
   promo?: { tag: string; label: string; ends: string | null } | null;
+  /** How long fulfilment takes, e.g. "Within 5 working days"; null when the reward doesn't say. */
+  wait?: string | null;
 };
 
 /** The label badge on a reward picture. */
@@ -133,6 +136,7 @@ export function RewardCard({
   balance: number;
 }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   // Toast + close from inside the action (not an effect watching its state).
   const [, formAction, pending] = useActionState<
     ActionResult | undefined,
@@ -140,7 +144,9 @@ export function RewardCard({
   >(async (prev, fd) => {
     const res = await redeemReward(prev, fd);
     if (res.ok) {
-      toast.success(res.message ?? "Reward requested!");
+      toast.success(res.message ?? "Reward requested!", {
+        action: { label: "Track it", onClick: () => router.push("/rewards/claimed") },
+      });
       setOpen(false);
     } else {
       toast.error(res.error);
@@ -236,6 +242,7 @@ export function RewardCard({
             <Row label="Cost" value={pts(reward.pointsCost)} />
           )}
           <Row label="Your balance" value={pts(balance)} />
+          {reward.wait ? <Row label="How long it takes" value={reward.wait} /> : null}
           {left !== null && !outOfStock ? (
             <Row label={reward.monthLeft !== null ? "Left this month" : "Left"} value={formatNumber(left)} />
           ) : null}
@@ -243,6 +250,12 @@ export function RewardCard({
             <Row label="After redeeming" value={canAfford ? pts(after) : "Not enough yet"} strong />
           </div>
         </dl>
+        <p className="text-muted mx-4 mt-3 flex items-start gap-1.5 text-xs">
+          <Clock className="mt-px size-3.5 shrink-0" aria-hidden />
+          {reward.wait
+            ? "You'll see the expected date and follow your claim in My rewards."
+            : "Follow your claim in My rewards. We'll update it as it's sorted."}
+        </p>
         <form action={formAction} className="pb-safe mt-4 flex gap-2 px-4 pb-4">
           <input type="hidden" name="rewardId" value={reward.id} />
           <input type="hidden" name="expectedCost" value={reward.pointsCost} />

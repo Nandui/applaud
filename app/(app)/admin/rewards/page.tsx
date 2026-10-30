@@ -40,6 +40,8 @@ export default async function AdminRewardsPage() {
         promoText: true,
         promoEndsAt: true,
         wasPointsCost: true,
+        fulfilmentAmount: true,
+        fulfilmentUnit: true,
       },
     }),
     prisma.site.findMany({

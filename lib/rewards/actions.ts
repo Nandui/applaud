@@ -11,6 +11,7 @@ import { getOrgSettings } from "@/lib/org-settings";
 import { checkClaim, economyMonth, parseEurosToCents, resetDateLabel, SUGGESTED_REWARDS } from "@/lib/economy";
 import { lockPool } from "@/lib/locks";
 import { isPromoTag, parseEndDate, promoState } from "@/lib/reward-promo";
+import { FULFILMENT_MAX, expectedByDate, expectedByLabel, fulfilmentLabel, isFulfilmentUnit } from "@/lib/fulfilment";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -36,7 +37,7 @@ export async function redeemReward(
   const { rewardId } = parsed.data;
 
   const settings = await getOrgSettings();
-  let redeemed: { id: string; name: string; pointsCost: number };
+  let redeemed: { id: string; name: string; pointsCost: number; label: string | null; expectedBy: Date | null; unit: string | null };
   try {
     redeemed = await prisma.$transaction(async (tx) => {
       const reward = await tx.reward.findUnique({ where: { id: rewardId } });
@@ -103,6 +104,10 @@ export async function redeemReward(
         }
       }
 
+      // The wait promised now stays with the claim, whatever the reward says later.
+      const now = new Date();
+      const label = fulfilmentLabel(reward.fulfilmentAmount, reward.fulfilmentUnit);
+      const expectedBy = expectedByDate(now, reward.fulfilmentAmount, reward.fulfilmentUnit);
       const redemption = await tx.redemption.create({
         data: {
           userId: me.id,
@@ -110,6 +115,9 @@ export async function redeemReward(
           pointsCost, // captured at redemption time
           euroCostCents: reward.euroCostCents,
           status: "requested",
+          fulfilmentLabel: label,
+          expectedBy,
+          createdAt: now,
         },
       });
       await tx.rewardLedger.create({
@@ -126,7 +134,7 @@ export async function redeemReward(
         where: { id: me.id },
         data: { walletBalance: { decrement: pointsCost } },
       });
-      return { id: redemption.id, name: reward.name, pointsCost };
+      return { id: redemption.id, name: reward.name, pointsCost, label, expectedBy, unit: reward.fulfilmentUnit };
     });
   } catch (error) {
     if (error instanceof RedeemError) return { ok: false, error: error.message };
@@ -143,9 +151,13 @@ export async function redeemReward(
     siteId: me.siteId,
   });
   revalidatePath("/rewards");
+  revalidatePath("/rewards/claimed");
   revalidatePath("/me");
   revalidatePath("/admin/redemptions");
-  return { ok: true, message: "Reward requested! An admin will fulfil it soon." };
+  const when = redeemed.expectedBy
+    ? ` Expect it by ${expectedByLabel(redeemed.expectedBy, redeemed.unit === "hours")}.`
+    : " An admin will sort it out soon.";
+  return { ok: true, message: `Reward requested!${when}` };
 }
 
 // ---------- Catalogue CRUD (admin) ----------
@@ -178,7 +190,12 @@ function parseRewardForm(fd: FormData) {
   const promoEndsAt = endsRaw === "" ? null : parseEndDate(endsRaw);
   const wasRaw = String(fd.get("wasPointsCost") ?? "").trim();
   const wasPointsCost = wasRaw === "" ? null : Math.floor(Number(wasRaw));
+  const waitRaw = String(fd.get("fulfilmentAmount") ?? "").trim();
+  const fulfilmentAmount = waitRaw === "" ? null : Math.floor(Number(waitRaw));
+  const fulfilmentUnit = String(fd.get("fulfilmentUnit") ?? "").trim() || null;
   return {
+    fulfilmentAmount,
+    fulfilmentUnit,
     kind,
     discountText,
     promoTag,
@@ -223,6 +240,13 @@ function validateReward(d: ReturnType<typeof parseRewardForm>): string | null {
   if (!Number.isFinite(d.sortOrder)) return "Enter a valid sort order.";
   if (d.imageUrl && !isProjectBlobUrl(d.imageUrl)) return "Unrecognised picture URL.";
   if (!FULFILMENT_TYPES.has(d.fulfilment)) return "Only manual fulfilment is supported.";
+  if (d.fulfilmentAmount !== null) {
+    if (!isFulfilmentUnit(d.fulfilmentUnit)) return "Pick hours, days, working days or weeks.";
+    if (!Number.isFinite(d.fulfilmentAmount) || d.fulfilmentAmount < 0)
+      return "Enter how long it takes, or leave it blank.";
+    if (d.fulfilmentAmount > FULFILMENT_MAX[d.fulfilmentUnit])
+      return `That's a long wait. Use at most ${FULFILMENT_MAX[d.fulfilmentUnit]} ${d.fulfilmentUnit.replace("_", " ")}.`;
+  }
   return null;
 }
 
@@ -236,6 +260,9 @@ function rewardData(d: ReturnType<typeof parseRewardForm>) {
     promoText: tag ? d.promoText || null : null,
     promoEndsAt: tag ? d.promoEndsAt : null,
     wasPointsCost: tag === "discounted" && !discount ? d.wasPointsCost : null,
+    // A standing discount is never claimed, so there's nothing to wait for.
+    fulfilmentAmount: discount ? null : d.fulfilmentAmount,
+    fulfilmentUnit: discount || d.fulfilmentAmount === null ? null : d.fulfilmentUnit,
     name: d.name,
     description: d.description || null,
     category: d.category || null,
@@ -423,17 +450,18 @@ export async function approveRedemption(formData: FormData): Promise<ActionResul
   if (!r || r.status !== "requested") {
     return { ok: false, error: "This redemption can't be approved." };
   }
-  await prisma.redemption.update({ where: { id }, data: { status: "approved" } });
+  await prisma.redemption.update({ where: { id }, data: { status: "approved", approvedAt: new Date() } });
   await writeAudit({
     actor: admin,
     action: "redemption.approved",
     entityType: "redemption",
     entityId: id,
-    summary: "Approved a redemption",
+    summary: "Marked a redemption in progress",
     metadata: { rewardId: r.rewardId, userId: r.userId, pointsCost: r.pointsCost },
   });
   revalidatePath("/admin/redemptions");
-  return { ok: true, message: "Approved." };
+  revalidatePath("/rewards/claimed");
+  return { ok: true, message: "Marked in progress." };
 }
 
 export async function fulfilRedemption(formData: FormData): Promise<ActionResult> {
@@ -474,7 +502,8 @@ export async function fulfilRedemption(formData: FormData): Promise<ActionResult
     metadata: { rewardId: r.rewardId, userId: r.userId, pointsCost: r.pointsCost },
   });
   revalidatePath("/admin/redemptions");
-  return { ok: true, message: "Fulfilled." };
+  revalidatePath("/rewards/claimed");
+  return { ok: true, message: "Marked fulfilled." };
 }
 
 export async function cancelRedemption(formData: FormData): Promise<ActionResult> {
@@ -536,6 +565,29 @@ export async function cancelRedemption(formData: FormData): Promise<ActionResult
   });
   revalidatePath("/admin/redemptions");
   revalidatePath("/rewards");
+  revalidatePath("/rewards/claimed");
   revalidatePath("/me");
   return { ok: true, message: "Cancelled and refunded." };
+}
+
+/** The admin's message to the person on their claim; blank clears it. */
+export async function setRedemptionNote(formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const note = String(formData.get("staffNote") ?? "").trim();
+  if (note.length > 280) return { ok: false, error: "Keep the note to 280 characters." };
+  const r = await prisma.redemption.findUnique({ where: { id }, select: { id: true, userId: true, rewardId: true } });
+  if (!r) return { ok: false, error: "Redemption not found." };
+  await prisma.redemption.update({ where: { id }, data: { staffNote: note || null } });
+  await writeAudit({
+    actor: admin,
+    action: "redemption.noted",
+    entityType: "redemption",
+    entityId: id,
+    summary: note ? "Updated the note on a redemption" : "Cleared the note on a redemption",
+    metadata: { rewardId: r.rewardId, userId: r.userId },
+  });
+  revalidatePath("/admin/redemptions");
+  revalidatePath("/rewards/claimed");
+  return { ok: true, message: note ? "Note saved." : "Note cleared." };
 }
