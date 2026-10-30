@@ -4,6 +4,10 @@ import { shortTime, fullTimestamp } from "@/lib/datetime";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import type { Cosmetic, FrameArt, Look } from "@/lib/cosmetics";
+import {
+  summarizeCommentReactions,
+  type CommentReactionSummary,
+} from "@/lib/recognition/comment-reactions";
 
 export type ReactionUser = { id: string; name: string; avatarUrl: string | null; frame: FrameArt | null };
 export type ReactionSummary = {
@@ -18,9 +22,37 @@ export type FeedCardComment = {
   body: string;
   /** A GIPHY GIF sent with (or instead of) the text. */
   gifUrl: string | null;
+  /** The top-level comment this one replies to, or null for a top-level comment. */
+  parentId: string | null;
   createdAtLabel: string;
   user: { id: string; name: string; avatarUrl: string | null; frame: FrameArt | null };
+  reactions: CommentReactionSummary[];
 };
+
+/** What the feed loads for each comment. */
+export const commentInclude = {
+  user: { select: { id: true, name: true, avatarUrl: true, profile: true } },
+  reactions: { select: { emoji: true, userId: true } },
+} as const;
+
+type RawComment = Prisma.CommentGetPayload<{ include: typeof commentInclude }>;
+
+export function toFeedComment(c: RawComment, viewerId: string, catalogue: Cosmetic[]): FeedCardComment {
+  return {
+    id: c.id,
+    body: c.body,
+    gifUrl: c.gifUrl,
+    parentId: c.parentId,
+    createdAtLabel: shortTime(c.createdAt),
+    user: {
+      id: c.user.id,
+      name: c.user.name,
+      avatarUrl: c.user.avatarUrl,
+      frame: lookOf(c.user.profile, catalogue).frame,
+    },
+    reactions: summarizeCommentReactions(c.reactions, viewerId),
+  };
+}
 
 /** Someone's shop look, so the feed can show the frames and banners they bought. */
 export type { Look };
@@ -71,7 +103,7 @@ const feedInclude = {
   },
   comments: {
     orderBy: { createdAt: "asc" as const },
-    include: { user: { select: { id: true, name: true, avatarUrl: true, profile: true } } },
+    include: commentInclude,
   },
 } as const;
 
@@ -131,18 +163,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
       reacted: g.reacted,
       users: g.users,
     })),
-    comments: r.comments.map((c) => ({
-      id: c.id,
-      body: c.body,
-    gifUrl: c.gifUrl,
-      createdAtLabel: shortTime(c.createdAt),
-      user: {
-        id: c.user.id,
-        name: c.user.name,
-        avatarUrl: c.user.avatarUrl,
-        frame: lookOf(c.user.profile, catalogue).frame,
-      },
-    })),
+    comments: r.comments.map((c) => toFeedComment(c, viewerId, catalogue)),
   };
 }
 
