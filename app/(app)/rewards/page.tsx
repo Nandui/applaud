@@ -20,9 +20,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
 
 /**
- * Rewards store: your balance with the next thing you can unlock, standing
- * staff discounts, a Featured row of labelled offers, category filters, then a
- * grid of rewards with "N to go" progress bars.
+ * Rewards store: your balance, standing staff discounts, a Featured row of
+ * labelled offers, category filters, then a grid of rewards with "N to go"
+ * progress bars.
  */
 export default async function RewardsPage({
   searchParams,
@@ -114,10 +114,6 @@ export default async function RewardsPage({
   const shown = filtered ? [activeCategory!] : categories;
   const freshIn = (cat: string) => groups.get(cat)!.some((r) => r.isNew);
 
-  // The cheapest in-stock reward you can't afford yet: the "next unlock".
-  const next = rewards
-    .filter((r) => r.pointsCost > balance && (r.stock === null || r.stock > 0) && !r.backOn)
-    .sort((a, b) => a.pointsCost - b.pointsCost)[0];
   const affordable = rewards.filter(
     (r) => r.pointsCost <= balance && (r.stock === null || r.stock > 0) && !r.backOn,
   ).length;
@@ -152,27 +148,6 @@ export default async function RewardsPage({
               ? `Enough for ${affordable} reward${affordable === 1 ? "" : "s"} right now.`
               : "Keep collecting shout-outs to unlock your first reward."}
           </p>
-          {next ? (
-            <div className="bg-surface-2 mt-4 rounded-2xl p-3">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate">
-                  <span className="text-muted">Next up · </span>
-                  <span className="font-semibold">{next.name}</span>
-                </span>
-                <span data-numeric className="shrink-0 font-bold">
-                  {formatNumber(next.pointsCost - balance)} to go
-                </span>
-              </div>
-              <div className="bg-surface-3 mt-2 h-2 overflow-hidden rounded-full">
-                <div
-                  className="bg-primary h-full rounded-full"
-                  style={{
-                    width: `${Math.max(4, Math.round((balance / next.pointsCost) * 100))}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
       </section>
 
