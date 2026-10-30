@@ -180,6 +180,19 @@ model Comment {
   @@index([recognitionId, createdAt])
 }
 
+// Who is writing a comment right now, for the "Ana is typing…" line. One row
+// per person per post, refreshed every few seconds while they type and
+// deleted when they send or stop. Rows older than a few seconds are stale and
+// ignored. No relations on purpose: the rows are throwaway.
+model CommentTyping {
+  recognitionId String
+  userId        String
+  updatedAt     DateTime @default(now())
+
+  @@id([recognitionId, userId])
+  @@index([recognitionId, updatedAt])
+}
+
 // ---------- Nomination awards ----------
 
 model AwardProgram {

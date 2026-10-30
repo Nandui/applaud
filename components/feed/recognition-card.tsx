@@ -2,6 +2,7 @@
 
 import {
   Fragment,
+  useEffect,
   useOptimistic,
   useRef,
   useState,
@@ -23,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { toggleReaction, addComment, toggleBoost, deletePost } from "@/lib/recognition/actions";
 import { togglePin } from "@/lib/profile-actions";
+import { useLiveComments, TypingLine } from "@/components/feed/live-comments";
 import {
   REACTION_EMOJIS,
   BOOSTS,
@@ -262,7 +264,7 @@ export function RecognitionCard({
     (state: FeedCard["reactions"], emoji: string) =>
       switchReaction(state, emoji, viewer),
   );
-  const [comments, addOptimisticComment] = useOptimistic(
+  const [shownComments, addOptimisticComment] = useOptimistic(
     card.comments,
     (state: FeedCard["comments"], text: string) => [
       ...state,
@@ -279,6 +281,34 @@ export function RecognitionCard({
       },
     ],
   );
+
+  // Comments from other people and "is typing…" arrive while you watch.
+  const {
+    comments,
+    typing,
+    watchRef,
+    onDraftChange,
+    stopTyping,
+  } = useLiveComments({
+    recognitionId: card.id,
+    viewerId: viewer.id,
+    serverComments: card.comments,
+    shown: shownComments,
+    open: commentsOpen,
+  });
+  // Whatever changes the draft (typing, an emoji, Reply) counts as typing.
+  useEffect(() => onDraftChange(body), [body, onDraftChange]);
+  const commentListRef = useRef<HTMLDivElement>(null);
+  const commentCount = comments.length;
+  // Keep the open sheet scrolled to the newest comment, unless the reader has
+  // scrolled up to read older ones.
+  useEffect(() => {
+    const list = commentListRef.current;
+    if (!list || !commentsOpen) return;
+    if (list.scrollHeight - list.scrollTop - list.clientHeight < 160) {
+      list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+    }
+  }, [commentCount, typing.length, commentsOpen]);
 
   function react(emoji: string) {
     const fd = new FormData();
@@ -385,6 +415,7 @@ export function RecognitionCard({
     fd.set("recognitionId", card.id);
     fd.set("body", value);
     setBody("");
+    stopTyping();
     startComment(async () => {
       addOptimisticComment(value);
       await addComment(fd);
@@ -754,6 +785,7 @@ export function RecognitionCard({
           View all {formatNumber(comments.length)} comments
         </button>
       )}
+      <span ref={watchRef} aria-hidden className="block" />
       {comments.slice(-2).map((c) => (
         <button
           key={c.id}
@@ -765,6 +797,7 @@ export function RecognitionCard({
           {c.body}
         </button>
       ))}
+      {!commentsOpen && <TypingLine users={typing} className="mt-1" />}
 
       {/* Comments sheet */}
       <Sheet open={commentsOpen} onOpenChange={setCommentsOpen}>
@@ -775,7 +808,7 @@ export function RecognitionCard({
               Comments on {card.sender.name}&apos;s {isPost ? "post" : "shout-out"}
             </SheetDescription>
           </SheetHeader>
-          <div className="max-h-[55svh] min-h-[30svh] space-y-4 overflow-y-auto px-4 py-4">
+          <div ref={commentListRef} className="max-h-[55svh] min-h-[30svh] space-y-4 overflow-y-auto px-4 py-4">
             {comments.length === 0 ? (
               <div className="text-muted flex h-full flex-col items-center justify-center gap-1 py-10 text-center">
                 <p className="text-foreground font-display text-lg font-semibold">
@@ -813,6 +846,7 @@ export function RecognitionCard({
                 </div>
               ))
             )}
+            <TypingLine users={typing} className="pl-1" />
           </div>
           {/* Quick emoji row + composer pinned to the bottom. */}
           <div className="border-t px-4 pt-2.5 pb-3">
