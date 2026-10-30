@@ -174,7 +174,8 @@ model Comment {
   recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
   userId        String
   user          User        @relation(fields: [userId], references: [id])
-  body          String
+  body          String // may be empty when the comment is just a GIF
+  gifUrl        String? // a GIPHY GIF picked in the comment box
   createdAt     DateTime    @default(now())
 
   @@index([recognitionId, createdAt])
