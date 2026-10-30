@@ -2,7 +2,6 @@
 
 import {
   Fragment,
-  useEffect,
   useOptimistic,
   useRef,
   useState,
@@ -15,17 +14,16 @@ import {
   Heart,
   MessageCircle,
   SmilePlus,
-  Send,
   Ellipsis,
   Pin,
   PinOff,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { toggleReaction, addComment, toggleBoost, deletePost } from "@/lib/recognition/actions";
+import { toggleReaction, toggleBoost, deletePost } from "@/lib/recognition/actions";
 import { togglePin } from "@/lib/profile-actions";
-import { useLiveComments, TypingLine } from "@/components/feed/live-comments";
-import { GifPicker } from "@/components/recognize/gif-picker";
+import { TypingLine } from "@/components/feed/live-comments";
+import { CommentsSheet, useCardComments } from "@/components/feed/comments";
 import {
   REACTION_EMOJIS,
   BOOSTS,
@@ -241,13 +239,11 @@ export function RecognitionCard({
   pinned?: boolean;
 }) {
   const [, startReaction] = useTransition();
-  const [, startComment] = useTransition();
   const [boostPending, startBoost] = useTransition();
   const [pinPending, startPin] = useTransition();
   const [deletePending, startDelete] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
-  const [body, setBody] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reactorsOpen, setReactorsOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
@@ -265,52 +261,9 @@ export function RecognitionCard({
     (state: FeedCard["reactions"], emoji: string) =>
       switchReaction(state, emoji, viewer),
   );
-  const [shownComments, addOptimisticComment] = useOptimistic(
-    card.comments,
-    (state: FeedCard["comments"], sent: { body: string; gifUrl: string | null }) => [
-      ...state,
-      {
-        id: `optimistic-${state.length}`,
-        body: sent.body,
-        gifUrl: sent.gifUrl,
-        createdAtLabel: "Just now",
-        user: {
-          id: viewer.id,
-          name: viewer.name,
-          avatarUrl: viewer.avatarUrl ?? null,
-          frame: viewer.frame ?? null,
-        },
-      },
-    ],
-  );
-
-  // Comments from other people and "is typing…" arrive while you watch.
-  const {
-    comments,
-    typing,
-    watchRef,
-    onDraftChange,
-    stopTyping,
-  } = useLiveComments({
-    recognitionId: card.id,
-    viewerId: viewer.id,
-    serverComments: card.comments,
-    shown: shownComments,
-    open: commentsOpen,
-  });
-  // Whatever changes the draft (typing, an emoji, Reply) counts as typing.
-  useEffect(() => onDraftChange(body), [body, onDraftChange]);
-  const commentListRef = useRef<HTMLDivElement>(null);
-  const commentCount = comments.length;
-  // Keep the open sheet scrolled to the newest comment, unless the reader has
-  // scrolled up to read older ones.
-  useEffect(() => {
-    const list = commentListRef.current;
-    if (!list || !commentsOpen) return;
-    if (list.scrollHeight - list.scrollTop - list.clientHeight < 160) {
-      list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
-    }
-  }, [commentCount, typing.length, commentsOpen]);
+  // Comments, replies and their reactions, live while you watch.
+  const commentState = useCardComments({ card, viewer, open: commentsOpen });
+  const { comments, typing, watchRef } = commentState;
 
   function react(emoji: string) {
     const fd = new FormData();
@@ -404,34 +357,6 @@ export function RecognitionCard({
     if (focus) setTimeout(() => commentInputRef.current?.focus(), 350);
   }
 
-  function replyTo(name: string) {
-    setBody((b) => (b.trim() ? b : `@${name} `));
-    commentInputRef.current?.focus();
-  }
-
-  // Sends the typed text, plus a GIF when one was just picked (picking a GIF
-  // sends straight away, with whatever was typed as its caption).
-  function sendComment(gifUrl: string | null = null) {
-    const value = body.trim();
-    if (!value && !gifUrl) return;
-    const fd = new FormData();
-    fd.set("recognitionId", card.id);
-    fd.set("body", value);
-    if (gifUrl) fd.set("gifUrl", gifUrl);
-    setBody("");
-    stopTyping();
-    startComment(async () => {
-      addOptimisticComment({ body: value, gifUrl });
-      const res = await addComment(fd);
-      if (!res.ok) toast.error(res.error);
-    });
-  }
-
-  function submitComment(e: React.FormEvent) {
-    e.preventDefault();
-    sendComment();
-  }
-
   // Point-multiplier boost display + the current viewer's ability to change it.
   const activeType =
     card.boostType && card.boostType in BOOSTS
@@ -475,6 +400,8 @@ export function RecognitionCard({
   const hasMedia = card.imageUrls.length > 0;
   // Who the post is about: the recipients of a shout-out, the author of a post.
   const subjectName = isPost ? card.sender.name : card.recipients[0]?.name;
+  // Under the post: the last two comments, not replies (those need the sheet).
+  const previewComments = comments.filter((c) => !c.parentId).slice(-2);
 
   if (deleted) return null;
 
@@ -695,10 +622,18 @@ export function RecognitionCard({
         <button
           type="button"
           onClick={() => openComments(true)}
-          aria-label="Comment"
-          className="press flex size-11 items-center justify-center rounded-full"
+          aria-label={comments.length > 0 ? `Comments (${comments.length})` : "Comment"}
+          className={cn(
+            "press flex h-11 items-center justify-center gap-1 rounded-full",
+            comments.length > 0 ? "px-2" : "w-11",
+          )}
         >
           <MessageCircle className="size-6 -scale-x-100" strokeWidth={1.8} />
+          {comments.length > 0 && (
+            <span data-numeric className="text-sm font-semibold">
+              {formatNumber(comments.length)}
+            </span>
+          )}
         </button>
 
         {/* Tray anchors here; holding the applaud button opens it too. */}
@@ -790,13 +725,15 @@ export function RecognitionCard({
         </p>
       )}
 
-      {comments.length > 2 && (
+      {comments.length > previewComments.length && (
         <button type="button" onClick={() => openComments()} className="text-muted mt-1 block text-[0.9rem]">
-          View all {formatNumber(comments.length)} comments
+          {comments.length === 1
+            ? "View 1 comment"
+            : `View all ${formatNumber(comments.length)} comments`}
         </button>
       )}
       <span ref={watchRef} aria-hidden className="block" />
-      {comments.slice(-2).map((c) => (
+      {previewComments.map((c) => (
         <button
           key={c.id}
           type="button"
@@ -809,113 +746,16 @@ export function RecognitionCard({
       ))}
       {!commentsOpen && <TypingLine users={typing} className="mt-1" />}
 
-      {/* Comments sheet */}
-      <Sheet open={commentsOpen} onOpenChange={setCommentsOpen}>
-        <SheetContent side="bottom" showCloseButton={false} className="gap-0 p-0">
-          <SheetHeader className="border-b pt-1 pb-3 text-center">
-            <SheetTitle className="text-center text-base">Comments</SheetTitle>
-            <SheetDescription className="sr-only">
-              Comments on {card.sender.name}&apos;s {isPost ? "post" : "shout-out"}
-            </SheetDescription>
-          </SheetHeader>
-          <div ref={commentListRef} className="max-h-[55svh] min-h-[30svh] space-y-4 overflow-y-auto px-4 py-4">
-            {comments.length === 0 ? (
-              <div className="text-muted flex h-full flex-col items-center justify-center gap-1 py-10 text-center">
-                <p className="text-foreground font-display text-lg font-semibold">
-                  No comments yet
-                </p>
-                <p className="text-sm">{isPost ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}</p>
-              </div>
-            ) : (
-              comments.map((c) => (
-                <div key={c.id} className="flex items-start gap-3">
-                  <Link href={`/profile/${c.user.id}`} className="shrink-0">
-                    <FramedAvatar
-                      name={c.user.name}
-                      avatarUrl={c.user.avatarUrl}
-                      frame={c.user.frame}
-                      className="size-9 text-xs"
-                    />
-                  </Link>
-                  <div className="min-w-0 flex-1 text-[0.9rem] leading-snug">
-                    <p className="flex items-baseline gap-1.5">
-                      <Link href={`/profile/${c.user.id}`} className="font-semibold">
-                        {c.user.name}
-                      </Link>
-                      <span className="text-muted text-xs">{c.createdAtLabel}</span>
-                    </p>
-                    {c.body && <p className="mt-0.5 break-words whitespace-pre-line">{c.body}</p>}
-                    {c.gifUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={c.gifUrl}
-                        alt="GIF"
-                        loading="lazy"
-                        className="bg-surface-2 mt-1.5 max-h-48 max-w-[12rem] rounded-xl"
-                      />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => replyTo(c.user.name)}
-                      className="text-muted mt-1 text-xs font-semibold"
-                    >
-                      Reply
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-            <TypingLine users={typing} className="pl-1" />
-          </div>
-          {/* Quick emoji row + composer pinned to the bottom. */}
-          <div className="border-t px-4 pt-2.5 pb-3">
-            <div className="mb-2.5 flex justify-between px-1">
-              {REACTION_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setBody((b) => b + e)}
-                  className="text-2xl leading-none transition-transform active:scale-90"
-                  aria-label={`Insert ${e}`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-            <form onSubmit={submitComment} className="flex items-center gap-2.5">
-              <FramedAvatar
-                name={viewer.name}
-                avatarUrl={viewer.avatarUrl ?? null}
-                frame={viewer.frame ?? null}
-                className="size-9 shrink-0 text-xs"
-              />
-              <div className="bg-surface-2 focus-within:ring-primary/40 flex flex-1 items-center rounded-full pl-4 focus-within:ring-2">
-                <input
-                  ref={commentInputRef}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder={`Add a comment for ${subjectName?.split(" ")[0] ?? "them"}…`}
-                  maxLength={500}
-                  enterKeyHint="send"
-                  className="placeholder:text-muted h-11 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
-                />
-                <GifPicker
-                  onSelect={(gif) => sendComment(gif.url)}
-                  triggerClassName="text-muted hover:text-foreground flex size-9 shrink-0 items-center justify-center transition-colors"
-                />
-                <button
-                  type="submit"
-                  disabled={!body.trim()}
-                  aria-label="Post comment"
-                  className="bg-primary disabled:bg-surface-3 disabled:text-muted mr-1 flex size-9 shrink-0 items-center justify-center rounded-full text-white transition-colors"
-                >
-                  <Send className="size-4" />
-                </button>
-              </div>
-            </form>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <CommentsSheet
+        state={commentState}
+        open={commentsOpen}
+        onOpenChange={setCommentsOpen}
+        viewer={viewer}
+        description={`Comments on ${card.sender.name}'s ${isPost ? "post" : "shout-out"}`}
+        emptyHint={isPost ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}
+        placeholderName={subjectName ?? "them"}
+        inputRef={commentInputRef}
+      />
 
       {/* Who reacted sheet */}
       <Sheet open={reactorsOpen} onOpenChange={setReactorsOpen}>

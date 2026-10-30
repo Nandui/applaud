@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { shortTime } from "@/lib/datetime";
-import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
-import type { FeedCardComment } from "@/lib/recognition/queries";
+import { commentInclude, toFeedComment, type FeedCardComment } from "@/lib/recognition/queries";
+import {
+  reactionsByComment,
+  type CommentReactionSummary,
+} from "@/lib/recognition/comment-reactions";
 import { TYPING_FRESH_MS, type TypingUser } from "@/lib/recognition/live-config";
 
 /** Most comments one poll returns; the rest come on the next poll. */
@@ -31,6 +33,7 @@ export async function canSeeRecognition(recognitionId: string, viewerId: string)
 export async function commentsAfter(
   recognitionId: string,
   afterId: string | null,
+  viewerId: string,
 ): Promise<FeedCardComment[]> {
   const after = afterId
     ? await prisma.comment.findFirst({
@@ -43,22 +46,26 @@ export async function commentsAfter(
       where: { recognitionId, ...(after ? { createdAt: { gt: after.createdAt } } : {}) },
       orderBy: { createdAt: "asc" },
       take: MAX_COMMENTS,
-      include: { user: { select: { id: true, name: true, avatarUrl: true, profile: true } } },
+      include: commentInclude,
     }),
     getCatalogue(),
   ]);
-  return rows.map((c) => ({
-    id: c.id,
-    body: c.body,
-    gifUrl: c.gifUrl,
-    createdAtLabel: shortTime(c.createdAt),
-    user: {
-      id: c.user.id,
-      name: c.user.name,
-      avatarUrl: c.user.avatarUrl,
-      frame: lookOf(c.user.profile, catalogue).frame,
-    },
-  }));
+  return rows.map((c) => toFeedComment(c, viewerId, catalogue));
+}
+
+/**
+ * Every reaction on every comment of a post, by comment id. Sent with each
+ * poll while the comments are open, because people react to old comments too.
+ */
+export async function commentReactionsOn(
+  recognitionId: string,
+  viewerId: string,
+): Promise<Record<string, CommentReactionSummary[]>> {
+  const rows = await prisma.commentReaction.findMany({
+    where: { comment: { recognitionId } },
+    select: { commentId: true, emoji: true, userId: true },
+  });
+  return reactionsByComment(rows, viewerId);
 }
 
 /** Everyone but the viewer who is writing a comment on this post right now. */

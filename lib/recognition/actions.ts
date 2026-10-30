@@ -19,6 +19,7 @@ import {
   type BoostType,
 } from "@/lib/config";
 import { isGiphyMediaUrl } from "@/lib/recognition/gif";
+import { canSeeRecognition } from "@/lib/recognition/live";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
 import { lockPool } from "@/lib/locks";
@@ -317,6 +318,8 @@ const commentSchema = z
       .string()
       .refine(isGiphyMediaUrl, "That GIF can't be used.")
       .nullable(),
+    // Replying to this comment.
+    parentId: z.string().min(1).nullable(),
   })
   .refine((c) => Boolean(c.body || c.gifUrl), "Write a comment.");
 
@@ -326,9 +329,20 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
     recognitionId: formData.get("recognitionId"),
     body: formData.get("body") ?? "",
     gifUrl: formData.get("gifUrl") || null,
+    parentId: formData.get("parentId") || null,
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid comment." };
+  }
+  // Replies are one level deep: a reply to a reply joins the same thread.
+  let parentId: string | null = null;
+  if (parsed.data.parentId) {
+    const parent = await prisma.comment.findFirst({
+      where: { id: parsed.data.parentId, recognitionId: parsed.data.recognitionId },
+      select: { id: true, parentId: true },
+    });
+    if (!parent) return { ok: false, error: "That comment no longer exists." };
+    parentId = parent.parentId ?? parent.id;
   }
   const comment = await prisma.comment.create({
     data: {
@@ -336,6 +350,7 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
       userId: me.id,
       body: parsed.data.body,
       gifUrl: parsed.data.gifUrl,
+      parentId,
     },
   });
   await writeAudit({
@@ -343,8 +358,74 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
     action: "recognition.commented",
     entityType: "recognition",
     entityId: parsed.data.recognitionId,
-    summary: "Commented on a recognition",
-    metadata: { commentId: comment.id, gif: Boolean(comment.gifUrl) },
+    summary: parentId ? "Replied to a comment" : "Commented on a recognition",
+    metadata: { commentId: comment.id, gif: Boolean(comment.gifUrl), parentId },
+    siteId: me.siteId,
+  });
+  revalidatePath("/");
+  revalidatePath("/profile/[id]", "page");
+  return { ok: true };
+}
+
+const commentReactionSchema = z.object({
+  commentId: z.string().min(1),
+  emoji: z
+    .string()
+    .refine((e) => (REACTION_EMOJIS as readonly string[]).includes(e), "Invalid emoji."),
+});
+
+/**
+ * Set the current user's single reaction on a comment, same rules as on
+ * posts: the same emoji toggles it off, a different emoji switches it.
+ */
+export async function toggleCommentReaction(formData: FormData): Promise<ActionResult> {
+  const me = await requireUser();
+  const parsed = commentReactionSchema.safeParse({
+    commentId: formData.get("commentId"),
+    emoji: formData.get("emoji"),
+  });
+  if (!parsed.success) return { ok: false, error: "Invalid reaction." };
+  const { commentId, emoji } = parsed.data;
+
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    select: { id: true, recognitionId: true },
+  });
+  if (!comment || !(await canSeeRecognition(comment.recognitionId, me.id))) {
+    return { ok: false, error: "That comment no longer exists." };
+  }
+
+  const existing = await prisma.commentReaction.findUnique({
+    where: { commentId_userId: { commentId, userId: me.id } },
+  });
+  let outcome: "added" | "changed" | "removed";
+  if (!existing) {
+    // Two quick taps can race; the unique key keeps it to one row.
+    await prisma.commentReaction.upsert({
+      where: { commentId_userId: { commentId, userId: me.id } },
+      create: { commentId, userId: me.id, emoji },
+      update: { emoji },
+    });
+    outcome = "added";
+  } else if (existing.emoji === emoji) {
+    await prisma.commentReaction.deleteMany({ where: { id: existing.id } });
+    outcome = "removed";
+  } else {
+    await prisma.commentReaction.update({ where: { id: existing.id }, data: { emoji } });
+    outcome = "changed";
+  }
+  await writeAudit({
+    actor: me,
+    action: "comment.reacted",
+    entityType: "recognition",
+    entityId: comment.recognitionId,
+    summary:
+      outcome === "removed"
+        ? `Removed ${emoji} from a comment`
+        : outcome === "added"
+          ? `Reacted ${emoji} to a comment`
+          : `Changed a comment reaction to ${emoji}`,
+    metadata: { commentId, emoji, outcome },
     siteId: me.siteId,
   });
   revalidatePath("/");

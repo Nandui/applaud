@@ -69,6 +69,7 @@ model User {
   receivedRecognitions RecognitionRecipient[]
   reactions            Reaction[]
   comments             Comment[]
+  commentReactions     CommentReaction[]
   nominationsMade      Nomination[]           @relation("Nominator")
   nominationsReceived  Nomination[]           @relation("Nominee")
   ledger               RewardLedger[]
@@ -176,9 +177,30 @@ model Comment {
   user          User        @relation(fields: [userId], references: [id])
   body          String // may be empty when the comment is just a GIF
   gifUrl        String? // a GIPHY GIF picked in the comment box
+  // The comment this one replies to. Replies are one level deep, like
+  // Instagram: replying to a reply attaches to the same top-level comment.
+  parentId      String?
+  parent        Comment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Comment[]   @relation("CommentReplies")
+  reactions     CommentReaction[]
   createdAt     DateTime    @default(now())
 
   @@index([recognitionId, createdAt])
+  @@index([parentId])
+}
+
+// An emoji reaction on a comment. Same rules as reactions on posts: one per
+// person per comment, reacting again with another emoji switches it.
+model CommentReaction {
+  id        String   @id @default(cuid())
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
 }
 
 // Who is writing a comment right now, for the "Ana is typing…" line. One row
