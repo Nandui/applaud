@@ -36,24 +36,24 @@ export function ProfilePreview({
   return (
     <div className={cn("bg-background border-border @container overflow-hidden rounded-2xl border", className)}>
       <ProfileBanner background={look.banner} className="aspect-[3/1]" />
-      <div className="flex items-end gap-[clamp(0.75rem,2.5cqw,1.25rem)] px-[clamp(1rem,3cqw,1.5rem)] pb-[clamp(1rem,3cqw,1.5rem)]">
+      <div className="flex items-end gap-[clamp(0.5rem,2.5cqw,1.25rem)] px-[clamp(0.75rem,3cqw,1.5rem)] pb-[clamp(0.75rem,3cqw,1.5rem)]">
         {/* Avatar about 40% of the banner's height, overlapping it by half. */}
-        <PopOnChange value={popKey ?? ""} className="relative -mt-[clamp(2.25rem,7cqw,3.5rem)]">
+        <PopOnChange value={popKey ?? ""} className="relative -mt-[clamp(1.75rem,7cqw,3.5rem)]">
           <FramedAvatar
             name={name}
             avatarUrl={avatarUrl}
             frame={look.frame}
-            className="size-[clamp(4rem,13cqw,6.5rem)] **:data-[slot=avatar-fallback]:text-[clamp(0.875rem,3.2cqw,1.75rem)]"
+            className="size-[clamp(3.25rem,13cqw,6.5rem)] **:data-[slot=avatar-fallback]:text-[clamp(0.8125rem,3.2cqw,1.75rem)]"
             shine={frameRarity}
           />
         </PopOnChange>
         <div className="min-w-0 flex-1 pb-1">
-          <p className="truncate text-[clamp(1rem,3.4cqw,1.75rem)] leading-tight font-bold">{name}</p>
+          <p className="truncate text-[clamp(0.9375rem,3.4cqw,1.75rem)] leading-tight font-bold">{name}</p>
         </div>
         {/* Not a button: a swatch of the theme's accent colour, the colour of
             the "Send … a shout-out" button on the real profile. */}
         <span
-          className="mb-1 shrink-0 rounded-lg px-[clamp(0.75rem,2cqw,1.125rem)] py-[clamp(0.375rem,1.1cqw,0.625rem)] text-[clamp(0.75rem,1.8cqw,0.9375rem)] font-semibold"
+          className="mb-1 shrink-0 rounded-md px-[clamp(0.5rem,2cqw,1.125rem)] py-[clamp(0.25rem,1.1cqw,0.625rem)] text-[clamp(0.6875rem,1.8cqw,0.9375rem)] font-semibold"
           style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#ffffff" }}
         >
           Theme colour
