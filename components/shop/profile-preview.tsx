@@ -7,9 +7,14 @@ import { PopOnChange } from "@/components/fx/pop-on-change";
 
 /**
  * A small version of someone's profile header (banner, framed avatar, name and
- * an accent-coloured button) so shop items can be tried on before buying.
+ * a theme colour swatch) so shop items can be tried on before buying.
  * It moves like the real profile; pass `popKey` (what's worn) to bounce the
  * avatar when that changes, i.e. right after equipping something.
+ *
+ * The banner stays 3:1 like the profile, so on wide screens it gets tall; the
+ * avatar, name and button grow with the card's width (container units) so
+ * they keep the same proportion to the banner instead of looking tiny under
+ * it. At phone width they're the same size as before.
  */
 export function ProfilePreview({
   name,
@@ -29,26 +34,35 @@ export function ProfilePreview({
 }) {
   const accent = look.theme;
   return (
-    <div className={cn("bg-background border-border overflow-hidden rounded-2xl border", className)}>
+    <div className={cn("bg-background border-border @container overflow-hidden rounded-2xl border", className)}>
       <ProfileBanner background={look.banner} className="aspect-[3/1]" />
-      <div className="flex items-end gap-3 px-4 pb-4">
-        <PopOnChange value={popKey ?? ""} className="relative -mt-9">
+      <div className="flex items-center gap-[clamp(0.5rem,2.5cqw,1.25rem)] px-[clamp(0.75rem,3cqw,1.5rem)] py-[clamp(0.625rem,2.5cqw,1.25rem)]">
+        {/* Avatar about 40% of the banner's height, overlapping it by half.
+            The negative margin also cancels the row's top padding, so the
+            row (and the centred name and swatch) covers only the strip
+            below the banner. */}
+        <PopOnChange
+          value={popKey ?? ""}
+          className="relative -mt-[calc(clamp(1.75rem,7cqw,3.5rem)+clamp(0.625rem,2.5cqw,1.25rem))]"
+        >
           <FramedAvatar
             name={name}
             avatarUrl={avatarUrl}
             frame={look.frame}
-            className="size-16 text-lg"
+            className="size-[clamp(3.25rem,13cqw,6.5rem)] **:data-[slot=avatar-fallback]:text-[clamp(0.8125rem,3.2cqw,1.75rem)]"
             shine={frameRarity}
           />
         </PopOnChange>
-        <div className="min-w-0 flex-1 pb-1">
-          <p className="truncate font-bold">{name}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[clamp(0.9375rem,3.4cqw,1.75rem)] leading-tight font-bold">{name}</p>
         </div>
+        {/* Not a button: a swatch of the theme's accent colour, the colour of
+            the "Send … a shout-out" button on the real profile. */}
         <span
-          className="mb-1 rounded-lg px-3 py-1.5 text-xs font-semibold"
+          className="shrink-0 rounded-md px-[clamp(0.4375rem,1.5cqw,0.875rem)] py-[clamp(0.1875rem,0.8cqw,0.4375rem)] text-[clamp(0.625rem,1.4cqw,0.8125rem)] font-semibold"
           style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#ffffff" }}
         >
-          Shout-out
+          Theme colour
         </span>
       </div>
     </div>
