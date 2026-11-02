@@ -103,7 +103,7 @@ function ValueFormDialog({
             <div className="min-w-0 space-y-1.5">
               <p className="text-sm font-semibold">Badge picture</p>
               <p className="text-muted text-xs">
-                The picture is the badge: it shows on every shout-out for this value. A square picture works
+                The picture is the badge: it shows on every recognition for this value. A square picture works
                 best.
               </p>
               <input

@@ -125,12 +125,12 @@ export function EconomyForm({
             )}
             {field(
               "maxPointsPerShoutoutStaff",
-              "Most per shout-out (staff)",
+              "Most per recognition (staff)",
               `Per person, ${euros(num("maxPointsPerShoutoutStaff"))}. 0 = no limit.`,
             )}
             {field(
               "maxPointsPerShoutoutManager",
-              "Most per shout-out (managers)",
+              "Most per recognition (managers)",
               `Per person, ${euros(num("maxPointsPerShoutoutManager"))}. 0 = no limit.`,
             )}
             <p className="text-muted text-xs sm:col-span-2">

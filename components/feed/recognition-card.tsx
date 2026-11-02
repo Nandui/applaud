@@ -186,7 +186,7 @@ function MediaHero({ urls }: { urls: string[] }) {
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={optimizedImage(urls[0], MEDIA_WIDTH)}
-        alt="Shout-out photo"
+        alt="Recognition photo"
         loading="lazy"
         decoding="async"
         draggable={false}
@@ -750,7 +750,7 @@ export function RecognitionCard({
         open={commentsOpen}
         onOpenChange={setCommentsOpen}
         viewer={viewer}
-        description={`Comments on ${card.sender.name}'s ${isPost ? "post" : "shout-out"}`}
+        description={`Comments on ${card.sender.name}'s ${isPost ? "post" : "recognition"}`}
         emptyHint={isPost ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}
         inputRef={commentInputRef}
       />
@@ -761,7 +761,7 @@ export function RecognitionCard({
           <SheetHeader className="border-b pt-1 pb-3">
             <SheetTitle className="text-center text-base">Reactions</SheetTitle>
             <SheetDescription className="sr-only">
-              People who reacted to this {isPost ? "post" : "shout-out"}
+              People who reacted to this {isPost ? "post" : "recognition"}
             </SheetDescription>
           </SheetHeader>
           <ul className="max-h-[60svh] overflow-y-auto py-2">

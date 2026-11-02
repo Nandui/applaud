@@ -1004,7 +1004,7 @@ export function StoreManager({
             ({euros(collection)} face value)
             {cheapest > 0 ? (
               <>
-                , and a {formatNumber(typicalShoutout)}-point shout-out buys the cheapest item{" "}
+                , and a {formatNumber(typicalShoutout)}-point recognition buys the cheapest item{" "}
                 <span data-numeric>{formatNumber(Math.floor(typicalShoutout / cheapest))}</span> times over
               </>
             ) : null}

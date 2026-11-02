@@ -78,7 +78,7 @@ export default async function FeedPage() {
           href="/recognize"
           className="bg-surface-2 flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-transform active:scale-95"
         >
-          <span aria-hidden>👏</span> Shout-out
+          <span aria-hidden>👏</span> Recognize
         </Link>
       </div>
 
@@ -99,7 +99,7 @@ export default async function FeedPage() {
             href="/recognize"
             className="bg-primary flex h-12 items-center gap-2 rounded-full px-6 font-semibold text-white"
           >
-            <Plus className="size-4" /> Send a shout-out
+            <Plus className="size-4" /> Recognize someone
           </Link>
           <Link href="/post" className="text-primary text-sm font-semibold">
             Write a post

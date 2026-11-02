@@ -107,14 +107,14 @@ export default async function MePage() {
           <p data-numeric className="mt-2 text-3xl font-bold">
             {formatNumber(receivedCount)}
           </p>
-          <p className="text-muted text-xs font-medium">shout-outs received</p>
+          <p className="text-muted text-xs font-medium">recognitions received</p>
         </div>
         <div className="bg-surface rounded-2xl p-4">
           <Send className="text-primary size-5" />
           <p data-numeric className="mt-2 text-3xl font-bold">
             {formatNumber(givenCount)}
           </p>
-          <p className="text-muted text-xs font-medium">shout-outs given</p>
+          <p className="text-muted text-xs font-medium">recognitions given</p>
         </div>
       </div>
 

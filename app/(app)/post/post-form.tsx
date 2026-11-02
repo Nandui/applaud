@@ -152,7 +152,7 @@ export function PostForm({
       />
 
       <p className="text-muted mt-3 text-xs">
-        Want to thank someone? <Link href="/recognize" className="text-primary font-semibold">Send a shout-out</Link>{" "}
+        Want to thank someone? <Link href="/recognize" className="text-primary font-semibold">Recognize someone</Link>{" "}
         instead, so it counts for them.
       </p>
 

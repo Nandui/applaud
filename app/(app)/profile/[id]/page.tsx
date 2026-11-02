@@ -138,7 +138,7 @@ export default async function ProfilePage({
             className="flex h-9 flex-1 items-center justify-center rounded-lg text-sm font-semibold transition-opacity active:opacity-80"
             style={{ backgroundColor: accent, color: onAccent }}
           >
-            Send {firstName} a shout-out
+            Recognize {firstName}
           </Link>
         )}
       </div>
@@ -173,7 +173,7 @@ export default async function ProfilePage({
 
       {listed.length === 0 && pinnedCards.length === 0 ? (
         <div className="text-muted flex flex-col items-center gap-2 px-6 py-16 text-center">
-          <p className="text-foreground font-bold">{tab === "posts" ? "No posts yet" : "No shout-outs yet"}</p>
+          <p className="text-foreground font-bold">{tab === "posts" ? "No posts yet" : "No recognitions yet"}</p>
           <p className="max-w-xs text-sm">
             {tab === "posts"
               ? isMe
@@ -181,11 +181,11 @@ export default async function ProfilePage({
                 : `${firstName} hasn't posted anything yet.`
               : tab === "given"
               ? isMe
-                ? "Shout-outs you send will show up here."
-                : `${firstName} hasn't sent any shout-outs yet.`
+                ? "Recognitions you send will show up here."
+                : `${firstName} hasn't recognized anyone yet.`
               : isMe
-                ? "Shout-outs you receive will show up here."
-                : `Be the first to give ${firstName} a shout-out.`}
+                ? "Recognitions you receive will show up here."
+                : `Be the first to recognize ${firstName}.`}
           </p>
         </div>
       ) : (

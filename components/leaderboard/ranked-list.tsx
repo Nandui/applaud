@@ -35,7 +35,7 @@ export function RankedList({
       <div className="text-muted flex flex-col items-center gap-2 py-20 text-center">
         <span className="text-4xl">🏁</span>
         <p className="text-foreground font-bold">No one on the board yet</p>
-        <p className="text-sm">Shout-outs in this period will show up here.</p>
+        <p className="text-sm">Recognitions in this period will show up here.</p>
       </div>
     );
   }

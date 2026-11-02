@@ -102,7 +102,7 @@ export async function createRecognition(
 
   const perShoutoutMax = maxPointsPerShoutout(me.role, settings);
   if (perShoutoutMax > 0 && points > perShoutoutMax) {
-    return { ok: false, error: `A shout-out can carry at most ${perShoutoutMax} points per person.` };
+    return { ok: false, error: `A recognition can carry at most ${perShoutoutMax} points per person.` };
   }
 
   const totalPoints = points * recipientIds.length;

@@ -93,7 +93,7 @@ export async function togglePin(recognitionId: string): Promise<ProfileActionRes
     where: { userId: me.id, recognitionId },
     select: { id: true },
   });
-  if (!received) return { ok: false, error: "You can only pin shout-outs you received." };
+  if (!received) return { ok: false, error: "You can only pin recognitions you received." };
 
   const custom = await loadCustom(me.id);
   const isPinned = custom.pinned.includes(recognitionId);

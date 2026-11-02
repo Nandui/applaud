@@ -7,7 +7,7 @@ import { getCatalogue } from "@/lib/catalogue";
 import { RecognizeForm } from "./recognize-form";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Send a shout-out" };
+export const metadata = { title: "Recognize someone" };
 
 export default async function RecognizePage({
   searchParams,
