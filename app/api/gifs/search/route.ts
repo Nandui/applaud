@@ -5,7 +5,7 @@ import type { GifResult } from "@/lib/recognition/gif";
 
 export const dynamic = "force-dynamic";
 
-const GIPHY_BASE = "https://api.giphy.com/v1/gifs";
+const GIPHY_API = "https://api.giphy.com/v1";
 
 type GiphyRendition = { url?: string; width?: string; height?: string };
 type GiphyGif = {
@@ -35,7 +35,8 @@ function toGifResult(g: GiphyGif): GifResult | null {
 
 /**
  * GIF-library search, proxied so the GIPHY API key never reaches the browser.
- * Auth-gated (same bar as posting). Empty query returns trending. When no
+ * Auth-gated (same bar as posting). Empty query returns trending.
+ * `?type=stickers` searches GIPHY's stickers (transparent GIFs) instead. When no
  * GIPHY_API_KEY is set the route degrades gracefully with `configured: false`
  * so the picker can explain itself instead of erroring.
  */
@@ -50,7 +51,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ configured: false, gifs: [] });
   }
 
-  const q = (new URL(request.url).searchParams.get("q") ?? "").trim();
+  const search = new URL(request.url).searchParams;
+  const q = (search.get("q") ?? "").trim();
+  const kind = search.get("type") === "stickers" ? "stickers" : "gifs";
   const params = new URLSearchParams({
     api_key: apiKey,
     limit: String(GIF_SEARCH_LIMIT),
@@ -58,7 +61,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     bundle: "fixed_height",
   });
   if (q) params.set("q", q);
-  const endpoint = `${GIPHY_BASE}/${q ? "search" : "trending"}?${params}`;
+  const endpoint = `${GIPHY_API}/${kind}/${q ? "search" : "trending"}?${params}`;
 
   try {
     // Cache identical queries briefly to stay comfortably under rate limits.

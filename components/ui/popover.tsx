@@ -40,15 +40,18 @@ function PopoverContent({
   align = "center",
   side = "bottom",
   sideOffset = 4,
+  anchor,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Popup> & {
+  /** Position against this element instead of the trigger (for a popover with no trigger). */
+  anchor?: React.ComponentProps<typeof PopoverPrimitive.Positioner>["anchor"]
   align?: React.ComponentProps<typeof PopoverPrimitive.Positioner>["align"]
   side?: React.ComponentProps<typeof PopoverPrimitive.Positioner>["side"]
   sideOffset?: React.ComponentProps<typeof PopoverPrimitive.Positioner>["sideOffset"]
 }) {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Positioner className="z-50" align={align} side={side} sideOffset={sideOffset}>
+      <PopoverPrimitive.Positioner className="z-50" align={align} side={side} sideOffset={sideOffset} anchor={anchor}>
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(

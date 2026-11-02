@@ -98,3 +98,27 @@ export function threadComments<T extends { id: string; parentId: string | null }
   }
   return threads;
 }
+
+/** How the comments sheet orders top-level comments. */
+export type CommentSort = "relevant" | "newest" | "all";
+
+/**
+ * Top-level comments in the chosen order. "relevant" puts the most reacted to
+ * and replied to first (a reply counts double), ties in the order posted;
+ * "newest" is newest first; "all" is the order they were posted. `threads`
+ * must be in the order posted, as threadComments returns them.
+ */
+export function sortThreads<T extends { comment: { reactions: CommentReactionSummary[] }; replies: unknown[] }>(
+  threads: T[],
+  sort: CommentSort,
+  reactionsOf: (comment: T["comment"]) => CommentReactionSummary[] = (c) => c.reactions,
+): T[] {
+  if (sort === "all") return [...threads];
+  if (sort === "newest") return [...threads].reverse();
+  const score = (t: T) =>
+    reactionsOf(t.comment).reduce((sum, r) => sum + r.count, 0) + 2 * t.replies.length;
+  return threads
+    .map((t, i) => ({ t, i, s: score(t) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map(({ t }) => t);
+}

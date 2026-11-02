@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   nextCommentReaction,
+  sortThreads,
   reactionsByComment,
   summarizeCommentReactions,
   threadComments,
@@ -65,5 +66,23 @@ test("replies sit under their comment; orphans stay visible", () => {
       ["b", []],
       ["x1", []],
     ],
+  );
+});
+
+test("comments sort by relevance, newest first, or as posted", () => {
+  const thread = (id: string, likes: number, replies: number) => ({
+    comment: { id, reactions: likes ? [{ emoji: "❤️", count: likes, reacted: false }] : [] },
+    replies: Array.from({ length: replies }, (_, i) => `${id}-${i}`),
+  });
+  const threads = [thread("a", 0, 0), thread("b", 1, 0), thread("c", 0, 1), thread("d", 1, 0)];
+  const ids = (list: typeof threads) => list.map((t) => t.comment.id);
+  // A reply counts double; ties keep the order posted.
+  assert.deepEqual(ids(sortThreads(threads, "relevant")), ["c", "b", "d", "a"]);
+  assert.deepEqual(ids(sortThreads(threads, "newest")), ["d", "c", "b", "a"]);
+  assert.deepEqual(ids(sortThreads(threads, "all")), ["a", "b", "c", "d"]);
+  // Live reaction counts can stand in for the page's.
+  assert.deepEqual(
+    ids(sortThreads(threads, "relevant", (c) => (c.id === "a" ? [{ emoji: "🔥", count: 5, reacted: true }] : c.reactions))),
+    ["a", "c", "b", "d"],
   );
 });
