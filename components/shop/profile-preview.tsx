@@ -7,7 +7,7 @@ import { PopOnChange } from "@/components/fx/pop-on-change";
 
 /**
  * A small version of someone's profile header (banner, framed avatar, name and
- * an accent-coloured button) so shop items can be tried on before buying.
+ * a theme colour swatch) so shop items can be tried on before buying.
  * It moves like the real profile; pass `popKey` (what's worn) to bounce the
  * avatar when that changes, i.e. right after equipping something.
  *
@@ -50,11 +50,13 @@ export function ProfilePreview({
         <div className="min-w-0 flex-1 pb-1">
           <p className="truncate text-[clamp(1rem,3.4cqw,1.75rem)] leading-tight font-bold">{name}</p>
         </div>
+        {/* Not a button: a swatch of the theme's accent colour, the colour of
+            the "Send … a shout-out" button on the real profile. */}
         <span
           className="mb-1 shrink-0 rounded-lg px-[clamp(0.75rem,2cqw,1.125rem)] py-[clamp(0.375rem,1.1cqw,0.625rem)] text-[clamp(0.75rem,1.8cqw,0.9375rem)] font-semibold"
           style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#ffffff" }}
         >
-          Shout-out
+          Theme colour
         </span>
       </div>
     </div>
