@@ -153,7 +153,7 @@ export default async function RewardsPage({
           <p className="text-muted mt-2 text-sm">
             {affordable > 0
               ? `Enough for ${affordable} reward${affordable === 1 ? "" : "s"} right now.`
-              : "Keep collecting shout-outs to unlock your first reward."}
+              : "Keep collecting recognitions to unlock your first reward."}
           </p>
         </div>
       </section>

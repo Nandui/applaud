@@ -60,7 +60,7 @@ export function SideNav({ user }: { user: SessionUser }) {
         href="/recognize"
         className="bg-primary text-primary-fg mt-4 flex h-11 items-center justify-center gap-2 rounded-xl font-semibold transition-opacity active:opacity-80"
       >
-        <Plus className="size-5" strokeWidth={2.6} /> Send a shout-out
+        <Plus className="size-5" strokeWidth={2.6} /> Recognize someone
       </Link>
       <Link
         href="/post"

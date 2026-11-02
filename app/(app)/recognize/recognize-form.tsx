@@ -228,7 +228,7 @@ export function RecognizeForm({
               <X className="size-6.5" />
             </Link>
             <h1 className="pointer-events-none absolute inset-x-0 text-center text-[1rem] font-bold">
-              New shout-out
+              New recognition
             </h1>
             <button
               type="button"
@@ -359,7 +359,7 @@ export function RecognizeForm({
               Back
             </button>
             <h1 className="pointer-events-none absolute inset-x-0 text-center text-[1rem] font-bold">
-              New shout-out
+              New recognition
             </h1>
             <button
               type="submit"
