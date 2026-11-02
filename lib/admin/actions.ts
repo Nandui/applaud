@@ -1,5 +1,6 @@
 "use server";
 
+import { backfillGoogleAvatars, isGooglePictureUrl } from "@/lib/google-avatar";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -256,7 +257,8 @@ export async function saveUser(
       return { ok: false, error: "One of those managers no longer exists." };
     }
   }
-  if (avatarUrl && !isProjectBlobUrl(avatarUrl)) {
+  // Their Google picture may be linked straight from Google (lib/google-avatar.ts).
+  if (avatarUrl && !isProjectBlobUrl(avatarUrl) && !isGooglePictureUrl(avatarUrl)) {
     return { ok: false, error: "Unrecognised picture URL." };
   }
 
@@ -344,6 +346,33 @@ export async function setUserActive(formData: FormData): Promise<ActionResult> {
   });
   revalidatePath("/admin/users");
   return { ok: true };
+}
+
+/** Admin > Users: give everyone without a picture their Google picture now. */
+export async function applyGooglePhotos(): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const { checked, updated } = await backfillGoogleAvatars();
+  if (updated > 0) {
+    await writeAudit({
+      actor: admin,
+      action: "user.updated",
+      entityType: "user",
+      entityId: admin.id,
+      summary: `Set the Google picture as the avatar of ${updated} ${updated === 1 ? "person" : "people"}`,
+      metadata: { checked, updated },
+    });
+    revalidatePath("/", "layout");
+  }
+  if (checked === 0) {
+    return { ok: true, message: "Everyone who has signed in with Google already has a picture." };
+  }
+  return {
+    ok: true,
+    message:
+      updated === checked
+        ? `Added the Google picture for ${updated} ${updated === 1 ? "person" : "people"}.`
+        : `Added the Google picture for ${updated} of ${checked}. The rest get it at their next sign-in.`,
+  };
 }
 
 /**

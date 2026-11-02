@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runMilestones } from "@/lib/milestones/run";
+import { backfillGoogleAvatars } from "@/lib/google-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -17,5 +18,10 @@ export async function GET(req: Request) {
   }
 
   const result = await runMilestones();
-  return NextResponse.json({ ok: true, ...result });
+  // Also: Google pictures for anyone who still has none (cheap once done).
+  const googlePhotos = await backfillGoogleAvatars().catch((error) => {
+    console.error("Google picture backfill failed:", error);
+    return null;
+  });
+  return NextResponse.json({ ok: true, ...result, googlePhotos });
 }

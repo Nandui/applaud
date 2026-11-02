@@ -2,6 +2,8 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { UsersManager, type UserRow } from "@/components/admin/users-manager";
+import { GooglePhotosButton } from "@/components/admin/google-photos-button";
+import { googleSignInEnabled } from "@/lib/auth/mode";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Users" };
@@ -69,6 +71,7 @@ export default async function AdminUsersPage() {
       <PageHeader
         title="Users"
         description="Manage people, sites, managers, company roles, and app roles."
+        action={googleSignInEnabled ? <GooglePhotosButton /> : undefined}
       />
       <UsersManager
         rows={rows}
