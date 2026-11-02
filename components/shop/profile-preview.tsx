@@ -36,9 +36,15 @@ export function ProfilePreview({
   return (
     <div className={cn("bg-background border-border @container overflow-hidden rounded-2xl border", className)}>
       <ProfileBanner background={look.banner} className="aspect-[3/1]" />
-      <div className="flex items-end gap-[clamp(0.5rem,2.5cqw,1.25rem)] px-[clamp(0.75rem,3cqw,1.5rem)] pb-[clamp(0.75rem,3cqw,1.5rem)]">
-        {/* Avatar about 40% of the banner's height, overlapping it by half. */}
-        <PopOnChange value={popKey ?? ""} className="relative -mt-[clamp(1.75rem,7cqw,3.5rem)]">
+      <div className="flex items-center gap-[clamp(0.5rem,2.5cqw,1.25rem)] px-[clamp(0.75rem,3cqw,1.5rem)] py-[clamp(0.625rem,2.5cqw,1.25rem)]">
+        {/* Avatar about 40% of the banner's height, overlapping it by half.
+            The negative margin also cancels the row's top padding, so the
+            row (and the centred name and swatch) covers only the strip
+            below the banner. */}
+        <PopOnChange
+          value={popKey ?? ""}
+          className="relative -mt-[calc(clamp(1.75rem,7cqw,3.5rem)+clamp(0.625rem,2.5cqw,1.25rem))]"
+        >
           <FramedAvatar
             name={name}
             avatarUrl={avatarUrl}
@@ -47,13 +53,13 @@ export function ProfilePreview({
             shine={frameRarity}
           />
         </PopOnChange>
-        <div className="min-w-0 flex-1 pb-1">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-[clamp(0.9375rem,3.4cqw,1.75rem)] leading-tight font-bold">{name}</p>
         </div>
         {/* Not a button: a swatch of the theme's accent colour, the colour of
             the "Send … a shout-out" button on the real profile. */}
         <span
-          className="mb-1 shrink-0 rounded-md px-[clamp(0.5rem,2cqw,1.125rem)] py-[clamp(0.25rem,1.1cqw,0.625rem)] text-[clamp(0.6875rem,1.8cqw,0.9375rem)] font-semibold"
+          className="shrink-0 rounded-md px-[clamp(0.4375rem,1.5cqw,0.875rem)] py-[clamp(0.1875rem,0.8cqw,0.4375rem)] text-[clamp(0.625rem,1.4cqw,0.8125rem)] font-semibold"
           style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#ffffff" }}
         >
           Theme colour
