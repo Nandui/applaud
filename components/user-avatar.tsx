@@ -38,7 +38,13 @@ export function UserAvatar({
     <Avatar className={cn("size-9", className)}>
       {/* One resized copy per person (96px, the profile size) serves every avatar size. */}
       {avatarUrl ? (
-        <AvatarImage src={optimizedImage(avatarUrl, 96)} alt={name} className="object-cover" />
+        // No referrer: Google's picture servers refuse some pages that send one.
+        <AvatarImage
+          src={optimizedImage(avatarUrl, 96)}
+          alt={name}
+          referrerPolicy="no-referrer"
+          className="object-cover"
+        />
       ) : null}
       <AvatarFallback
         className={cn(

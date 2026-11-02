@@ -90,7 +90,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   callbacks: {
     ...authConfig.callbacks,
-    async signIn({ account, profile }) {
+    async signIn({ user, account, profile }) {
       if (account?.provider !== "google") return true;
 
       const email = normaliseEmail(profile?.email);
@@ -107,8 +107,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         mayCreate: googleAllowedDomains.length > 0,
       });
       if (!result.ok) return `/sign-in?error=${result.error}`;
-      // Their Google picture becomes their avatar unless they've set their own.
-      await syncGoogleAvatar(result.user, profile?.picture);
+      // Every sign-in: their Google picture is their avatar unless they've
+      // uploaded their own (lib/google-avatar.ts).
+      await syncGoogleAvatar(result.user, profile?.picture ?? user?.image);
       return true;
     },
   },
