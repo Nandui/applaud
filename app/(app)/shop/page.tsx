@@ -71,14 +71,16 @@ export default async function ShopPage() {
           {formatNumber(me.walletBalance)} pts to spend
         </p>
       </div>
-      <ProfilePreview
-        name={wearer.name}
-        avatarUrl={wearer.avatarUrl}
-        look={wearer.look}
-        frameRarity={wearer.frameRarity}
-        popKey={Object.values(wearer.worn).join("|")}
-        className="mt-2"
-      />
+      {/* The app tour points at this card. */}
+      <div data-tour="shop-look" className="mt-2">
+        <ProfilePreview
+          name={wearer.name}
+          avatarUrl={wearer.avatarUrl}
+          look={wearer.look}
+          frameRarity={wearer.frameRarity}
+          popKey={Object.values(wearer.worn).join("|")}
+        />
+      </div>
 
       {perk ? (
         <div className="border-primary/30 bg-primary/10 mt-4 flex items-start gap-3 rounded-xl border px-4 py-3">

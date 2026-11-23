@@ -59,6 +59,7 @@ export function AccountSheet({
       <button
         type="button"
         aria-label="Menu"
+        data-tour="profile-menu"
         className={triggerClassName}
         onClick={() => setOpen(true)}
       >

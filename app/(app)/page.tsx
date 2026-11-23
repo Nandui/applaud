@@ -53,6 +53,7 @@ export default async function FeedPage() {
             href="/me"
             className="bg-surface-2 flex h-9 items-center gap-1.5 rounded-full pr-3.5 pl-1.5 text-sm font-bold transition-transform active:scale-95"
             aria-label="My wallet"
+            data-tour="wallet"
           >
             <span className="bg-primary text-primary-fg flex size-6 items-center justify-center rounded-full text-[0.7rem] font-black">
               ✦
@@ -63,7 +64,7 @@ export default async function FeedPage() {
       />
 
       {/* "What's new?" prompt: tap to write a post; the pill sends a shout-out. */}
-      <div className="border-border flex items-center gap-3 border-b py-3">
+      <div data-tour="composer" className="border-border flex items-center gap-3 border-b py-3">
         <Link href="/post" className="flex min-w-0 flex-1 items-center gap-3">
           <FramedAvatar
             name={me.name}

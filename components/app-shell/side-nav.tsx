@@ -23,14 +23,14 @@ export function SideNav({ user }: { user: SessionUser }) {
   const active = (href: string, exact = false) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 
-  const items: { href: string; label: string; icon: LucideIcon; on: boolean; news?: SeenArea }[] = [
-    { href: "/", label: "Home", icon: House, on: active("/", true) },
-    { href: "/leaderboard", label: "Ranks", icon: Trophy, on: active("/leaderboard") },
+  const items: { href: string; label: string; icon: LucideIcon; on: boolean; news?: SeenArea; tour?: string }[] = [
+    { href: "/", label: "Home", icon: House, on: active("/", true), tour: "nav-home" },
+    { href: "/leaderboard", label: "Ranks", icon: Trophy, on: active("/leaderboard"), tour: "nav-ranks" },
     { href: "/awards", label: "Awards", icon: Award, on: active("/awards") },
-    { href: "/rewards", label: "Rewards", icon: Gift, on: active("/rewards") && !active("/rewards/claimed"), news: "rewards" },
+    { href: "/rewards", label: "Rewards", icon: Gift, on: active("/rewards") && !active("/rewards/claimed"), news: "rewards", tour: "nav-store" },
     { href: "/rewards/claimed", label: "My rewards", icon: PackageOpen, on: active("/rewards/claimed"), news: "claims" },
     { href: "/shop", label: "Profile shop", icon: Sparkles, on: active("/shop"), news: "shop" },
-    { href: "/me", label: "Wallet", icon: Wallet, on: active("/me") },
+    { href: "/me", label: "Wallet", icon: Wallet, on: active("/me"), tour: "nav-wallet" },
   ];
   if (isAdmin(user)) {
     items.push({ href: "/admin", label: "Admin", icon: Shield, on: active("/admin") });
@@ -44,6 +44,7 @@ export function SideNav({ user }: { user: SessionUser }) {
           key={item.href}
           href={item.href}
           aria-current={item.on ? "page" : undefined}
+          data-tour={item.tour}
           className={cn(
             "flex items-center gap-3.5 rounded-2xl px-3 py-2.5 text-[0.95rem] transition-colors",
             item.on
@@ -58,6 +59,7 @@ export function SideNav({ user }: { user: SessionUser }) {
       ))}
       <Link
         href="/recognize"
+        data-tour="nav-recognize"
         className="bg-primary text-primary-fg mt-4 flex h-11 items-center justify-center gap-2 rounded-xl font-semibold transition-opacity active:opacity-80"
       >
         <Plus className="size-5" strokeWidth={2.6} /> Recognize someone
@@ -70,6 +72,7 @@ export function SideNav({ user }: { user: SessionUser }) {
       </Link>
       <Link
         href={`/profile/${user.id}`}
+        data-tour="nav-profile"
         className={cn(
           "mt-auto flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors",
           active(`/profile/${user.id}`) ? "bg-surface-2" : "hover:bg-surface-2/60",
