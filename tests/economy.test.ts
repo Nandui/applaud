@@ -9,6 +9,11 @@ import {
   resetDateLabel,
   suggestMonthlyStock,
   suggestPointsPrice,
+  daysUntilWalletExpiry,
+  isWalletExpiryMonth,
+  walletExpiryPhrase,
+  walletYear,
+  yearEndExpiryAmount,
 } from "../lib/economy";
 import { BUILTIN_COSMETICS } from "../lib/cosmetics";
 
@@ -81,4 +86,33 @@ test("advised monthly stock keeps one reward to a quarter of the budget", () => 
   assert.equal(suggestMonthlyStock(300, 50000), 41);
   assert.equal(suggestMonthlyStock(90000, 50000), 1);
   assert.equal(suggestMonthlyStock(0, 50000), null);
+});
+
+test("wallet expiry: expires at Irish midnight on 1 January", () => {
+  const { year, expiresAt } = walletYear(new Date("2026-11-23T20:00:00Z"));
+  assert.equal(year, 2026);
+  assert.equal(expiresAt.toISOString(), "2027-01-01T00:00:00.000Z");
+});
+
+test("wallet expiry: puts the last minutes of 31 Dec in the old year and 1 Jan in the new", () => {
+  assert.equal(walletYear(new Date("2026-12-31T23:59:59Z")).year, 2026);
+  assert.equal(walletYear(new Date("2027-01-01T00:00:01Z")).year, 2027);
+});
+
+test("wallet expiry: only reminds in December and counts the days down", () => {
+  assert.equal(isWalletExpiryMonth(new Date("2026-11-30T12:00:00Z")), false);
+  assert.equal(isWalletExpiryMonth(new Date("2026-12-01T00:30:00Z")), true);
+  assert.equal(walletExpiryPhrase(new Date("2026-11-30T12:00:00Z")), "expire on 31 Dec");
+  assert.equal(daysUntilWalletExpiry(new Date("2026-12-23T12:00:00Z")), 9);
+  assert.equal(walletExpiryPhrase(new Date("2026-12-23T12:00:00Z")), "expire in 9 days");
+  assert.equal(walletExpiryPhrase(new Date("2026-12-30T12:00:00Z")), "expire tomorrow");
+  assert.equal(walletExpiryPhrase(new Date("2026-12-31T12:00:00Z")), "expire tonight");
+});
+
+test("wallet expiry: takes what was held at midnight, never more than is held now", () => {
+  assert.equal(yearEndExpiryAmount(300, 300), 300);
+  assert.equal(yearEndExpiryAmount(300, 250), 250); // spent 50 after midnight
+  assert.equal(yearEndExpiryAmount(300, 400), 300); // received 100 after midnight
+  assert.equal(yearEndExpiryAmount(0, 50), 0);
+  assert.equal(yearEndExpiryAmount(-10, 0), 0);
 });

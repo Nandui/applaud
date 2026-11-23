@@ -12,7 +12,6 @@ import { Switch } from "@/components/ui/switch";
 
 export type SettingsData = {
   appName: string;
-  pointsExpiryMonths: number | null;
   allowSelfRecognition: boolean;
   autoCreateGoogleUsers: boolean;
 };
@@ -43,25 +42,12 @@ export function SettingsForm({ settings }: { settings: SettingsData }) {
             <p className="text-muted text-xs">Shown in the UI and emails.</p>
           </div>
           <p className="text-muted text-sm">
-            Points, allowances, the euro conversion and the rewards budget live in{" "}
+            Points, allowances, the euro conversion, the rewards budget and year-end expiry live in{" "}
             <Link href="/admin/economy" className="text-primary font-medium">
               Economy
             </Link>
             .
           </p>
-          <div className="space-y-1.5">
-            <Label htmlFor="pointsExpiryMonths">Points expiry (months)</Label>
-            <Input
-              id="pointsExpiryMonths"
-              name="pointsExpiryMonths"
-              type="number"
-              min={1}
-              defaultValue={settings.pointsExpiryMonths ?? ""}
-              placeholder="Never"
-              className="font-mono"
-            />
-            <p className="text-muted text-xs">Leave blank for points that never expire.</p>
-          </div>
           <div className="border-border flex items-center justify-between rounded-lg border p-3">
             <div>
               <p className="text-sm font-medium">Allow self-recognition</p>

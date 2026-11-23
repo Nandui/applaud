@@ -25,6 +25,7 @@ export default async function AppLayout({
   return (
     <NewItemsProvider counts={newCounts}>
       <TourProvider
+        userId={user.id}
         onboarded={user.onboarded ?? true}
         firstName={firstName}
         allowance={allowanceForRank(user.pointsRank, settings)}

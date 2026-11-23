@@ -343,8 +343,8 @@ model RewardLedger {
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   amount     Int // signed: + earned, - spent
-  type       String // RECOGNITION | AWARD | REDEMPTION | EXPIRY | ADJUSTMENT
-  sourceType String? // "recognition_recipient" | "nomination" | "redemption"
+  type       String // RECOGNITION | AWARD | REDEMPTION | EXPIRY | ADJUSTMENT | ...
+  sourceType String? // "recognition_recipient" | "nomination" | "redemption" | "year_end" (sourceId = the year)
   sourceId   String?
   note       String?
   createdAt  DateTime @default(now())
@@ -460,7 +460,11 @@ model OrgSettings {
   maxPointsPerShoutoutManager   Int     @default(300)
   /// Points per month for boosts and approved awards/milestones, outside anyone's allowance.
   monthlyBonusPool              Int     @default(4400)
-  pointsExpiryMonths            Int? // null = never expire
+  /// Legacy, never used: replaced by walletPointsExpireYearEnd.
+  pointsExpiryMonths            Int?
+  /// Unspent wallet points expire at midnight on 31 Dec, Irish time
+  /// (lib/wallet-expiry.ts, run by the year-end and daily crons).
+  walletPointsExpireYearEnd     Boolean @default(true)
   allowSelfRecognition          Boolean @default(false)
   /// Create a staff account on the first Google sign-in from the company workspace.
   autoCreateGoogleUsers         Boolean @default(true)

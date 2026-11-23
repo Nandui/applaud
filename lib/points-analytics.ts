@@ -95,6 +95,8 @@ export async function getPointsMonth(settings: OrgSettings, ref: Date) {
   const received = sumType("RECOGNITION") + sumType("AWARD") + Math.max(0, sumType("BOOST"));
   const bonusUsed = Math.max(0, sumType("AWARD") + sumType("BOOST") - instantTotal);
   const spentStore = Math.abs(sumType("SHOP"));
+  // Year-end expiry rows are dated 31 Dec, so they land in December.
+  const expired = Math.abs(sumType("EXPIRY"));
   const spentRewards = redemptions.reduce((s, r) => s + (r._sum.pointsCost ?? 0), 0);
   const cashCents = redemptions.reduce((s, r) => s + (r._sum.euroCostCents ?? 0), 0);
 
@@ -125,6 +127,7 @@ export async function getPointsMonth(settings: OrgSettings, ref: Date) {
     bonusUsed,
     bonusPool: settings.monthlyBonusPool,
     spentStore,
+    expired,
     spentRewards,
     cashCents,
     budgetCents: settings.monthlyRewardBudgetCents,

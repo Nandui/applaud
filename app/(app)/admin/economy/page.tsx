@@ -3,7 +3,15 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getEconomyStatus, getMonthlyClaimCounts } from "@/lib/budget";
-import { centsToEuros, pointsToCents, type RankHeadcount } from "@/lib/economy";
+import {
+  centsToEuros,
+  daysUntilWalletExpiry,
+  FIRST_WALLET_EXPIRY_YEAR,
+  pointsToCents,
+  walletYear,
+  type RankHeadcount,
+} from "@/lib/economy";
+import { getYearEndSummary } from "@/lib/wallet-expiry";
 import { POINTS_RANKS, isPointsRank } from "@/lib/ranks";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
@@ -24,7 +32,8 @@ export default async function AdminEconomyPage() {
   await requireAdmin();
   const settings = await getOrgSettings();
 
-  const [people, rewards, claims, status, birthdayRule, birthdaysByMonth] = await Promise.all([
+  const { year } = walletYear();
+  const [people, rewards, claims, status, birthdayRule, birthdaysByMonth, inWallets, lastYear] = await Promise.all([
     prisma.user.groupBy({
       by: ["pointsRank"],
       _count: { _all: true },
@@ -46,6 +55,12 @@ export default async function AdminEconomyPage() {
     prisma.$queryRaw<{ month: number; n: bigint }[]>`
       SELECT EXTRACT(MONTH FROM "birthday")::int AS month, COUNT(*) AS n
       FROM "User" WHERE "active" AND "birthday" IS NOT NULL GROUP BY 1`,
+    prisma.user.aggregate({
+      _sum: { walletBalance: true },
+      _count: { _all: true },
+      where: { walletBalance: { gt: 0 } },
+    }),
+    year - 1 >= FIRST_WALLET_EXPIRY_YEAR ? getYearEndSummary(year - 1) : null,
   ]);
   const busiestBirthdayMonth = Math.max(0, ...birthdaysByMonth.map((b) => Number(b.n)));
 
@@ -77,7 +92,7 @@ export default async function AdminEconomyPage() {
     <div className="space-y-6">
       <PageHeader
         title="Economy"
-        description="What a point is worth, the monthly budget, allowances and prices. Changes apply straight away."
+        description="What a point is worth, the monthly budget, allowances, wallet expiry and prices. Changes apply straight away."
       />
 
       <BudgetCard status={status} />
@@ -94,8 +109,16 @@ export default async function AdminEconomyPage() {
           monthlyBonusPool: settings.monthlyBonusPool,
           maxPointsPerShoutoutStaff: settings.maxPointsPerShoutoutStaff,
           maxPointsPerShoutoutManager: settings.maxPointsPerShoutoutManager,
+          walletPointsExpireYearEnd: settings.walletPointsExpireYearEnd,
         }}
         headcount={headcount}
+        wallets={{
+          points: inWallets._sum.walletBalance ?? 0,
+          people: inWallets._count._all,
+          year,
+          daysLeft: daysUntilWalletExpiry(),
+          lastYear: lastYear ? { year: year - 1, ...lastYear } : null,
+        }}
       />
 
       <Card className="mb-6">

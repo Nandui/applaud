@@ -10,18 +10,20 @@ import { relativeTime } from "@/lib/datetime";
 import { AppBar } from "@/components/app-shell/app-bar";
 import { BackButton } from "@/components/app-shell/back-button";
 import { cn } from "@/lib/utils";
+import { WalletExpiryNote } from "@/components/rewards/wallet-expiry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My wallet" };
 
 export default async function MePage() {
   const me = await requireUser();
+  const settings = await getOrgSettings();
   const [user, allowance, ledger, receivedCount, givenCount] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: me.id },
       select: { walletBalance: true },
     }),
-    getOrgSettings().then((settings) => getAllowanceStatus(me, settings)),
+    getAllowanceStatus(me, settings),
     prisma.rewardLedger.findMany({
       where: { userId: me.id },
       orderBy: { createdAt: "desc" },
@@ -55,6 +57,11 @@ export default async function MePage() {
           <span data-numeric>{formatNumber(user.walletBalance)}</span>
         </p>
         <p className="text-muted mt-1 text-sm font-medium">points</p>
+        <WalletExpiryNote
+          balance={user.walletBalance}
+          enabled={settings.walletPointsExpireYearEnd}
+          className="mt-3"
+        />
         <div className="mt-6 grid w-full grid-cols-2 gap-2">
           <Link
             href="/rewards"

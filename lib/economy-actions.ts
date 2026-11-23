@@ -13,7 +13,7 @@ export type ActionResult =
 
 function revalidateEconomy() {
   updateTag(ORG_SETTINGS_TAG);
-  for (const path of ["/admin", "/admin/economy", "/admin/points", "/admin/rewards", "/rewards", "/shop", "/recognize", "/me"]) {
+  for (const path of ["/admin", "/admin/economy", "/admin/points", "/admin/rewards", "/rewards", "/shop", "/recognize", "/me", "/"]) {
     revalidatePath(path);
   }
 }
@@ -71,6 +71,7 @@ export async function updateEconomySettings(
     maxPointsPerShoutoutStaff,
     maxPointsPerShoutoutManager,
     monthlyBonusPool,
+    walletPointsExpireYearEnd: String(formData.get("walletPointsExpireYearEnd") ?? "true") === "true",
   };
   await prisma.orgSettings.upsert({
     where: { id: "singleton" },

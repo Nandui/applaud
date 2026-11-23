@@ -6,8 +6,9 @@
  * Two pots, two rules:
  *  - the GIVING allowance is per calendar month (Irish time) and anything left
  *    on the last day is simply gone, because usage is counted per month;
- *  - the WALLET (points received) never expires. Profile cosmetics cost the
- *    company nothing; real rewards carry a euro cost and draw on a monthly
+ *  - the WALLET (points received) lasts until the end of the year: whatever is
+ *    unspent at midnight on 31 Dec (Irish time) expires (lib/wallet-expiry.ts,
+ *    switchable in Admin > Economy). Profile cosmetics cost the company nothing; real rewards carry a euro cost and draw on a monthly
  *    company-wide budget (OrgSettings.monthlyRewardBudgetCents).
  */
 
@@ -152,6 +153,48 @@ export function resetsInLabel(ref: Date = new Date(), tz: string = ECONOMY_TIMEZ
   if (days <= 1) return "resets tonight";
   if (days === 2) return "resets tomorrow";
   return `resets in ${days} days`;
+}
+
+/** The first year whose unspent wallet points expire: nothing before it is touched. */
+export const FIRST_WALLET_EXPIRY_YEAR = 2026;
+
+/**
+ * The wallet year containing `ref` (Irish time) and the instant its points
+ * expire: local midnight at the start of 1 January of the next year.
+ */
+export function walletYear(ref: Date = new Date(), tz: string = ECONOMY_TIMEZONE): { year: number; expiresAt: Date } {
+  const { year } = zonedYearMonth(ref, tz);
+  return { year, expiresAt: zonedDayStart(year + 1, 0, 1, tz) };
+}
+
+/** Whole days until wallet points expire (1 on 31 Dec). */
+export function daysUntilWalletExpiry(ref: Date = new Date(), tz: string = ECONOMY_TIMEZONE): number {
+  const { expiresAt } = walletYear(ref, tz);
+  return Math.max(1, Math.ceil((expiresAt.getTime() - ref.getTime()) / 86_400_000));
+}
+
+/** December, Irish time: the month to remind people to spend their points. */
+export function isWalletExpiryMonth(ref: Date = new Date(), tz: string = ECONOMY_TIMEZONE): boolean {
+  return zonedYearMonth(ref, tz).month0 === 11;
+}
+
+/** "expire tonight" / "expire tomorrow" / "expire in 8 days" / "expire on 31 Dec". */
+export function walletExpiryPhrase(ref: Date = new Date(), tz: string = ECONOMY_TIMEZONE): string {
+  if (!isWalletExpiryMonth(ref, tz)) return "expire on 31 Dec";
+  const days = daysUntilWalletExpiry(ref, tz);
+  if (days <= 1) return "expire tonight";
+  if (days === 2) return "expire tomorrow";
+  return `expire in ${days} days`;
+}
+
+/**
+ * Points to expire for one person at a year end: what they held at midnight
+ * (`atYearEnd`), but never more than they hold now (`now`), in case they spent
+ * some of it between midnight and the job running. Points received after
+ * midnight are never taken.
+ */
+export function yearEndExpiryAmount(atYearEnd: number, now: number): number {
+  return Math.max(0, Math.min(atYearEnd, now));
 }
 
 export type EconomyInputs = RankAllowances & {
