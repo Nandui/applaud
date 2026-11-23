@@ -6,6 +6,8 @@ export type SessionUser = {
   name: string;
   email: string;
   role: Role;
+  /** Points rank (lib/ranks.ts): sets the monthly giving allowance. */
+  pointsRank: string;
   siteId: string | null;
   avatarUrl?: string | null;
 };

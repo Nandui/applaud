@@ -8,7 +8,7 @@ import { requireUser, requireManager, requireAdmin } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
 import { writeAudit } from "@/lib/audit";
 import { getOrgSettings } from "@/lib/org-settings";
-import { allowanceForRole, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
+import { allowanceForRank, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
 import { lockPool } from "@/lib/locks";
 
 export type ActionResult =
@@ -128,7 +128,7 @@ export async function nominate(
     await prisma.$transaction(async (tx) => {
       if (program.points > 0) {
         const used = await getMonthlyAllowanceUsage(me.id, new Date(), tx);
-        const allowance = allowanceForRole(me.role, settings);
+        const allowance = allowanceForRank(me.pointsRank, settings);
         if (used + program.points > allowance) {
           throw new PoolError(
             `${program.name} costs ${program.points} of your points to give, and you have ${Math.max(0, allowance - used)} left this month.`,

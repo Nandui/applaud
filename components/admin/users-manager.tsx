@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ManagerPicker } from "@/components/admin/manager-picker";
+import { POINTS_RANKS, RANK_LABELS, rankForRole } from "@/lib/ranks";
 
 export type UserRow = {
   id: string;
@@ -50,6 +51,7 @@ export type UserRow = {
   avatarUrl: string | null;
   jobTitle: string | null;
   role: string;
+  pointsRank: string;
   siteId: string;
   siteName: string;
   managerIds: string[]; // zero or more people, name-sorted
@@ -101,6 +103,15 @@ function UserFormDialog({
     FormData
   >(saveUser, undefined);
   const [role, setRole] = useState(editing?.role ?? "staff");
+  const [pointsRank, setPointsRank] = useState(
+    editing?.pointsRank ?? rankForRole(editing?.role ?? "staff"),
+  );
+  // Changing the app role moves the rank along with it while the rank still
+  // matches the old role; a rank picked on purpose is left alone.
+  function changeRole(next: string) {
+    if (pointsRank === rankForRole(role)) setPointsRank(rankForRole(next));
+    setRole(next);
+  }
   const [siteId, setSiteId] = useState(editing?.siteId ?? sites[0]?.id ?? "");
   const [managerIds, setManagerIds] = useState<string[]>(
     editing?.managerIds ?? [],
@@ -161,6 +172,7 @@ function UserFormDialog({
         <form action={formAction} className="space-y-4">
           {editing && <input type="hidden" name="id" value={editing.id} />}
           <input type="hidden" name="role" value={role} />
+          <input type="hidden" name="pointsRank" value={pointsRank} />
           <input type="hidden" name="siteId" value={siteId} />
           {managerIds.map((m) => (
             <input key={m} type="hidden" name="managerIds" value={m} />
@@ -255,7 +267,7 @@ function UserFormDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>App role</Label>
-              <Select value={role} onValueChange={setRole} items={ROLE_LABELS}>
+              <Select value={role} onValueChange={(v) => changeRole(String(v))} items={ROLE_LABELS}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -269,6 +281,29 @@ function UserFormDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label>Points rank</Label>
+              <Select
+                value={pointsRank}
+                onValueChange={(v) => setPointsRank(String(v))}
+                items={RANK_LABELS}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POINTS_RANKS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {RANK_LABELS[r]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-muted col-span-2 -mt-1.5 text-xs">
+              The app role decides what they can open. The points rank decides how many points
+              they can give each month (set in Economy).
+            </p>
+            <div className="col-span-2 space-y-1.5">
               <Label>Site</Label>
               <Select value={siteId} onValueChange={setSiteId} items={siteItems}>
                 <SelectTrigger>
@@ -471,6 +506,15 @@ export function UsersManager({
           className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_TONE[row.original.role] ?? ""}`}
         >
           {ROLE_LABELS[row.original.role] ?? row.original.role}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "pointsRank",
+      header: "Points rank",
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {RANK_LABELS[row.original.pointsRank as keyof typeof RANK_LABELS] ?? row.original.pointsRank}
         </span>
       ),
     },

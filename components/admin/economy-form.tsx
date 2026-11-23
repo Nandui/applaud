@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateEconomySettings, type ActionResult } from "@/lib/economy-actions";
@@ -9,7 +10,9 @@ import {
   parseEurosToCents,
   pointsToCents,
   type EconomyInputs,
+  type RankHeadcount,
 } from "@/lib/economy";
+import { POINTS_RANKS, RANK_ALLOWANCE_FIELD, RANK_LABELS } from "@/lib/ranks";
 import { formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +37,7 @@ export function EconomyForm({
   headcount,
 }: {
   settings: EconomyFormData;
-  headcount: { staff: number; managers: number };
+  headcount: RankHeadcount;
 }) {
   const [state, formAction, pending] = useActionState<ActionResult | undefined, FormData>(
     updateEconomySettings,
@@ -51,6 +54,9 @@ export function EconomyForm({
     monthlyRewardBudgetCents: String(settings.monthlyRewardBudgetCents / 100),
     monthlyAllowanceStaff: String(settings.monthlyAllowanceStaff),
     monthlyAllowanceManager: String(settings.monthlyAllowanceManager),
+    monthlyAllowanceCentreManager: String(settings.monthlyAllowanceCentreManager),
+    monthlyAllowanceOperations: String(settings.monthlyAllowanceOperations),
+    monthlyAllowanceCeo: String(settings.monthlyAllowanceCeo),
     monthlyBonusPool: String(settings.monthlyBonusPool),
     maxPointsPerShoutoutStaff: String(settings.maxPointsPerShoutoutStaff),
     maxPointsPerShoutoutManager: String(settings.maxPointsPerShoutoutManager),
@@ -62,6 +68,9 @@ export function EconomyForm({
     monthlyRewardBudgetCents: parseEurosToCents(raw.monthlyRewardBudgetCents) ?? 0,
     monthlyAllowanceStaff: num("monthlyAllowanceStaff"),
     monthlyAllowanceManager: num("monthlyAllowanceManager"),
+    monthlyAllowanceCentreManager: num("monthlyAllowanceCentreManager"),
+    monthlyAllowanceOperations: num("monthlyAllowanceOperations"),
+    monthlyAllowanceCeo: num("monthlyAllowanceCeo"),
     monthlyBonusPool: num("monthlyBonusPool"),
   };
   const f = economyForecast(inputs, headcount);
@@ -113,16 +122,30 @@ export function EconomyForm({
             <CardTitle>Points to give each month</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            {field(
-              "monthlyAllowanceStaff",
-              "Staff allowance",
-              `${euros(inputs.monthlyAllowanceStaff)} each · ${formatNumber(headcount.staff)} people = ${formatNumber(f.staffPoints)} pts (${euros(f.staffPoints)})`,
-            )}
-            {field(
-              "monthlyAllowanceManager",
-              "Manager allowance",
-              `${euros(inputs.monthlyAllowanceManager)} each · ${formatNumber(headcount.managers)} managers, admins, operations and CEO = ${formatNumber(f.managerPoints)} pts (${euros(f.managerPoints)})`,
-            )}
+            <p className="text-muted text-sm sm:col-span-2">
+              Each person gives from the allowance of their points rank. Set someone&apos;s rank in{" "}
+              <Link href="/admin/users" className="text-primary font-medium">
+                Users
+              </Link>
+              .
+            </p>
+            {POINTS_RANKS.map((rank) => {
+              const key = RANK_ALLOWANCE_FIELD[rank];
+              const people = headcount[rank];
+              const each = euros(inputs[key]);
+              return (
+                <div key={rank} className={rank === "staff" ? "sm:col-span-2 sm:max-w-[calc(50%-0.5rem)]" : undefined}>
+                  {field(
+                    key,
+                    RANK_LABELS[rank],
+                    people === 0
+                      ? `${each} each · nobody has this rank yet`
+                      : `${each} each · ${formatNumber(people)} ${people === 1 ? "person" : "people"} = ${formatNumber(f.byRank[rank])} pts (${euros(f.byRank[rank])})`,
+                  )}
+                </div>
+              );
+            })}
+            <div className="border-border border-t sm:col-span-2" />
             {field(
               "maxPointsPerShoutoutStaff",
               "Most per recognition (staff)",
@@ -130,7 +153,7 @@ export function EconomyForm({
             )}
             {field(
               "maxPointsPerShoutoutManager",
-              "Most per recognition (managers)",
+              "Most per recognition (all other ranks)",
               `Per person, ${euros(num("maxPointsPerShoutoutManager"))}. 0 = no limit.`,
             )}
             <p className="text-muted text-xs sm:col-span-2">
@@ -169,8 +192,14 @@ export function EconomyForm({
             If everyone gave every point and every point were spent on rewards with a cash cost.
           </p>
           <dl className="space-y-1.5">
-            <Line label="Staff allowances" value={`${formatNumber(f.staffPoints)} pts`} sub={euros(f.staffPoints)} />
-            <Line label="Manager allowances" value={`${formatNumber(f.managerPoints)} pts`} sub={euros(f.managerPoints)} />
+            {POINTS_RANKS.map((rank) => (
+              <Line
+                key={rank}
+                label={`${RANK_LABELS[rank]} (${formatNumber(headcount[rank])})`}
+                value={`${formatNumber(f.byRank[rank])} pts`}
+                sub={euros(f.byRank[rank])}
+              />
+            ))}
             <Line label="Bonus pool" value={`${formatNumber(f.bonusPoints)} pts`} sub={euros(f.bonusPoints)} />
             <div className="border-border border-t pt-1.5">
               <Line label="Most points a month" value={`${formatNumber(f.maxPoints)} pts`} sub={centsToEuros(f.maxCents)} strong />

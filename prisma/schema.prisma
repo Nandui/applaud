@@ -33,6 +33,11 @@ model User {
   avatarUrl   String?
   jobTitle    String? // the job in the company, e.g. "Duty Manager", "Lifeguard"
   role        String        @default("staff") // app permission: "staff" | "manager" | "admin" | "operations" | "ceo"
+  // Points rank: decides the monthly giving allowance and the most per
+  // recognition. Separate from the app role so, e.g., an admin can be a Centre
+  // manager. "staff" | "manager" | "centre_manager" | "operations" | "ceo"
+  // (lib/ranks.ts).
+  pointsRank  String        @default("staff")
   // Nullable so a removed person can be detached from their site: hard-delete
   // is refused by the content FKs below, and a site with users assigned can't
   // be deleted. Detached users are treated as removed everywhere.
@@ -432,26 +437,29 @@ model AuditEvent {
 // ---------- Config ----------
 
 model OrgSettings {
-  id                          String  @id @default("singleton")
-  appName                     String  @default("Applaud")
-  monthlyAllowanceStaff       Int     @default(400)
-  monthlyAllowanceManager     Int     @default(1200)
+  id                            String  @id @default("singleton")
+  appName                       String  @default("Applaud")
+  monthlyAllowanceStaff         Int     @default(400)
+  monthlyAllowanceManager       Int     @default(1200)
+  monthlyAllowanceCentreManager Int     @default(1200)
+  monthlyAllowanceOperations    Int     @default(1200)
+  monthlyAllowanceCeo           Int     @default(1200)
   /// How many points make one euro (the internal conversion; staff never see euros).
-  pointsPerEuro               Int     @default(100)
+  pointsPerEuro                 Int     @default(100)
   /// Legacy: profile Store price overrides from before the Cosmetic table.
   /// Copied into Cosmetic.price by migration 20261021230000; no longer read.
-  cosmeticPrices              Json?
+  cosmeticPrices                Json?
   /// Company-wide cash budget for real rewards per month, in euro cents.
-  monthlyRewardBudgetCents    Int     @default(50000)
+  monthlyRewardBudgetCents      Int     @default(50000)
   /// Most points one recipient can get from a single shout-out (0 = no limit).
-  maxPointsPerShoutoutStaff   Int     @default(100)
-  maxPointsPerShoutoutManager Int     @default(300)
+  maxPointsPerShoutoutStaff     Int     @default(100)
+  maxPointsPerShoutoutManager   Int     @default(300)
   /// Points per month for boosts and approved awards/milestones, outside anyone's allowance.
-  monthlyBonusPool            Int     @default(4400)
-  pointsExpiryMonths          Int? // null = never expire
-  allowSelfRecognition        Boolean @default(false)
+  monthlyBonusPool              Int     @default(4400)
+  pointsExpiryMonths            Int? // null = never expire
+  allowSelfRecognition          Boolean @default(false)
   /// Create a staff account on the first Google sign-in from the company workspace.
-  autoCreateGoogleUsers       Boolean @default(true)
+  autoCreateGoogleUsers         Boolean @default(true)
 }
 
 // ---------- next-auth (Auth.js Prisma adapter) ----------
