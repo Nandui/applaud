@@ -16,9 +16,9 @@ export function StoreTabs({ active }: { active: "rewards" | "shop" | "claims" })
     <TabLinks
       active={active}
       tabs={[
-        { key: "rewards", label: <Label text="Rewards" area="rewards" />, href: "/rewards" },
-        { key: "shop", label: <Label text="Profile shop" area="shop" />, href: "/shop" },
-        { key: "claims", label: <Label text="My rewards" area="claims" />, href: "/rewards/claimed" },
+        { key: "rewards", label: <Label text="Rewards" area="rewards" />, href: "/rewards", tour: "tab-rewards" },
+        { key: "shop", label: <Label text="Profile shop" area="shop" />, href: "/shop", tour: "tab-shop" },
+        { key: "claims", label: <Label text="My rewards" area="claims" />, href: "/rewards/claimed", tour: "tab-claims" },
       ]}
     />
   );

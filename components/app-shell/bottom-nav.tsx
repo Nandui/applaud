@@ -31,22 +31,22 @@ export function BottomNav({ user }: { user: SessionUser }) {
       className="border-border pb-safe fixed inset-x-0 bottom-0 z-40 border-t bg-[var(--tabbar)] backdrop-blur-xl md:hidden"
     >
       <div className="mx-auto flex h-14 max-w-md items-stretch">
-        <Tab href="/" label="Home" active={active("/", true)}>
+        <Tab href="/" label="Home" tour="nav-home" active={active("/", true)}>
           <House className="size-6" />
         </Tab>
-        <Tab href="/leaderboard" label="Ranks" active={onRanks}>
+        <Tab href="/leaderboard" label="Ranks" tour="nav-ranks" active={onRanks}>
           <Trophy className="size-6" />
         </Tab>
-        <Tab href="/recognize" label="Send" active={false}>
+        <Tab href="/recognize" label="Send" tour="nav-recognize" active={false}>
           <SquarePlus className="size-6" />
         </Tab>
-        <Tab href="/rewards" label="Store" active={onStore}>
+        <Tab href="/rewards" label="Store" tour="nav-store" active={onStore}>
           <span className="relative">
             <ShoppingBag className="size-6" />
             <NewDot areas={["shop", "rewards", "claims"]} className="ring-background absolute -top-0.5 -right-0.5 ring-2" />
           </span>
         </Tab>
-        <Tab href={`/profile/${user.id}`} label="Profile" active={onProfile}>
+        <Tab href={`/profile/${user.id}`} label="Profile" tour="nav-profile" active={onProfile}>
           <UserAvatar
             name={user.name}
             avatarUrl={user.avatarUrl}
@@ -64,11 +64,14 @@ export function BottomNav({ user }: { user: SessionUser }) {
 function Tab({
   href,
   label,
+  tour,
   active,
   children,
 }: {
   href: string;
   label: string;
+  /** Lets the app tour point at this tab (components/onboarding/tour.tsx). */
+  tour: string;
   active: boolean;
   children: React.ReactNode;
 }) {
@@ -76,6 +79,7 @@ function Tab({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
+      data-tour={tour}
       className={cn(
         "flex flex-1 flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium transition-colors active:opacity-60",
         active ? "text-foreground [&_svg]:stroke-[2.5]" : "text-muted [&_svg]:stroke-[1.75]",

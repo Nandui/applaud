@@ -12,7 +12,7 @@ export function TabLinks({
   className,
   accent,
 }: {
-  tabs: { key: string; label: React.ReactNode; href: string }[];
+  tabs: { key: string; label: React.ReactNode; href: string; tour?: string }[];
   active: string;
   className?: string;
   /** Underline colour; defaults to the foreground colour. */
@@ -29,6 +29,7 @@ export function TabLinks({
             replace
             scroll={false}
             aria-current={on ? "page" : undefined}
+            data-tour={t.tour}
             className={cn(
               "relative flex h-11 flex-1 items-center justify-center text-[0.95rem] font-semibold transition-colors",
               on ? "text-foreground" : "text-muted",

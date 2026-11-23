@@ -593,7 +593,7 @@ export function RecognitionCard({
       )}
 
       {/* Action row */}
-      <div className="-ml-2.5 mt-1 flex items-center">
+      <div data-tour="post-actions" className="-ml-2.5 mt-1 flex items-center">
         <button
           type="button"
           onClick={quickReact}
