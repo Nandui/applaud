@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   Smartphone,
+  Compass,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/sheet";
 import { signOutAction } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
+import { useTour } from "@/components/onboarding/tour";
 
 /**
  * The ☰ menu on your own profile (as on Instagram): appearance, every
@@ -44,6 +46,7 @@ export function AccountSheet({
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const { theme, setTheme } = useTheme();
+  const { openTour } = useTour();
 
   const themes: { id: string; label: string; icon: LucideIcon }[] = [
     { id: "system", label: "Auto", icon: Smartphone },
@@ -97,6 +100,18 @@ export function AccountSheet({
             <Item href="/rewards/claimed" icon={PackageOpen} label="My rewards" onClick={close} />
             <Item href="/awards" icon={Award} label="Awards & nominations" onClick={close} />
             <Item href="/leaderboard" icon={Trophy} label="Ranks" onClick={close} />
+            <button
+              type="button"
+              onClick={() => {
+                close();
+                openTour();
+              }}
+              className="active:bg-surface-2 hover:bg-surface-2/60 flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-[0.95rem] font-medium"
+            >
+              <Compass className="size-5.5" strokeWidth={1.8} />
+              <span className="flex-1 text-left">App tour</span>
+              <ChevronRight className="text-muted size-4.5" />
+            </button>
             {admin && <Item href="/admin" icon={Shield} label="Admin" onClick={close} />}
             <div className="bg-border mx-3 my-2 h-px" />
             <button

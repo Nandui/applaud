@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { economyMonth, maxPointsPerShoutout, resetsInLabel } from "@/lib/economy";
+import { economyMonth, resetsInLabel } from "@/lib/economy";
+import { allowanceForRank, maxPointsForRank, type RankAllowances } from "@/lib/ranks";
 
-type AllowanceSettings = {
-  monthlyAllowanceStaff: number;
-  monthlyAllowanceManager: number;
+type AllowanceSettings = RankAllowances & {
   maxPointsPerShoutoutStaff: number;
   maxPointsPerShoutoutManager: number;
 };
@@ -12,15 +11,12 @@ type TxClient = Pick<typeof prisma, "recognitionRecipient" | "rewardLedger" | "u
 type UsageClient = Pick<typeof prisma, "recognitionRecipient" | "nomination">;
 
 /**
- * The GIVING allowance for a role. Staff get the staff allowance; managers and
- * admins get the (higher) manager allowance. This is the budget for
- * recognising others — it resets monthly and is never redeemable.
+ * The GIVING allowance comes from the person's points rank (lib/ranks.ts):
+ * Staff, Manager, Centre manager, Operations manager or CEO, each set in
+ * Admin > Economy. It is the budget for recognising others — it resets
+ * monthly and is never redeemable.
  */
-export function allowanceForRole(role: string, settings: AllowanceSettings): number {
-  return role === "staff"
-    ? settings.monthlyAllowanceStaff
-    : settings.monthlyAllowanceManager;
-}
+export { allowanceForRank } from "@/lib/ranks";
 
 /**
  * Points the user has spent from their allowance in the current month (Irish
@@ -90,17 +86,17 @@ export type AllowanceStatus = {
 };
 
 export async function getAllowanceStatus(
-  user: { id: string; role: string },
+  user: { id: string; pointsRank: string },
   settings: AllowanceSettings,
   ref: Date = new Date(),
 ): Promise<AllowanceStatus> {
-  const total = allowanceForRole(user.role, settings);
+  const total = allowanceForRank(user.pointsRank, settings);
   const used = await getMonthlyAllowanceUsage(user.id, ref);
   return {
     total,
     used,
     remaining: Math.max(0, total - used),
-    perShoutoutMax: maxPointsPerShoutout(user.role, settings),
+    perShoutoutMax: maxPointsForRank(user.pointsRank, settings),
     resetsIn: resetsInLabel(ref),
   };
 }

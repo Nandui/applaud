@@ -3,7 +3,8 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getEconomyStatus, getMonthlyClaimCounts } from "@/lib/budget";
-import { centsToEuros, pointsToCents } from "@/lib/economy";
+import { centsToEuros, pointsToCents, type RankHeadcount } from "@/lib/economy";
+import { POINTS_RANKS, isPointsRank } from "@/lib/ranks";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { BudgetCard } from "@/components/admin/budget-card";
@@ -25,7 +26,7 @@ export default async function AdminEconomyPage() {
 
   const [people, rewards, claims, status] = await Promise.all([
     prisma.user.groupBy({
-      by: ["role"],
+      by: ["pointsRank"],
       _count: { _all: true },
       where: { active: true, siteId: { not: null } },
     }),
@@ -39,8 +40,11 @@ export default async function AdminEconomyPage() {
     getEconomyStatus(settings),
   ]);
 
-  const staff = people.find((p) => p.role === "staff")?._count._all ?? 0;
-  const managers = people.filter((p) => p.role !== "staff").reduce((n, p) => n + p._count._all, 0);
+  // Unknown ranks count as staff, as they do when giving.
+  const headcount = Object.fromEntries(POINTS_RANKS.map((r) => [r, 0])) as RankHeadcount;
+  for (const p of people) {
+    headcount[isPointsRank(p.pointsRank) ? p.pointsRank : "staff"] += p._count._all;
+  }
   const rate = settings.pointsPerEuro;
   const budget = settings.monthlyRewardBudgetCents;
 
@@ -75,11 +79,14 @@ export default async function AdminEconomyPage() {
           monthlyRewardBudgetCents: settings.monthlyRewardBudgetCents,
           monthlyAllowanceStaff: settings.monthlyAllowanceStaff,
           monthlyAllowanceManager: settings.monthlyAllowanceManager,
+          monthlyAllowanceCentreManager: settings.monthlyAllowanceCentreManager,
+          monthlyAllowanceOperations: settings.monthlyAllowanceOperations,
+          monthlyAllowanceCeo: settings.monthlyAllowanceCeo,
           monthlyBonusPool: settings.monthlyBonusPool,
           maxPointsPerShoutoutStaff: settings.maxPointsPerShoutoutStaff,
           maxPointsPerShoutoutManager: settings.maxPointsPerShoutoutManager,
         }}
-        headcount={{ staff, managers }}
+        headcount={headcount}
       />
 
       <Card>

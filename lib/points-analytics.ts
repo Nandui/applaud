@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { allowanceForRole } from "@/lib/points";
+import { allowanceForRank } from "@/lib/ranks";
 import { ECONOMY_TIMEZONE, economyMonth } from "@/lib/economy";
 import type { OrgSettings } from "@/lib/org-settings";
 
@@ -39,7 +39,7 @@ export async function getPointsMonth(settings: OrgSettings, ref: Date) {
   const [people, sent, instantAwards, ledger, redemptions, rewards] = await Promise.all([
     prisma.user.findMany({
       where: { active: true, siteId: { not: null } },
-      select: { id: true, name: true, role: true, jobTitle: true, walletBalance: true },
+      select: { id: true, name: true, role: true, pointsRank: true, jobTitle: true, walletBalance: true },
       orderBy: { name: "asc" },
     }),
     prisma.recognition.findMany({
@@ -79,7 +79,7 @@ export async function getPointsMonth(settings: OrgSettings, ref: Date) {
 
   const rows = people
     .map((p) => {
-      const allowance = allowanceForRole(p.role, settings);
+      const allowance = allowanceForRank(p.pointsRank, settings);
       const given = givenBy.get(p.id) ?? 0;
       return { ...p, allowance, given, left: Math.max(0, allowance - given) };
     })
