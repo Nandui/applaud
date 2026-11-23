@@ -17,8 +17,8 @@ const HOW_TO = "Just mention you work here when you pay.";
 
 /**
  * A standing staff discount: always on, nothing to redeem. A big card with
- * the picture on top, the discount in a large tag over it, and what it's for
- * underneath; tapping opens how to use it.
+ * the square picture on top (like every reward, left uncovered), then the
+ * discount in large type and what it's for; tapping opens how to use it.
  */
 export function DiscountCard({ discount, className }: { discount: DiscountCardData; className?: string }) {
   const [open, setOpen] = useState(false);
@@ -32,19 +32,16 @@ export function DiscountCard({ discount, className }: { discount: DiscountCardDa
             className,
           )}
         >
-          <span className="relative block aspect-[2/1] w-full overflow-hidden">
+          <span className="relative block aspect-square w-full overflow-hidden">
             <RewardArt reward={discount} icon={BadgePercent} />
-            {discount.discountText ? (
-              <span
-                className="bg-background text-primary absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-xl px-3 py-1.5 text-2xl leading-none font-black tracking-tight shadow-md"
-                data-numeric
-              >
-                {discount.discountText}
-              </span>
-            ) : null}
             {discount.isNew ? <NewLabel className="absolute top-3 right-3 shadow" /> : null}
           </span>
           <span className="flex flex-1 flex-col gap-1 p-3.5">
+            {discount.discountText ? (
+              <span className="text-primary truncate text-2xl leading-none font-black tracking-tight" data-numeric>
+                {discount.discountText}
+              </span>
+            ) : null}
             <span className="text-base leading-tight font-bold">{discount.name}</span>
             <span className="text-muted line-clamp-2 text-sm leading-snug">{discount.description ?? HOW_TO}</span>
             <span className="mt-auto pt-1.5">
@@ -60,7 +57,7 @@ export function DiscountCard({ discount, className }: { discount: DiscountCardDa
         </button>
       </SheetTrigger>
       <SheetContent side="bottom" showCloseButton={false} className="gap-0 px-0">
-        <div className="mx-4 aspect-[16/9] overflow-hidden rounded-2xl">
+        <div className="mx-auto aspect-square w-[calc(100%-2rem)] max-w-64 overflow-hidden rounded-2xl">
           <RewardArt reward={discount} icon={BadgePercent} />
         </div>
         <SheetHeader className="pt-4 text-left">
@@ -94,8 +91,8 @@ export function DiscountCard({ discount, className }: { discount: DiscountCardDa
 
 /**
  * The Staff discounts panel at the top of Rewards: a violet-tinted block so
- * it reads as its own thing, not one more row of the shop. One discount fills
- * the width; more scroll sideways, two at a time on wider screens.
+ * it reads as its own thing, not one more row of the shop. Cards scroll
+ * sideways, with square pictures like the reward cards.
  */
 export function StaffDiscounts({ discounts }: { discounts: DiscountCardData[] }) {
   if (discounts.length === 0) return null;
@@ -125,14 +122,14 @@ export function StaffDiscounts({ discounts }: { discounts: DiscountCardData[] })
       <div
         className={cn(
           "mt-3.5 px-4",
-          !single && "no-scrollbar flex snap-x scroll-px-4 gap-3 overflow-x-auto pb-1",
+          "no-scrollbar flex snap-x scroll-px-4 gap-3 overflow-x-auto pb-1",
         )}
       >
         {discounts.map((d) => (
           <DiscountCard
             key={d.id}
             discount={d}
-            className={single ? "w-full" : "w-[84%] shrink-0 snap-start sm:w-[calc(50%-0.375rem)]"}
+            className="w-[62%] shrink-0 snap-start sm:w-60"
           />
         ))}
       </div>
