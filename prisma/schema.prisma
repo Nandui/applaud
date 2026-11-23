@@ -81,6 +81,8 @@ model User {
   reactions            Reaction[]
   comments             Comment[]
   commentReactions     CommentReaction[]
+  pollVotes            PollVote[]
+  questionAnswers      QuestionAnswer[]
   nominationsMade      Nomination[]           @relation("Nominator")
   nominationsReceived  Nomination[]           @relation("Nominee")
   ledger               RewardLedger[]
@@ -129,7 +131,9 @@ model Recognition {
   id         String    @id @default(cuid())
   /// "recognition" (a shout-out: recipients, a value, maybe points) | "post"
   /// (an ordinary feed post by senderId: text and/or pictures, no recipients,
-  /// no value, no points). Shout-out counts and analytics only count recognitions.
+  /// no value, no points) | "poll" (message is the question, pollOptions the
+  /// choices) | "question" (message is the question; answers are private to
+  /// the sender). Shout-out counts and analytics only count recognitions.
   kind       String    @default("recognition")
   senderId   String
   sender     User      @relation("Sender", fields: [senderId], references: [id])
@@ -145,14 +149,69 @@ model Recognition {
   boostType  String?
   boostById  String? // user who applied the current boost
   boostAt    DateTime?
+  /// Polls only: when voting stops (null = never closes).
+  pollClosesAt    DateTime?
+  /// Polls only: true = voters see the results once they have voted;
+  /// false = only the person who asked sees them.
+  pollShowResults Boolean   @default(true)
+  /// Polls and questions: the sites whose people can see it (Site ids).
+  /// Empty = everyone. The author and admins always see it.
+  audienceSiteIds String[]  @default([])
   createdAt  DateTime  @default(now())
 
   recipients RecognitionRecipient[]
   reactions  Reaction[]
   comments   Comment[]
+  pollOptions PollOption[]
+  pollVotes   PollVote[]
+  answers     QuestionAnswer[]
 
   @@index([createdAt])
   @@index([senderId, createdAt])
+}
+
+/// A choice on a poll post (Recognition kind "poll").
+model PollOption {
+  id            String      @id @default(cuid())
+  recognitionId String
+  recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
+  label         String
+  sortOrder     Int         @default(0)
+  votes         PollVote[]
+
+  @@index([recognitionId])
+}
+
+/// One vote per person per poll; voting again moves it to another option.
+/// Votes are anonymous: only counts are ever shown.
+model PollVote {
+  id            String      @id @default(cuid())
+  recognitionId String
+  recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
+  optionId      String
+  option        PollOption  @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([recognitionId, userId])
+  @@index([optionId])
+}
+
+/// A private answer to a question post (Recognition kind "question"). Only
+/// the person who asked and the person who answered can ever read it.
+model QuestionAnswer {
+  id            String      @id @default(cuid())
+  recognitionId String
+  recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  body          String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([recognitionId, userId])
 }
 
 model RecognitionRecipient {

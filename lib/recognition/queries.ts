@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { formatDistanceStrict } from "date-fns";
 import { shortTime, fullTimestamp } from "@/lib/datetime";
+import { AUTHORED_KINDS } from "@/lib/posts/kinds";
+import { audienceLabel, audienceLabels, audienceWhere } from "@/lib/posts/audience";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import type { Cosmetic, FrameArt, Look } from "@/lib/cosmetics";
@@ -57,10 +60,40 @@ export function toFeedComment(c: RawComment, viewerId: string, catalogue: Cosmet
 /** Someone's shop look, so the feed can show the frames and banners they bought. */
 export type { Look };
 
+/**
+ * A poll, shaped for one viewer. Per-choice counts are only sent when this
+ * viewer may see them: the person who asked always can; voters can once they
+ * have voted (or the poll has closed) unless the asker kept results to
+ * themselves. Votes are anonymous, so no names are ever sent.
+ */
+export type FeedPoll = {
+  options: { id: string; label: string; votes: number | null }[];
+  totalVotes: number;
+  myOptionId: string | null;
+  closed: boolean;
+  /** "2 days left", "Ended 3h ago", or null when it never closes. */
+  closesLabel: string | null;
+  resultsVisible: boolean;
+  /** The asker's setting: voters see results after voting. */
+  showResultsToVoters: boolean;
+};
+
+/**
+ * A question, shaped for one viewer. Answers are private: the viewer only
+ * ever gets their own; the asker reads everyone's with getQuestionAnswers.
+ */
+export type FeedQuestion = {
+  answerCount: number;
+  myAnswer: string | null;
+};
+
 export type FeedCard = {
   id: string;
-  /** "recognition" (a shout-out) or "post" (an ordinary post by the sender). */
-  kind: "recognition" | "post";
+  /**
+   * "recognition" (a shout-out), "post" (an ordinary post by the sender),
+   * "poll" or "question" (asked by the sender; message is the question).
+   */
+  kind: "recognition" | "post" | "poll" | "question";
   message: string;
   imageUrls: string[];
   boostType: string | null;
@@ -85,9 +118,17 @@ export type FeedCard = {
   pointsEach: number;
   reactions: ReactionSummary[];
   comments: FeedCardComment[];
+  poll: FeedPoll | null;
+  question: FeedQuestion | null;
+  /** "Bishopstown only" when a poll or question is limited to some sites. */
+  audienceLabel: string | null;
 };
 
-const feedInclude = {
+/**
+ * What the feed loads per row. Takes the viewer because poll votes and
+ * question answers are only loaded for them (counts for everyone else).
+ */
+const feedInclude = (viewerId: string) => ({
   sender: { select: { id: true, name: true, avatarUrl: true, jobTitle: true, profile: true } },
   value: { select: { name: true, icon: true, color: true, imageUrl: true } },
   recipients: {
@@ -104,13 +145,52 @@ const feedInclude = {
     orderBy: { createdAt: "asc" as const },
     include: commentInclude,
   },
-} as const;
+  pollOptions: {
+    orderBy: { sortOrder: "asc" as const },
+    select: { id: true, label: true, _count: { select: { votes: true } } },
+  },
+  pollVotes: { where: { userId: viewerId }, select: { optionId: true } },
+  answers: { where: { userId: viewerId }, select: { body: true } },
+  _count: { select: { pollVotes: true, answers: true } },
+}) satisfies Prisma.RecognitionInclude;
 
 type RawRecognition = Prisma.RecognitionGetPayload<{
-  include: typeof feedInclude;
+  include: ReturnType<typeof feedInclude>;
 }>;
 
-export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosmetic[]): FeedCard {
+const KINDS = ["recognition", "post", "poll", "question"] as const;
+
+function toFeedPoll(r: RawRecognition, viewerId: string, now: Date): FeedPoll {
+  const myOptionId = r.pollVotes[0]?.optionId ?? null;
+  const closed = r.pollClosesAt !== null && r.pollClosesAt <= now;
+  const isAsker = r.senderId === viewerId;
+  const resultsVisible = isAsker || (r.pollShowResults && (myOptionId !== null || closed));
+  return {
+    options: r.pollOptions.map((o) => ({
+      id: o.id,
+      label: o.label,
+      votes: resultsVisible ? o._count.votes : null,
+    })),
+    totalVotes: r._count.pollVotes,
+    myOptionId,
+    closed,
+    closesLabel: r.pollClosesAt
+      ? closed
+        ? `Ended ${formatDistanceStrict(r.pollClosesAt, now)} ago`
+        : `${formatDistanceStrict(r.pollClosesAt, now)} left`
+      : null,
+    resultsVisible,
+    showResultsToVoters: r.pollShowResults,
+  };
+}
+
+export function toFeedCard(
+  r: RawRecognition,
+  viewerId: string,
+  catalogue: Cosmetic[],
+  siteNames: Map<string, string> = new Map(),
+): FeedCard {
+  const kind = (KINDS as readonly string[]).includes(r.kind) ? (r.kind as FeedCard["kind"]) : "recognition";
   const grouped = new Map<
     string,
     { count: number; reacted: boolean; users: ReactionUser[] }
@@ -130,7 +210,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
 
   return {
     id: r.id,
-    kind: r.kind === "post" ? "post" : "recognition",
+    kind,
     message: r.message,
     imageUrls: r.imageUrls,
     boostType: r.boostType,
@@ -161,7 +241,14 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
       reacted: g.reacted,
       users: g.users,
     })),
-    comments: r.comments.map((c) => toFeedComment(c, viewerId, catalogue)),
+    // Questions never show public comments: answers are private.
+    comments: kind === "question" ? [] : r.comments.map((c) => toFeedComment(c, viewerId, catalogue)),
+    poll: kind === "poll" ? toFeedPoll(r, viewerId, new Date()) : null,
+    question:
+      kind === "question"
+        ? { answerCount: r._count.answers, myAnswer: r.answers[0]?.body ?? null }
+        : null,
+    audienceLabel: audienceLabel(r.audienceSiteIds, siteNames),
   };
 }
 
@@ -178,7 +265,7 @@ export async function getReceivedCards(
     },
     orderBy: { createdAt: "desc" },
     take,
-    include: feedInclude,
+    include: feedInclude(viewerId),
   });
   return rows.map((r) => toFeedCard(r, viewerId, catalogue));
 }
@@ -198,25 +285,29 @@ export async function getGivenCards(
     },
     orderBy: { createdAt: "desc" },
     take,
-    include: feedInclude,
+    include: feedInclude(viewerId),
   });
   return rows.map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
-/** Ordinary posts a user has written, newest first (posts are always public). */
+/** Posts, polls and questions a user has written, newest first (always public). */
 export async function getPostCards(
   userId: string,
   viewerId: string,
   take = 20,
 ): Promise<FeedCard[]> {
-  const catalogue = await getCatalogue();
+  const [catalogue, audience, siteNames] = await Promise.all([
+    getCatalogue(),
+    audienceWhere(viewerId),
+    audienceLabels(),
+  ]);
   const rows = await prisma.recognition.findMany({
-    where: { senderId: userId, kind: "post" },
+    where: { AND: [{ senderId: userId, kind: { in: [...AUTHORED_KINDS] } }, audience] },
     orderBy: { createdAt: "desc" },
     take,
-    include: feedInclude,
+    include: feedInclude(viewerId),
   });
-  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue, siteNames));
 }
 
 /**
@@ -225,12 +316,10 @@ export async function getPostCards(
  */
 export async function getCardsByIds(ids: string[], viewerId: string): Promise<FeedCard[]> {
   if (ids.length === 0) return [];
-  const catalogue = await getCatalogue();
+  const [catalogue, audience] = await Promise.all([getCatalogue(), audienceWhere(viewerId)]);
   const rows = await prisma.recognition.findMany({
-    where: {
-      id: { in: ids },
-    },
-    include: feedInclude,
+    where: { AND: [{ id: { in: ids } }, audience] },
+    include: feedInclude(viewerId),
   });
   const byId = new Map(rows.map((r) => [r.id, r]));
   return ids
@@ -239,14 +328,21 @@ export async function getCardsByIds(ids: string[], viewerId: string): Promise<Fe
     .map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
-/** The feed: every recognition and post, newest first. All of them are public. */
+/**
+ * The feed, newest first: every recognition and post, plus the polls and
+ * questions meant for the viewer's site (or for everyone).
+ */
 export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
-  const catalogue = await getCatalogue();
+  const [catalogue, audience, siteNames] = await Promise.all([
+    getCatalogue(),
+    audienceWhere(viewerId),
+    audienceLabels(),
+  ]);
   const rows = await prisma.recognition.findMany({
-    where: {},
+    where: audience,
     orderBy: { createdAt: "desc" },
     take,
-    include: feedInclude,
+    include: feedInclude(viewerId),
   });
-  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue, siteNames));
 }
