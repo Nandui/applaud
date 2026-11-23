@@ -79,6 +79,51 @@ export function splitFrameImage(art: string): { src: string; fit: FrameFit } {
   return { src: art.slice(0, hash), fit: parseFit(fragment.get("fit")) ?? DEFAULT_FIT };
 }
 
+/**
+ * The circle a frame's hole was drawn as. Ornaments often bite into the
+ * hole (a hat brim over the top, a bow at the bottom), so its bounding box is
+ * shorter than the circle and off-centre. A circle is widest across its
+ * middle, though: the widest rows give the diameter and the centre's height,
+ * the tallest columns the centre's left/right, as long as nothing covers
+ * more than half of it.
+ */
+function holeCircle(label: Int32Array, id: number, width: number, height: number) {
+  const rowMin = new Int32Array(height).fill(width);
+  const rowMax = new Int32Array(height).fill(-1);
+  const colMin = new Int32Array(width).fill(height);
+  const colMax = new Int32Array(width).fill(-1);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (label[y * width + x] !== id) continue;
+      if (x < rowMin[y]) rowMin[y] = x;
+      if (x > rowMax[y]) rowMax[y] = x;
+      if (y < colMin[x]) colMin[x] = y;
+      if (y > colMax[x]) colMax[x] = y;
+    }
+  }
+  const spans = (min: Int32Array, max: Int32Array) => Array.from(max, (hi, k) => (hi < 0 ? 0 : hi - min[k] + 1));
+  const rows = spans(rowMin, rowMax);
+  const cols = spans(colMin, colMax);
+  const widest = Math.max(...rows);
+  const tallest = Math.max(...cols);
+  // Middle of the run of near-widest rows (a circle's widest part is flat-ish
+  // at pixel scale), and the same for columns.
+  const middle = (spans: number[], top: number) => {
+    let sum = 0;
+    let count = 0;
+    spans.forEach((v, k) => {
+      if (v >= top - 1) {
+        sum += k;
+        count++;
+      }
+    });
+    return sum / count + 0.5;
+  };
+  const cy = middle(rows, widest);
+  const cx = middle(cols, tallest);
+  return { d: Math.max(widest, tallest), cx, cy };
+}
+
 /** Pixels at or below this alpha count as see-through. */
 const CLEAR = 96;
 
@@ -132,30 +177,31 @@ export function detectFrameFit(rgba: ArrayLike<number>, width: number, height: n
   }
 
   // What's left see-through is enclosed. The biggest enclosed patch is the hole.
-  let best: { area: number; minX: number; maxX: number; minY: number; maxY: number } | null = null;
+  const label = new Int32Array(n).fill(-1);
+  let patch = 0;
+  let best = -1;
+  let bestArea = 0;
   for (let i = 0; i < n; i++) {
     if (cell[i] !== 1) continue;
-    const box = { area: 0, minX: width, maxX: -1, minY: height, maxY: -1 };
+    let area = 0;
     flood(i, 1, 3, (j) => {
-      const x = j % width;
-      const y = (j - x) / width;
-      box.area++;
-      if (x < box.minX) box.minX = x;
-      if (x > box.maxX) box.maxX = x;
-      if (y < box.minY) box.minY = y;
-      if (y > box.maxY) box.maxY = y;
+      label[j] = patch;
+      area++;
     });
-    if (!best || box.area > best.area) best = box;
+    if (area > bestArea) {
+      bestArea = area;
+      best = patch;
+    }
+    patch++;
   }
 
   // Specks inside the artwork aren't the hole; it has to be a real part of the picture.
-  if (best && best.area >= n * 0.03) {
-    const holeW = best.maxX - best.minX + 1;
-    const holeH = best.maxY - best.minY + 1;
+  if (best >= 0 && bestArea >= n * 0.03) {
+    const hole = holeCircle(label, best, width, height);
     return clampFit({
-      size: width / Math.min(holeW, holeH),
-      x: (best.minX + holeW / 2) / width,
-      y: (best.minY + holeH / 2) / height,
+      size: width / hole.d,
+      x: hole.cx / width,
+      y: hole.cy / height,
     });
   }
 

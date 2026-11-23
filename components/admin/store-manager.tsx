@@ -185,12 +185,119 @@ function FitSlider({
   );
 }
 
-/** Preview avatars; `outer` is the photo plus its gap in px (on a wide screen). */
+/** The small sizes; `outer` is the photo plus its gap in px. */
 const PREVIEW_SIZES = [
-  { label: "Comments", className: "size-9", xl: false, outer: 42 },
-  { label: "Feed", className: "size-14", xl: false, outer: 62 },
-  { label: "Profile", className: "size-28 text-3xl", xl: true, outer: 128 },
+  { label: "Comments", className: "size-9", outer: 42 },
+  { label: "Feed", className: "size-14", outer: 62 },
 ];
+
+/** One nudge with the arrow keys, as a share of the picture (Shift: 5×). */
+const NUDGE = 0.002;
+
+/**
+ * The fit editor's main preview: the frame on an avatar exactly the size of
+ * the profile header's (same FramedAvatar, same classes), with a dashed
+ * circle where the see-through middle belongs. Drag the frame, or focus it
+ * and use the arrow keys, to move it; what it shows is what profiles show.
+ */
+function FitStage({
+  art,
+  fit,
+  sample,
+  onChange,
+}: {
+  art: string;
+  fit: FrameFit;
+  sample: Sample;
+  onChange: (fit: FrameFit) => void;
+}) {
+  const avatarRef = useRef<HTMLSpanElement>(null);
+  const drag = useRef<{ px: number; py: number; fit: FrameFit } | null>(null);
+  const overhang = frameOverhang(fit);
+
+  // The frame picture's size on screen, to turn a drag in pixels into a fit.
+  const pictureSize = () => {
+    const img = avatarRef.current?.querySelector("img[draggable='false']");
+    const box = img?.getBoundingClientRect();
+    return box && box.width > 0 ? { w: box.width, h: box.height } : null;
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { px: e.clientX, py: e.clientY, fit };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const start = drag.current;
+    const size = pictureSize();
+    if (!start || !size) return;
+    // Dragging the frame right means a point further left of it sits on the avatar.
+    onChange(
+      clampFit({
+        ...start.fit,
+        x: start.fit.x - (e.clientX - start.px) / size.w,
+        y: start.fit.y - (e.clientY - start.py) / size.h,
+      }),
+    );
+  };
+  const onPointerUp = () => {
+    drag.current = null;
+  };
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const step = NUDGE * (e.shiftKey ? 5 : 1);
+    const move: Record<string, Partial<FrameFit>> = {
+      ArrowLeft: { x: fit.x + step },
+      ArrowRight: { x: fit.x - step },
+      ArrowUp: { y: fit.y + step },
+      ArrowDown: { y: fit.y - step },
+    };
+    const patch = move[e.key];
+    if (!patch) return;
+    e.preventDefault();
+    onChange(clampFit({ ...fit, ...patch }));
+  };
+
+  return (
+    <div className="bg-surface overflow-hidden rounded-md">
+      <div
+        role="group"
+        tabIndex={0}
+        aria-label="Frame position on the profile avatar. Drag, or use the arrow keys."
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onKeyDown={onKeyDown}
+        className="focus-visible:ring-primary flex cursor-move touch-none justify-center py-3 outline-none select-none focus-visible:ring-2 focus-visible:ring-inset"
+      >
+        {/* --d: the profile avatar's outer size (photo + gap), as on the profile page. */}
+        <span
+          className="flex [--d:124px] sm:[--d:160px]"
+          style={{
+            padding: `calc(var(--d) * ${overhang.top}) calc(var(--d) * ${overhang.right}) calc(var(--d) * ${overhang.bottom}) calc(var(--d) * ${overhang.left})`,
+          }}
+        >
+          <span ref={avatarRef} className="relative inline-flex">
+            <FramedAvatar
+              name={sample.name}
+              avatarUrl={sample.avatarUrl}
+              frame={art}
+              className="size-28 text-3xl sm:size-36 sm:text-4xl"
+              gapClassName="bg-surface"
+              xl
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed border-sky-500/90"
+            />
+          </span>
+        </span>
+      </div>
+      <p className="text-muted px-3 pb-2 text-center text-[0.7rem]">
+        Profile size. Drag the frame (or use the arrow keys) until its middle sits on the dashed circle.
+      </p>
+    </div>
+  );
+}
 
 /**
  * How an uploaded frame sits on the avatar: previews at the sizes the app uses,
@@ -242,9 +349,11 @@ function FrameFitControls({
           </Button>
         </div>
       </div>
-      {/* The sizes people see it at: comments, the feed, and the profile
-          header. Each gets room for how far the frame reaches past the photo. */}
-      <div className="bg-surface flex flex-wrap items-end justify-center gap-x-4 gap-y-2 overflow-hidden rounded-md px-2 py-3">
+      {/* The profile header avatar, drawn exactly as profiles draw it (same
+          component and sizes). The dashed circle is where the see-through
+          middle should sit; drag the frame or use the arrow keys to move it. */}
+      <FitStage art={art} fit={fit} sample={sample} onChange={onChange} />
+      <div className="bg-surface flex items-end justify-center gap-6 rounded-md px-2 py-3">
         {PREVIEW_SIZES.map((p) => (
           <span key={p.label} className="flex flex-col items-center gap-2">
             <span
@@ -259,7 +368,6 @@ function FrameFitControls({
                 frame={art}
                 className={p.className}
                 gapClassName="bg-surface"
-                xl={p.xl}
               />
             </span>
             <span className="text-muted text-[0.7rem]">{p.label}</span>
@@ -272,8 +380,8 @@ function FrameFitControls({
           value={fit.size}
           min={0.8}
           max={3}
-          step={0.01}
-          format={(v) => `${Math.round(v * 100)}%`}
+          step={0.005}
+          format={(v) => `${Math.round(v * 1000) / 10}%`}
           onChange={(size) => set({ size })}
         />
         {/* Moving the frame right means a point further left of the picture sits on the avatar. */}
@@ -282,7 +390,7 @@ function FrameFitControls({
           value={Math.round((0.5 - fit.x) * 1000) / 10}
           min={-30}
           max={30}
-          step={0.5}
+          step={0.1}
           format={(v) => (v > 0 ? `+${v}` : String(v))}
           onChange={(v) => set({ x: 0.5 - v / 100 })}
         />
@@ -291,7 +399,7 @@ function FrameFitControls({
           value={Math.round((0.5 - fit.y) * 1000) / 10}
           min={-30}
           max={30}
-          step={0.5}
+          step={0.1}
           format={(v) => (v > 0 ? `+${v}` : String(v))}
           onChange={(v) => set({ y: 0.5 - v / 100 })}
         />

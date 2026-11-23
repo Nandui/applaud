@@ -103,3 +103,16 @@ test("frameOverhang: how far a frame reaches past the avatar", () => {
   assert.equal(o.bottom, 0.25);
   assert.equal(o.left, 0.5);
 });
+
+test("a hat brim biting into the top of the hole doesn't move the centre", () => {
+  // Hole of radius 40 at (60, 80); a brim covers its top 25px.
+  const brim = (x: number, y: number) => y > 30 && y < 65 && x > 10 && x < 110;
+  const fit = detectFrameFit(
+    picture(120, 140, (x, y) => ring(60, 80, 40, 52)(x, y) || brim(x, y)),
+    120,
+    140,
+  )!;
+  near(fit.x, 0.5, 0.01, "x");
+  near(fit.y, 80 / 140, 0.01, "y");
+  near(fit.size, 120 / 80, 0.03, "size");
+});
