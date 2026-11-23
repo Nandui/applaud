@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { ChevronRight, Trophy } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ValueSeal } from "@/components/value-seal";
+import { AwardBadge, ValueSeal } from "@/components/value-seal";
 import { FramedAvatar } from "@/components/user-avatar";
 import { CountUp } from "@/components/fx/count-up";
 import { CELEBRATION_EMOJI, CELEBRATION_LABELS, type ProfileData } from "@/lib/profile";
@@ -98,28 +98,21 @@ function BadgeGrid({ items }: { items: Badge[] }) {
 
 const times = (n: number) => (n === 1 ? "Once" : `${formatNumber(n)} times`);
 
-/** Awards won, one badge per award with how many times and when last. */
+/** Awards won: one gold hexagon per award, with how many times and when last. */
 export function AwardShelf({ data }: { data: ProfileData }) {
-  const byName = new Map<string, { name: string; count: number; last: Date }>();
+  const byProgram = new Map<string, { award: ProfileData["awards"][number]; count: number; last: Date }>();
   for (const a of data.awards) {
     const won = new Date(a.wonAt);
-    const g = byName.get(a.name);
+    const g = byProgram.get(a.programId);
     if (g) {
       g.count += 1;
       if (won > g.last) g.last = won;
-    } else byName.set(a.name, { name: a.name, count: 1, last: won });
+    } else byProgram.set(a.programId, { award: a, count: 1, last: won });
   }
-  const items: Badge[] = [...byName.values()].map((g) => ({
-    key: g.name,
-    label: g.name,
-    art: (
-      <span
-        className="flex size-14 items-center justify-center rounded-full shadow-sm"
-        style={{ background: "linear-gradient(135deg, #fbbf24, #d97706)" }}
-      >
-        <Trophy className="size-6 text-white" />
-      </span>
-    ),
+  const items: Badge[] = [...byProgram.values()].map((g) => ({
+    key: g.award.programId,
+    label: g.award.name,
+    art: <AwardBadge award={g.award} size="md" />,
     note: g.count > 1 ? `${g.count}×, last ${format(g.last, "MMM yyyy")}` : format(g.last, "MMM yyyy"),
   }));
   return <BadgeGrid items={items} />;
