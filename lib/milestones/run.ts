@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isBirthdayOn } from "@/lib/birthday";
 
 type RunResult = {
   date: string;
@@ -69,7 +70,7 @@ export async function runMilestones(referenceDate: Date = new Date()): Promise<R
           eligible.push({ userId: u.id, userName: u.name, type: rule.type, years });
         }
       } else if (rule.type === "birthday" && u.birthday) {
-        if (sameMonthDay(u.birthday, referenceDate)) {
+        if (isBirthdayOn(u.birthday, referenceDate)) {
           eligible.push({ userId: u.id, userName: u.name, type: rule.type, years: 0 });
         }
       } else if (rule.type === "onboarding" && u.hireDate) {
@@ -111,6 +112,7 @@ export async function runMilestones(referenceDate: Date = new Date()): Promise<R
           data: {
             senderId,
             system: true,
+            imageUrls: [],
             message: milestoneMessage(e.type, e.userName, e.years),
             recipients: { create: [{ userId: e.userId, points: 0 }] },
           },

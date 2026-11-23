@@ -12,12 +12,15 @@ import { RecognitionCard } from "@/components/feed/recognition-card";
 import { FramedAvatar } from "@/components/user-avatar";
 import { getActiveClaims } from "@/lib/claims";
 import { ClaimsHomeRow } from "@/components/rewards/active-claims";
+import { BirthdayHomeCard } from "@/components/birthday/birthday-prompt";
+import { getBirthdayPoints } from "@/lib/birthday-points";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const me = await requireUser();
-  const [cards, wallet, catalogue, myClaims] = await Promise.all([
+  const askBirthday = (me.onboarded ?? true) && !(me.hasBirthday ?? true);
+  const [cards, wallet, catalogue, myClaims, birthdayPoints] = await Promise.all([
     getFeedCards(me.id),
     prisma.user.findUnique({
       where: { id: me.id },
@@ -25,6 +28,7 @@ export default async function FeedPage() {
     }),
     getCatalogue(),
     getActiveClaims(me.id),
+    askBirthday ? getBirthdayPoints() : 0,
   ]);
   const myFrame = lookOf(wallet?.profile, catalogue).frame;
   const viewer = {
@@ -81,6 +85,9 @@ export default async function FeedPage() {
           <span aria-hidden>👏</span> Recognize
         </Link>
       </div>
+
+      {/* New people are asked in the app tour; this is for everyone else. */}
+      {askBirthday ? <BirthdayHomeCard points={birthdayPoints} /> : null}
 
       <ClaimsHomeRow claims={myClaims} />
 

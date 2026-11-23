@@ -7,6 +7,7 @@ import { getNewCounts } from "@/lib/new-items";
 import { getOrgSettings } from "@/lib/org-settings";
 import { allowanceForRank } from "@/lib/ranks";
 import { TourProvider } from "@/components/onboarding/tour";
+import { getBirthdayPoints } from "@/lib/birthday-points";
 
 export default async function AppLayout({
   children,
@@ -14,9 +15,10 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
-  const [newCounts, settings] = await Promise.all([
+  const [newCounts, settings, birthdayPoints] = await Promise.all([
     getNewCounts(user),
     getOrgSettings(),
+    getBirthdayPoints(),
   ]);
   const firstName = user.name.trim().split(/\s+/)[0] || user.name;
 
@@ -26,6 +28,8 @@ export default async function AppLayout({
         onboarded={user.onboarded ?? true}
         firstName={firstName}
         allowance={allowanceForRank(user.pointsRank, settings)}
+        askBirthday={!(user.hasBirthday ?? true)}
+        birthdayPoints={birthdayPoints}
       >
         <div className="mx-auto flex min-h-full w-full max-w-6xl">
           {/* Desktop rail. Phones get a per-screen AppBar + the floating tab bar. */}

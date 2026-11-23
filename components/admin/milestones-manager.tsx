@@ -20,6 +20,8 @@ export type RuleRow = {
   points: number;
   active: boolean;
   config: Record<string, unknown>;
+  /** Extra line under the rule, e.g. how many people added a birthday. */
+  note?: string;
 };
 
 const TYPE_META: Record<
@@ -31,7 +33,11 @@ const TYPE_META: Record<
     icon: CalendarHeart,
     hint: "Celebrated on the hire-date anniversary for the years below.",
   },
-  birthday: { label: "Birthday", icon: Cake, hint: "Celebrated each year on the birthday." },
+  birthday: {
+    label: "Birthday",
+    icon: Cake,
+    hint: "Paid each year on the day. People add their own birthday.",
+  },
   onboarding: {
     label: "Onboarding",
     icon: UserPlus,
@@ -78,6 +84,7 @@ function RuleForm({ rule }: { rule: RuleRow }) {
               <div>
                 <h3 className="font-display font-semibold">{meta.label}</h3>
                 <p className="text-muted text-xs">{meta.hint}</p>
+                {rule.note ? <p className="text-primary mt-1 text-xs font-semibold">{rule.note}</p> : null}
               </div>
             </div>
             <Switch checked={active} onCheckedChange={setActive} />
