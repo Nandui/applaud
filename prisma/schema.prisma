@@ -71,6 +71,10 @@ model User {
   rewardsSeenAt DateTime?
   /// When they last opened My rewards (claim updates after it get a dot).
   claimsSeenAt  DateTime?
+  /// When they finished the first-sign-in app tour (and got the one-off
+  /// welcome points). Null: they haven't, so the tour opens for them. Replaying
+  /// the tour from the menu never changes it, so the points are paid once.
+  onboardedAt   DateTime?
 
   sentRecognitions     Recognition[]          @relation("Sender")
   receivedRecognitions RecognitionRecipient[]

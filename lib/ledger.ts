@@ -11,6 +11,7 @@ export const LEDGER_TYPE_META: Record<
   ADJUSTMENT: { label: "Adjustment", tone: "neutral" },
   BOOST: { label: "Boost", tone: "earn" },
   SHOP: { label: "Profile shop", tone: "spend" },
+  WELCOME: { label: "Welcome bonus", tone: "earn" },
 };
 
 export function ledgerTypeMeta(type: string) {

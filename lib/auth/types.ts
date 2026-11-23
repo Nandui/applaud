@@ -10,6 +10,8 @@ export type SessionUser = {
   pointsRank: string;
   siteId: string | null;
   avatarUrl?: string | null;
+  /** Finished the first-sign-in app tour (lib/onboarding.ts). */
+  onboarded?: boolean;
 };
 
 // Access hierarchy: staff < manager < admin. `operations` and `ceo` are
