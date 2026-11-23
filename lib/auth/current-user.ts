@@ -31,6 +31,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
       pointsRank: true,
       siteId: true,
       avatarUrl: true,
+      onboardedAt: true,
     },
   });
   if (!dbUser) return null;
@@ -43,5 +44,6 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     pointsRank: dbUser.pointsRank,
     siteId: dbUser.siteId,
     avatarUrl: dbUser.avatarUrl,
+    onboarded: dbUser.onboardedAt !== null,
   };
 });
