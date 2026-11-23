@@ -33,6 +33,7 @@ import {
   type BoostType,
 } from "@/lib/config";
 import type { FeedCard } from "@/lib/recognition/queries";
+import { ServiceMedal } from "@/components/service-medal";
 import { FramedAvatar } from "@/components/user-avatar";
 import { DEFAULT_LOOK } from "@/lib/cosmetics";
 import { isLight } from "@/lib/contrast";
@@ -172,6 +173,12 @@ function BannerHero({ card }: { card: FeedCard }) {
       </p>
     </div>
   );
+}
+
+/** A small service medal after someone's name, from one year on. */
+function NameMedal({ months }: { months: number | null }) {
+  if (!months) return null;
+  return <ServiceMedal months={months} size={18} className="ml-1 -translate-y-px" />;
 }
 
 /** The feed column is at most 576px wide; photos are resized to fit it. */
@@ -413,12 +420,16 @@ export function RecognitionCard({
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-[1.05rem] font-bold tracking-tight">
             {isPost ? (
-              <Link href={`/profile/${card.sender.id}`}>{card.sender.name}</Link>
+              <>
+                <Link href={`/profile/${card.sender.id}`}>{card.sender.name}</Link>
+                <NameMedal months={card.sender.serviceMonths} />
+              </>
             ) : (
               card.recipients.map((r, i) => (
                 <Fragment key={r.id}>
                   {i > 0 && (i === card.recipients.length - 1 ? " & " : ", ")}
                   <Link href={`/profile/${r.id}`}>{r.name}</Link>
+                  <NameMedal months={r.serviceMonths} />
                 </Fragment>
               ))
             )}

@@ -21,6 +21,7 @@ import {
   ValueShelf,
 } from "@/components/profile/profile-showcase";
 import { ProfileBanner } from "@/components/profile/profile-banner";
+import { ServiceLadder, ServicePlaque } from "@/components/profile/service-honour";
 import { TabLinks } from "@/components/tab-links";
 
 export const dynamic = "force-dynamic";
@@ -170,6 +171,7 @@ export default async function ProfilePage({
               ) : null}
             </h1>
             <p className="text-muted text-sm">{[user.jobTitle, user.site?.name].filter(Boolean).join(" · ")}</p>
+            {data.service ? <ServicePlaque service={data.service} /> : null}
             {custom.bio ? <p className="pt-1 text-[0.95rem] whitespace-pre-line">{custom.bio}</p> : null}
             <Managers data={data} />
           </section>
@@ -201,6 +203,18 @@ export default async function ProfilePage({
                   <RecognitionCard key={card.id} card={card} index={i} viewer={viewerProps} pinned={isMe ? true : undefined} />
                 ))}
               </div>
+            </ShowcaseSection>
+          ) : null}
+
+          {data.service ? (
+            <ShowcaseSection title="Years of service">
+              <ServiceLadder service={data.service} firstName={firstName} isMe={isMe} />
+            </ShowcaseSection>
+          ) : isMe ? (
+            <ShowcaseSection title="Years of service">
+              <p className="text-muted text-sm">
+                Your start date isn&apos;t set yet, so your service medals can&apos;t show. Ask an admin to add it.
+              </p>
             </ShowcaseSection>
           ) : null}
 
