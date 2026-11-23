@@ -10,6 +10,7 @@ import { writeAudit } from "@/lib/audit";
 import { getOrgSettings } from "@/lib/org-settings";
 import { allowanceForRank, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
 import { lockPool } from "@/lib/locks";
+import { badgeLookError } from "@/lib/value-icons";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -299,10 +300,17 @@ export async function saveAwardProgram(
   if (!Number.isFinite(d.points) || d.points < 0) {
     return { ok: false, error: "Enter a valid points value." };
   }
+  const icon = String(formData.get("icon") ?? "").trim();
+  const color = String(formData.get("color") ?? "").trim();
+  const lookError = badgeLookError(icon, color);
+  if (lookError) return { ok: false, error: lookError };
 
   const data = {
     name: d.name,
     description: d.description || null,
+    // Badge look: gold-rimmed holo hexagon on winners' profiles and in Awards.
+    icon: icon || null,
+    color: color ? color.toLowerCase() : null,
     points: d.points,
     cadence: d.cadence,
     requiresApproval: d.requiresApproval,

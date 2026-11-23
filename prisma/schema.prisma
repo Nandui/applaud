@@ -237,6 +237,10 @@ model AwardProgram {
   cadence          String? // "monthly" | "quarterly" | null (ad hoc)
   requiresApproval Boolean      @default(true)
   active           Boolean      @default(true)
+  /// Badge look: lucide icon name and hex colour for the gold-rimmed holo
+  /// hexagon shown on winners' profiles and in Awards. Null: trophy in gold.
+  icon             String?
+  color            String?
   nominations      Nomination[]
 }
 

@@ -10,6 +10,8 @@ import {
   type ActionResult,
 } from "@/lib/awards/actions";
 import { DataTable } from "@/components/data-table";
+import { BadgeLookPicker } from "@/components/admin/badge-look-picker";
+import { AwardBadge, DEFAULT_AWARD_COLOR } from "@/components/value-seal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -40,6 +42,8 @@ export type ProgramRow = {
   cadence: string | null;
   requiresApproval: boolean;
   active: boolean;
+  icon: string | null;
+  color: string | null;
 };
 
 const ADHOC = "adhoc";
@@ -62,6 +66,9 @@ function ProgramFormDialog({
     editing?.requiresApproval ?? true,
   );
   const [active, setActive] = useState(editing?.active ?? true);
+  const [name, setName] = useState(editing?.name ?? "");
+  const [icon, setIcon] = useState(editing?.icon ?? "Trophy");
+  const [color, setColor] = useState(editing?.color ?? DEFAULT_AWARD_COLOR);
 
   useEffect(() => {
     if (state?.ok) {
@@ -74,7 +81,7 @@ function ProgramFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit program" : "New award program"}</DialogTitle>
           <DialogDescription>
@@ -90,10 +97,20 @@ function ProgramFormDialog({
             value={String(requiresApproval)}
           />
           <input type="hidden" name="active" value={String(active)} />
+          <input type="hidden" name="icon" value={icon} />
+          <input type="hidden" name="color" value={color} />
+
+          <div className="bg-surface-2 flex items-center gap-4 rounded-xl p-4">
+            <AwardBadge award={{ name: name || "Award", icon, color }} size="lg" />
+            <p className="text-muted text-xs">
+              Winners get this badge on their profile, and it shows in Awards. Pick an icon and colour below.
+            </p>
+          </div>
+          <BadgeLookPicker icon={icon} color={color} onIconChange={setIcon} onColorChange={setColor} />
 
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" defaultValue={editing?.name ?? ""} required />
+            <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="description">Description</Label>
@@ -181,7 +198,16 @@ export function AwardProgramsManager({ rows }: { rows: ProgramRow[] }) {
   const [editing, setEditing] = useState<ProgramRow | null>(null);
 
   const columns: ColumnDef<ProgramRow>[] = [
-    { accessorKey: "name", header: "Name" },
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => (
+        <span className="flex items-center gap-3">
+          <AwardBadge award={row.original} size="xs" />
+          <span className="font-medium">{row.original.name}</span>
+        </span>
+      ),
+    },
     {
       accessorKey: "points",
       header: "Points",

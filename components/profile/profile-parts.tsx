@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ValueSeal } from "@/components/value-seal";
+import { AwardBadge, ValueSeal } from "@/components/value-seal";
 import { CELEBRATION_EMOJI, CELEBRATION_LABELS, type ProfileData } from "@/lib/profile";
 import { CountUp } from "@/components/fx/count-up";
 
@@ -37,17 +36,27 @@ type Highlight = {
 };
 
 /**
- * Story-highlight circles under the bio (Instagram): awards won, the values
- * this person has been recognised for (with counts), and milestones.
+ * Badge shelves under the bio: the awards this person has won (gold holo
+ * hexagons, one per award with how many times), then the values they've been
+ * recognised for and their milestones.
  */
 export function Highlights({ data }: { data: ProfileData }) {
-  const items: Highlight[] = [
-    ...data.awards.map((a) => ({
-      key: `award-${a.id}`,
-      label: a.name,
-      circle: <Trophy className="size-6 text-white" />,
-      background: "linear-gradient(135deg, #fbbf24, #d97706)",
-    })),
+  const awardMap = new Map<string, Highlight>();
+  for (const a of data.awards) {
+    const h = awardMap.get(a.programId);
+    if (h) h.count = (h.count ?? 1) + 1;
+    else
+      awardMap.set(a.programId, {
+        key: `award-${a.programId}`,
+        label: a.name,
+        circle: <AwardBadge award={a} size="md" />,
+        background: "transparent",
+        bare: true,
+        count: 1,
+      });
+  }
+  const awards = [...awardMap.values()];
+  const badges: Highlight[] = [
     ...data.valueTags.map((t) => ({
       key: `value-${t.value.id}`,
       label: t.value.name,
@@ -63,41 +72,53 @@ export function Highlights({ data }: { data: ProfileData }) {
       background: "var(--surface-2)",
     })),
   ];
-  if (items.length === 0) return null;
+  if (awards.length === 0 && badges.length === 0) return null;
 
   return (
-    <ul className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4" aria-label="Highlights">
-      {items.map((h) => (
-        <li key={h.key} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-          <span
-            className={cn(
-              "relative flex size-16 items-center justify-center rounded-full",
-              !h.bare && "border-border border p-[3px]",
-            )}
-          >
-            {h.bare ? (
-              h.circle
-            ) : (
-              <span
-                className="flex size-full items-center justify-center rounded-full"
-                style={{ background: h.background }}
-              >
-                {h.circle}
-              </span>
-            )}
-            {h.count && h.count > 1 ? (
-              <span
-                data-numeric
-                className="bg-foreground text-background ring-background absolute -right-0.5 -bottom-0.5 min-w-5 rounded-full px-1 text-center text-[0.65rem] leading-5 font-bold ring-2"
-              >
-                {h.count}
-              </span>
-            ) : null}
-          </span>
-          <span className="w-full truncate text-center text-xs">{h.label}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      {awards.length > 0 && <HighlightRow title="Awards" items={awards} />}
+      {badges.length > 0 && <HighlightRow title="Recognised for" items={badges} />}
+    </div>
+  );
+}
+
+function HighlightRow({ title, items }: { title: string; items: Highlight[] }) {
+  return (
+    <section aria-label={title}>
+      <h2 className="text-muted mb-2 text-[0.7rem] font-semibold tracking-wider uppercase">{title}</h2>
+      <ul className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4">
+        {items.map((h) => (
+          <li key={h.key} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+            <span
+              className={cn(
+                "relative flex size-16 items-center justify-center rounded-full",
+                !h.bare && "border-border border p-[3px]",
+              )}
+            >
+              {h.bare ? (
+                h.circle
+              ) : (
+                <span
+                  className="flex size-full items-center justify-center rounded-full"
+                  style={{ background: h.background }}
+                >
+                  {h.circle}
+                </span>
+              )}
+              {h.count && h.count > 1 ? (
+                <span
+                  data-numeric
+                  className="bg-foreground text-background ring-background absolute -right-0.5 -bottom-0.5 min-w-5 rounded-full px-1 text-center text-[0.65rem] leading-5 font-bold ring-2"
+                >
+                  {h.count}
+                </span>
+              ) : null}
+            </span>
+            <span className="w-full truncate text-center text-xs">{h.label}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

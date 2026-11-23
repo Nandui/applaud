@@ -22,6 +22,8 @@ export default async function AdminAwardsPage() {
       cadence: true,
       requiresApproval: true,
       active: true,
+      icon: true,
+      color: true,
     },
   });
 
