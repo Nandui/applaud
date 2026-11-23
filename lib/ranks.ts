@@ -67,3 +67,18 @@ export function rankForRole(role: string): PointsRank {
   if (role === "ceo") return "ceo";
   return "manager";
 }
+
+/**
+ * Every rank above Staff gets the whole profile shop (frames, banners,
+ * themes) at no cost: buying or "Buy all" takes nothing from their wallet.
+ * Rewards are not affected.
+ */
+export function shopIsFreeFor(rank: string | null | undefined): boolean {
+  return normalise(rank) !== "staff";
+}
+
+/** What a profile shop price comes to for someone of this rank. */
+export function shopPriceFor(rank: string | null | undefined, price: number): number {
+  return shopIsFreeFor(rank) ? 0 : price;
+}
+

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { Check, Crown } from "lucide-react";
 import { buyItem, equipItem } from "@/lib/profile-actions";
 import {
   DEFAULT_BANNER,
@@ -79,6 +79,7 @@ export function ShopItem({
   owned,
   balance,
   isNew = false,
+  perk = null,
 }: {
   item: Cosmetic;
   me: Wearer;
@@ -86,13 +87,17 @@ export function ShopItem({
   balance: number;
   /** Added since this person last looked at the shop. */
   isNew?: boolean;
+  /** Their rank label when the shop is free for them (every rank above Staff). */
+  perk?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const worn = me.worn[item.kind];
   const wearing = worn === item.id || (!worn && DEFAULTS[item.kind] === item.id);
-  const free = item.price === 0;
-  const short = item.price - balance;
+  // Free for them thanks to their rank, though it has a price for everyone else.
+  const perkFree = perk !== null && item.price > 0;
+  const free = item.price === 0 || perkFree;
+  const short = free ? 0 : item.price - balance;
   const rarity = RARITY[item.rarity];
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) =>
@@ -129,9 +134,16 @@ export function ShopItem({
             <span style={{ color: rarity.color }} className="font-semibold">
               {rarity.label}
             </span>
-            <span className="text-muted font-medium" data-numeric>
-              {owned ? "Owned" : free ? "Free" : pts(item.price)}
-            </span>
+            {perkFree && !owned ? (
+              <span className="flex min-w-0 items-baseline gap-1" data-numeric>
+                <span className="text-muted truncate line-through">{pts(item.price)}</span>
+                <span className="text-primary font-bold">Free</span>
+              </span>
+            ) : (
+              <span className="text-muted font-medium" data-numeric>
+                {owned ? "Owned" : free ? "Free" : pts(item.price)}
+              </span>
+            )}
           </span>
         </button>
       </SheetTrigger>
@@ -154,6 +166,7 @@ export function ShopItem({
         <div className="pb-safe mt-4 space-y-2 px-4 pb-4">
           {!owned ? (
             <>
+              {perkFree ? <PerkNote perk={perk} price={item.price} /> : null}
               <button
                 type="button"
                 disabled={pending || short > 0}
@@ -171,7 +184,9 @@ export function ShopItem({
                       : `Buy for ${pts(item.price)}`}
               </button>
               <p className="text-muted text-center text-xs" data-numeric>
-                {free
+                {perkFree
+                  ? "Nothing comes off your points."
+                  : free
                   ? "Free, but only for people who grab it here."
                   : `You have ${formatNumber(balance)} pts${short <= 0 ? ` · ${formatNumber(balance - item.price)} left after` : ""}`}
               </p>
@@ -202,5 +217,21 @@ export function ShopItem({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** The "free just for you" strip in a buy sheet: the struck-through price and why it's free. */
+export function PerkNote({ perk, price, items }: { perk: string; price: number; items?: number }) {
+  return (
+    <div className="bg-primary/10 text-foreground flex items-center gap-3 rounded-xl px-3 py-2.5">
+      <Crown className="text-primary size-5 shrink-0" aria-hidden />
+      <p className="min-w-0 text-sm leading-snug">
+        <span className="font-semibold">Free for you as {perk}.</span>{" "}
+        <span className="text-muted" data-numeric>
+          Staff pay <span className="whitespace-nowrap line-through">{pts(price)}</span>
+          {items && items > 1 ? ` for these ${items}` : ""}.
+        </span>
+      </p>
+    </div>
   );
 }

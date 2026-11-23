@@ -7,6 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { KIND_LABELS, itemById, type CosmeticKind } from "@/lib/cosmetics";
 import { getCatalogue, getCategories } from "@/lib/catalogue";
+import { RANK_LABELS, isPointsRank, shopIsFreeFor } from "@/lib/ranks";
 import {
   MAX_PINNED,
   bundleFor,
@@ -24,6 +25,15 @@ export type ProfileActionResult =
   | { ok: false; error: string };
 
 class ShopError extends Error {}
+
+/**
+ * Whether the shop is free for this person, read from the database inside the
+ * purchase transaction so a rank change can't be raced.
+ */
+async function rankOf(tx: Pick<typeof prisma, "user">, userId: string) {
+  const row = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { pointsRank: true } });
+  return { free: shopIsFreeFor(row.pointsRank), label: isPointsRank(row.pointsRank) ? RANK_LABELS[row.pointsRank] : "Staff" };
+}
 
 async function loadCustom(userId: string): Promise<ProfileCustom> {
   const row = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { profile: true } });
@@ -118,26 +128,34 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
   const item = itemById(await getCatalogue(), itemId);
   if (!item || !item.active) return { ok: false, error: "That item isn't in the shop." };
 
+  // Managers and every rank above them pay nothing (lib/ranks.ts shopIsFreeFor).
+  let charged = item.price;
+  let perk: string | null = null;
   try {
     await prisma.$transaction(async (tx) => {
       const row = await tx.user.findUniqueOrThrow({ where: { id: me.id }, select: { profile: true } });
       const custom = parseProfile(row.profile);
       if (ownsItem(custom, item)) throw new ShopError("You already own this.");
+      const rank = await rankOf(tx, me.id);
+      if (rank.free && item.price > 0) {
+        charged = 0;
+        perk = rank.label;
+      }
 
-      if (item.price > 0) {
+      if (charged > 0) {
         const agg = await tx.rewardLedger.aggregate({ _sum: { amount: true }, where: { userId: me.id } });
-        if ((agg._sum.amount ?? 0) < item.price) throw new ShopError("You don't have enough points yet.");
-        await tx.user.update({ where: { id: me.id }, data: { walletBalance: { decrement: item.price } } });
+        if ((agg._sum.amount ?? 0) < charged) throw new ShopError("You don't have enough points yet.");
+        await tx.user.update({ where: { id: me.id }, data: { walletBalance: { decrement: charged } } });
       }
       // Free items get a 0-point entry too, so claims count as buyers in Admin > Store.
       await tx.rewardLedger.create({
         data: {
           userId: me.id,
-          amount: 0 - item.price,
+          amount: 0 - charged,
           type: "SHOP",
           sourceType: "cosmetic",
           sourceId: item.id,
-          note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()}`,
+          note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()}${perk ? ` (free for ${perk})` : ""}`,
         },
       });
       await tx.user.update({ where: { id: me.id }, data: { profile: withPurchase(custom, item) } });
@@ -152,8 +170,10 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
     action: "shop.purchased",
     entityType: "user",
     entityId: me.id,
-    summary: `${item.price === 0 ? "Claimed" : "Bought"} ${item.name} (${KIND_LABELS[item.kind].one}, ${item.price} pts)`,
-    metadata: { itemId: item.id, price: item.price },
+    summary: perk
+      ? `Claimed ${item.name} free as ${perk} (${KIND_LABELS[item.kind].one}, list price ${item.price} pts)`
+      : `${item.price === 0 ? "Claimed" : "Bought"} ${item.name} (${KIND_LABELS[item.kind].one}, ${item.price} pts)`,
+    metadata: { itemId: item.id, price: charged, listPrice: item.price, rankPerk: perk !== null },
     siteId: me.siteId,
   });
   revalidateProfile(me.id);
@@ -166,6 +186,7 @@ export async function buyItem(itemId: string): Promise<ProfileActionResult> {
  * of their prices (no discount). Each item gets its own SHOP entry in the
  * wallet ledger, exactly as if bought one by one, so wallet history, buyer
  * counts and the Points analytics stay the same. Nothing is equipped.
+ * Ranks above Staff pay 0 for the bundle (each entry is 0 points).
  * `expectedPrice` is what the buyer was shown; if prices or ownership changed
  * since, the purchase stops instead of charging a different amount.
  */
@@ -176,12 +197,18 @@ export async function buyBundle(categoryId: string, expectedPrice: number): Prom
   if (!category || !category.active) return { ok: false, error: "That bundle isn't in the shop." };
 
   let bought: ReturnType<typeof bundleFor> = { items: [], price: 0 };
+  let perk: string | null = null;
   try {
     await prisma.$transaction(async (tx) => {
       const row = await tx.user.findUniqueOrThrow({ where: { id: me.id }, select: { profile: true } });
       const custom = parseProfile(row.profile);
       bought = bundleFor(custom, catalogue, category.id);
       if (bought.items.length === 0) throw new ShopError("You already own everything in this bundle.");
+      const rank = await rankOf(tx, me.id);
+      if (rank.free) {
+        if (bought.price > 0) perk = rank.label;
+        bought = { items: bought.items.map((i) => ({ ...i, price: 0 })), price: 0 };
+      }
       if (bought.price !== expectedPrice) {
         throw new ShopError("This bundle changed since you opened it. Have another look and try again.");
       }
@@ -198,7 +225,7 @@ export async function buyBundle(categoryId: string, expectedPrice: number): Prom
           type: "SHOP",
           sourceType: "cosmetic",
           sourceId: item.id,
-          note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()} (${category.name} bundle)`,
+          note: `${item.name} ${KIND_LABELS[item.kind].one.toLowerCase()} (${category.name} bundle${perk ? `, free for ${perk}` : ""})`,
         })),
       });
       await tx.user.update({ where: { id: me.id }, data: { profile: withOwned(custom, bought.items) } });
@@ -214,8 +241,10 @@ export async function buyBundle(categoryId: string, expectedPrice: number): Prom
     action: "shop.purchased",
     entityType: "user",
     entityId: me.id,
-    summary: `Bought the ${category.name} bundle (${items.length} items, ${price} pts)`,
-    metadata: { categoryId: category.id, itemIds: items.map((i) => i.id), price },
+    summary: perk
+      ? `Claimed the ${category.name} bundle free as ${perk} (${items.length} items)`
+      : `Bought the ${category.name} bundle (${items.length} items, ${price} pts)`,
+    metadata: { categoryId: category.id, itemIds: items.map((i) => i.id), price, rankPerk: perk !== null },
     siteId: me.siteId,
   });
   revalidateProfile(me.id);
