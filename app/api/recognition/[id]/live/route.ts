@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: Context) {
   const me = await getCurrentUser();
   if (!me) return Response.json({ error: "Not signed in." }, { status: 401 });
   const { id } = await params;
-  if (!(await canSeeRecognition(id))) {
+  if (!(await canSeeRecognition(id, me.id))) {
     return Response.json({ error: "Not found." }, { status: 404 });
   }
   const search = new URL(request.url).searchParams;
@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: Context) {
   const { id } = await params;
   const body = (await request.json().catch(() => null)) as { typing?: unknown } | null;
   const typing = body?.typing === true;
-  if (typing && !(await canSeeRecognition(id))) {
+  if (typing && !(await canSeeRecognition(id, me.id))) {
     return Response.json({ error: "Not found." }, { status: 404 });
   }
   await setTyping(id, me.id, typing);
