@@ -27,6 +27,7 @@ export function DiscountCard({ discount, className }: { discount: DiscountCardDa
       <SheetTrigger asChild>
         <button
           type="button"
+          data-reward-id={discount.id}
           className={cn(
             "bg-background flex flex-col overflow-hidden rounded-2xl text-left shadow-sm transition-transform active:scale-[0.98]",
             className,

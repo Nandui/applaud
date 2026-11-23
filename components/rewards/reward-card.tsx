@@ -174,9 +174,10 @@ export function RewardCard({
       <SheetTrigger asChild>
         <button
           type="button"
-          className="group flex w-full flex-col overflow-hidden text-left active:opacity-80"
+          data-reward-id={reward.id}
+          className="group bg-background ring-border flex h-full w-full flex-col overflow-hidden rounded-2xl text-left shadow-sm ring-1 transition-transform active:scale-[0.98] dark:bg-surface"
         >
-          <span className="relative block aspect-square w-full overflow-hidden rounded-xl">
+          <span className="relative block aspect-square w-full overflow-hidden">
             <RewardArt reward={reward} />
             <span className="absolute top-2 right-9 left-2 flex flex-wrap items-start gap-1">
               {reward.promo ? <PromoBadge promo={reward.promo} className="shadow-sm" /> : null}
@@ -192,7 +193,7 @@ export function RewardCard({
               </span>
             ) : null}
           </span>
-          <span className="flex flex-1 flex-col pt-2">
+          <span className="flex flex-1 flex-col p-3">
             <span className="line-clamp-2 text-sm leading-snug font-bold">{reward.name}</span>
             <span className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2">
               <Price reward={reward} highlight={canAfford && !outOfStock} />

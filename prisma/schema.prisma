@@ -342,7 +342,12 @@ model Reward {
   monthlyStock     Int?
   siteId           String? // null = all sites
   active           Boolean      @default(true)
+  /// Position on the staff Rewards page: Admin > Rewards renumbers it when
+  /// offerings are dragged. Categories follow their first offering's position.
   sortOrder        Int          @default(0)
+  /// Position in the Featured row, set by dragging in Admin > Rewards. Null =
+  /// not placed yet: after the placed ones, most urgent label first.
+  featuredOrder    Int?
   createdAt        DateTime     @default(now())
   /// When it went on show (created, or shown again after being hidden): newer
   /// than someone's User.rewardsSeenAt means "New" to them.

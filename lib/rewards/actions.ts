@@ -179,8 +179,9 @@ function parseRewardForm(fd: FormData) {
   const euroCostCents = parseEurosToCents(String(fd.get("euroCost") ?? ""));
   const monthlyRaw = String(fd.get("monthlyStock") ?? "").trim();
   const monthlyStock = monthlyRaw === "" ? null : Math.max(0, Math.floor(Number(monthlyRaw)));
+  // Position is set by dragging in Admin > Rewards; the form no longer sends it.
   const sortRaw = String(fd.get("sortOrder") ?? "").trim();
-  const sortOrder = sortRaw === "" ? 0 : Math.floor(Number(sortRaw));
+  const sortOrder = sortRaw === "" ? null : Math.floor(Number(sortRaw));
   const kind = String(fd.get("kind") ?? "reward") === "discount" ? "discount" : "reward";
   const discountText = String(fd.get("discountText") ?? "").trim();
   const promoRaw = String(fd.get("promoTag") ?? "").trim();
@@ -237,7 +238,7 @@ function validateReward(d: ReturnType<typeof parseRewardForm>): string | null {
   if (d.euroCostCents === null) return "Enter the euro cost, e.g. 4.50 (0 for perks).";
   if (d.monthlyStock !== null && !Number.isFinite(d.monthlyStock))
     return "Enter a valid monthly stock, or leave it blank for no limit.";
-  if (!Number.isFinite(d.sortOrder)) return "Enter a valid sort order.";
+  if (d.sortOrder !== null && !Number.isFinite(d.sortOrder)) return "Enter a valid sort order.";
   if (d.imageUrl && !isProjectBlobUrl(d.imageUrl)) return "Unrecognised picture URL.";
   if (!FULFILMENT_TYPES.has(d.fulfilment)) return "Only manual fulfilment is supported.";
   if (d.fulfilmentAmount !== null) {
@@ -276,7 +277,7 @@ function rewardData(d: ReturnType<typeof parseRewardForm>) {
     active: d.active,
     fulfilment: d.fulfilment,
     type: d.type,
-    sortOrder: d.sortOrder,
+    ...(d.sortOrder !== null ? { sortOrder: d.sortOrder } : {}),
   };
 }
 
@@ -289,7 +290,11 @@ export async function createReward(
   const err = validateReward(d);
   if (err) return { ok: false, error: err };
 
-  const created = await prisma.reward.create({ data: rewardData(d) });
+  // New offerings go to the end of the page unless told otherwise.
+  const last = await prisma.reward.aggregate({ _max: { sortOrder: true } });
+  const created = await prisma.reward.create({
+    data: { sortOrder: (last._max.sortOrder ?? 0) + 10, ...rewardData(d) },
+  });
   await writeAudit({
     actor: admin,
     action: "reward.created",
@@ -366,51 +371,59 @@ export async function setRewardActive(formData: FormData): Promise<ActionResult>
   return { ok: true };
 }
 
-export async function reorderReward(formData: FormData): Promise<ActionResult> {
+/**
+ * Save where offerings sit on the staff Rewards page (Admin > Rewards, after a
+ * drag or an arrow press). `order` is every offering, top to bottom: staff
+ * discounts, then each category in turn. `featured` is the Featured row, left
+ * to right. Offerings missing from `order` (added by someone else meanwhile)
+ * keep their relative order after the rest; unknown ids are ignored. Only rows
+ * whose position changed are written.
+ */
+export async function saveRewardLayout(input: { order: string[]; featured: string[] }): Promise<ActionResult> {
   const admin = await requireAdmin();
-  const id = String(formData.get("id") ?? "");
-  const direction = String(formData.get("direction") ?? "");
-  if (!id || (direction !== "up" && direction !== "down")) {
-    return { ok: false, error: "Invalid reorder." };
-  }
-  const current = await prisma.reward.findUnique({ where: { id } });
-  if (!current) return { ok: false, error: "Missing reward." };
+  const order = Array.isArray(input?.order) ? input.order.filter((x) => typeof x === "string") : [];
+  const featured = Array.isArray(input?.featured) ? input.featured.filter((x) => typeof x === "string") : [];
+  if (order.length === 0) return { ok: false, error: "Nothing to reorder." };
 
-  const neighbor = await prisma.reward.findFirst({
-    where:
-      direction === "up"
-        ? { sortOrder: { lt: current.sortOrder } }
-        : { sortOrder: { gt: current.sortOrder } },
-    orderBy:
-      direction === "up"
-        ? [{ sortOrder: "desc" }, { name: "desc" }]
-        : [{ sortOrder: "asc" }, { name: "asc" }],
+  const all = await prisma.reward.findMany({
+    orderBy: [{ sortOrder: "asc" }, { pointsCost: "asc" }, { name: "asc" }],
+    select: { id: true, sortOrder: true, featuredOrder: true },
   });
-  const nextOrder = neighbor
-    ? neighbor.sortOrder
-    : direction === "up"
-      ? current.sortOrder - 1
-      : current.sortOrder + 1;
-  if (neighbor) {
-    await prisma.$transaction([
-      prisma.reward.update({ where: { id: current.id }, data: { sortOrder: neighbor.sortOrder } }),
-      prisma.reward.update({ where: { id: neighbor.id }, data: { sortOrder: current.sortOrder } }),
-    ]);
-  } else {
-    await prisma.reward.update({ where: { id }, data: { sortOrder: nextOrder } });
+  const known = new Map(all.map((r) => [r.id, r]));
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const id of [...order, ...all.map((r) => r.id)]) {
+    if (known.has(id) && !seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
   }
+  const featuredPos = new Map<string, number>();
+  for (const id of featured) if (known.has(id) && !featuredPos.has(id)) featuredPos.set(id, featuredPos.size + 1);
+
+  // Steps of 10 leave room, though every save renumbers anyway.
+  const updates = ids.flatMap((id, i) => {
+    const r = known.get(id)!;
+    const sortOrder = (i + 1) * 10;
+    // Rewards not in the Featured row keep their place in it for when their label is back.
+    const featuredOrder = featuredPos.has(id) ? featuredPos.get(id)! : r.featuredOrder;
+    if (r.sortOrder === sortOrder && r.featuredOrder === featuredOrder) return [];
+    return [prisma.reward.update({ where: { id }, data: { sortOrder, featuredOrder } })];
+  });
+  if (updates.length === 0) return { ok: true, message: "Already in that order." };
+  await prisma.$transaction(updates);
+
   await writeAudit({
     actor: admin,
     action: "reward.updated",
     entityType: "reward",
-    entityId: id,
-    summary: `Reordered ${current.name} ${direction}`,
-    metadata: { direction, sortOrder: nextOrder },
-    siteId: current.siteId,
+    summary: `Reordered the Rewards page (${updates.length} offering${updates.length === 1 ? "" : "s"} moved)`,
+    metadata: { order: ids, featured: [...featuredPos.keys()] },
   });
   revalidatePath("/admin/rewards");
   revalidatePath("/rewards");
-  return { ok: true };
+  revalidatePath("/");
+  return { ok: true, message: "Order saved." };
 }
 
 /**
