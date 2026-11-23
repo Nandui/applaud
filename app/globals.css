@@ -656,54 +656,111 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Service medals: years of service (components/service-medal.tsx). A struck
- * metal medal on a ribbon, unlike the holo hexagons, so it reads as an
- * honour. Gold (5 years) and up catch the light every few seconds; Diamond and Legend
- * also glow. Locked medals (not earned yet) are greyed out.
+ * Service medals: years of service (components/service-medal.tsx). The same
+ * layers as the holo hexagons (polished rim, face, holo foil, sheen), in a
+ * circle and in the tier's metal: --rim-hi/--rim/--rim-lo, --face-hi/--face-lo.
+ * Gold (5 years) and up carry the shimmering foil; Diamond and Legend glow.
+ * Locked medals (not earned yet) are greyed out.
  * ------------------------------------------------------------------------- */
 .service-medal {
-  display: inline-flex;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
   flex-shrink: 0;
+  width: var(--s);
+  height: var(--s);
   line-height: 0;
   vertical-align: middle;
-  filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28));
+  border-radius: 9999px;
+  filter: drop-shadow(0 calc(var(--s) * 0.07) calc(var(--s) * 0.09) color-mix(in srgb, var(--rim-lo) 45%, transparent));
 }
-.service-medal[data-mini] {
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.3));
+.service-medal-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 200deg,
+    var(--rim-hi),
+    var(--rim),
+    var(--rim-lo),
+    var(--rim),
+    var(--rim-hi),
+    var(--rim),
+    var(--rim-lo),
+    var(--rim),
+    var(--rim-hi)
+  );
+  box-shadow:
+    inset 0 calc(var(--s) * 0.012) 0 rgb(255 255 255 / 0.7),
+    inset 0 calc(var(--s) * -0.015) 0 rgb(0 0 0 / 0.25);
+}
+.service-medal-face {
+  position: absolute;
+  inset: calc(var(--s) * 0.085);
+  overflow: hidden;
+  border-radius: inherit;
+  background: radial-gradient(circle at 35% 28%, var(--face-hi) 0%, var(--face-lo) 92%);
+  box-shadow:
+    inset 0 calc(var(--s) * 0.03) calc(var(--s) * 0.05) rgb(0 0 0 / 0.4),
+    inset 0 calc(var(--s) * -0.01) 0 rgb(255 255 255 / 0.25),
+    0 0 0 calc(var(--s) * 0.012) color-mix(in srgb, var(--rim-hi) 70%, transparent);
+}
+.service-medal[data-mini] .service-medal-face {
+  inset: calc(var(--s) * 0.1);
+}
+.service-medal-foil,
+.service-medal-shine {
+  position: absolute;
+  inset: 0;
+  background-size: 260% 260%;
+  background-position: 30% 50%;
+}
+.service-medal-foil {
+  display: none;
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+  background-image: linear-gradient(
+    115deg,
+    transparent 18%,
+    #ff6ad5 32%,
+    #7af6ff 44%,
+    #fff27a 54%,
+    #9b7bff 64%,
+    transparent 80%
+  );
+}
+.service-medal-shine {
+  background-image: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 0.4) 48%, transparent 58%);
+}
+.service-medal-spark {
+  position: absolute;
+  top: 2%;
+  right: 4%;
+  width: 17%;
+  height: 17%;
+  color: #fff;
+  filter: drop-shadow(0 0 3px #fff);
+}
+.service-medal-art {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.service-medal:not([data-tier="steel"], [data-tier="bronze"], [data-tier="copper"], [data-tier="silver"], [data-mini], [data-locked])
+  .service-medal-foil {
+  display: block;
 }
 .service-medal:is([data-tier="diamond"], [data-tier="legend"]):not([data-mini], [data-locked]) {
-  filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28))
+  filter: drop-shadow(0 calc(var(--s) * 0.07) calc(var(--s) * 0.09) color-mix(in srgb, var(--rim-lo) 45%, transparent))
     drop-shadow(0 0 calc(var(--s) * 0.14) color-mix(in srgb, var(--glow) 70%, transparent));
 }
 .service-medal[data-locked] {
   filter: grayscale(1);
   opacity: 0.32;
 }
-.service-medal-shine {
-  opacity: 0;
-}
-@keyframes service-medal-shine {
-  0%,
-  62% {
-    transform: skewX(-18deg) translateX(0);
-    opacity: 0;
-  }
-  64% {
-    opacity: 1;
-  }
-  88%,
-  100% {
-    transform: skewX(-18deg) translateX(190px);
-    opacity: 0;
-  }
-}
 @media (prefers-reduced-motion: no-preference) {
-  .service-medal:not([data-tier="steel"], [data-tier="bronze"], [data-tier="copper"], [data-tier="silver"]):not(
-      [data-mini],
-      [data-locked]
-    )
-    .service-medal-shine {
-    animation: service-medal-shine 6s ease-in-out infinite;
+  .service-medal:not([data-mini], [data-locked]) :is(.service-medal-foil, .service-medal-shine) {
+    animation: value-holo-foil 5.5s ease-in-out infinite;
   }
   .service-medal[data-tier="legend"]:not([data-mini], [data-locked]) {
     animation: service-medal-glow 3.2s ease-in-out infinite;
@@ -712,11 +769,11 @@
 @keyframes service-medal-glow {
   0%,
   100% {
-    filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28))
+    filter: drop-shadow(0 calc(var(--s) * 0.07) calc(var(--s) * 0.09) color-mix(in srgb, var(--rim-lo) 45%, transparent))
       drop-shadow(0 0 calc(var(--s) * 0.1) color-mix(in srgb, var(--glow) 55%, transparent));
   }
   50% {
-    filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28))
+    filter: drop-shadow(0 calc(var(--s) * 0.07) calc(var(--s) * 0.09) color-mix(in srgb, var(--rim-lo) 45%, transparent))
       drop-shadow(0 0 calc(var(--s) * 0.22) color-mix(in srgb, #f5c542 75%, transparent));
   }
 }

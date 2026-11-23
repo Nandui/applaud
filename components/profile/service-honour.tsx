@@ -28,7 +28,7 @@ export function ServicePlaque({ service }: { service: NonNullable<ProfileData["s
         borderColor: `color-mix(in srgb, ${accent} 45%, transparent)`,
       }}
     >
-      <ServiceMedal months={service.months} size={46} />
+      <ServiceMedal months={service.months} size={54} />
       <div className="min-w-0 leading-tight">
         <p
           className="text-[0.68rem] font-extrabold tracking-[0.14em] uppercase"
