@@ -17,6 +17,8 @@ import {
   Pin,
   PinOff,
   Trash2,
+  BarChart3,
+  MessageCircleQuestion,
 } from "lucide-react";
 import { toast } from "sonner";
 import { toggleReaction, toggleBoost, deletePost } from "@/lib/recognition/actions";
@@ -37,6 +39,8 @@ import { isLight } from "@/lib/contrast";
 import { optimizedImage } from "@/lib/image-url";
 import { ValueSeal } from "@/components/value-seal";
 import { PostBanner } from "@/components/feed/post-banner";
+import { PollChoices } from "@/components/feed/poll";
+import { QuestionAnswers } from "@/components/feed/question";
 import { tint } from "@/components/value-chip";
 import {
   Popover,
@@ -388,7 +392,12 @@ export function RecognitionCard({
   const leadReactor =
     allReactors.find((u) => u.id !== viewer.id) ?? allReactors[0] ?? null;
 
-  const isPost = card.kind === "post";
+  // Posts, polls and questions are written by one person (no recipients).
+  const isPost = card.kind !== "recognition";
+  const isPoll = card.kind === "poll" && card.poll !== null;
+  const isQuestion = card.kind === "question" && card.question !== null;
+  const isMine = card.sender.id === viewer.id;
+  const noun = card.kind === "recognition" ? "recognition" : card.kind;
   const canPin =
     pinned !== undefined && !card.system && card.recipients.some((r) => r.id === viewer.id);
   // Posts can be deleted by whoever wrote them, and by admins (moderation).
@@ -514,7 +523,7 @@ export function RecognitionCard({
                   )}
                 >
                   <Trash2 className="size-4.5" />
-                  {confirmDelete ? "Tap again to delete" : "Delete post"}
+                  {confirmDelete ? "Tap again to delete" : `Delete ${noun}`}
                 </button>
               )}
             </PopoverContent>
@@ -532,7 +541,24 @@ export function RecognitionCard({
         )}
         onClick={onBodyTap}
       >
-        {hasMedia ? (
+        {isPoll || isQuestion ? (
+          <PostBanner
+            banner={card.sender.look.banner}
+            message={card.message}
+            className="aspect-[2/1] min-h-44 py-6"
+            label={
+              isPoll ? (
+                <>
+                  <BarChart3 className="size-3.5" /> Poll
+                </>
+              ) : (
+                <>
+                  <MessageCircleQuestion className="size-3.5" /> Question
+                </>
+              )
+            }
+          />
+        ) : hasMedia ? (
           <MediaHero urls={card.imageUrls} />
         ) : isPost ? (
           <PostBanner banner={card.sender.look.banner} message={card.message} />
@@ -552,6 +578,18 @@ export function RecognitionCard({
           </span>
         )}
       </div>
+
+      {isPoll && card.poll && (
+        <PollChoices pollId={card.id} poll={card.poll} isAsker={isMine} askerName={card.sender.name} />
+      )}
+      {isQuestion && card.question && (
+        <QuestionAnswers
+          questionId={card.id}
+          question={card.question}
+          isAsker={isMine}
+          askerName={card.sender.name}
+        />
+      )}
 
       {/* What it's for: the value's medal and name, with the points earned. */}
       {(card.value || card.pointsEach > 0) && (
@@ -616,6 +654,7 @@ export function RecognitionCard({
           </span>
         </button>
 
+        {!isQuestion && (
         <button
           type="button"
           onClick={() => openComments(true)}
@@ -632,6 +671,7 @@ export function RecognitionCard({
             </span>
           )}
         </button>
+        )}
 
         {/* Tray anchors here; holding the applaud button opens it too. */}
         <Popover open={reactOpen} onOpenChange={setReactOpen}>
@@ -748,7 +788,7 @@ export function RecognitionCard({
         open={commentsOpen}
         onOpenChange={setCommentsOpen}
         viewer={viewer}
-        description={`Comments on ${card.sender.name}'s ${isPost ? "post" : "recognition"}`}
+        description={`Comments on ${card.sender.name}'s ${noun}`}
         emptyHint={isPost ? "Start the conversation 💬" : "Be the first to hype them up 🙌"}
         inputRef={commentInputRef}
       />
@@ -759,7 +799,7 @@ export function RecognitionCard({
           <SheetHeader className="border-b pt-1 pb-3">
             <SheetTitle className="text-center text-base">Reactions</SheetTitle>
             <SheetDescription className="sr-only">
-              People who reacted to this {isPost ? "post" : "recognition"}
+              People who reacted to this {noun}
             </SheetDescription>
           </SheetHeader>
           <ul className="max-h-[60svh] overflow-y-auto py-2">

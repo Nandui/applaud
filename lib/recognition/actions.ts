@@ -23,6 +23,7 @@ import { canSeeRecognition } from "@/lib/recognition/live";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
 import { lockPool } from "@/lib/locks";
+import { AUTHORED_KINDS } from "@/lib/posts/kinds";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -229,7 +230,9 @@ export async function deletePost(postId: string): Promise<ActionResult> {
     where: { id: postId },
     select: { id: true, kind: true, senderId: true, message: true, imageUrls: true, sender: { select: { name: true } } },
   });
-  if (!post || post.kind !== "post") return { ok: false, error: "That post no longer exists." };
+  if (!post || !(AUTHORED_KINDS as readonly string[]).includes(post.kind)) {
+    return { ok: false, error: "That post no longer exists." };
+  }
   const own = post.senderId === me.id;
   if (!own && !isAdmin(me)) return { ok: false, error: "You can only delete your own posts." };
 
@@ -240,7 +243,7 @@ export async function deletePost(postId: string): Promise<ActionResult> {
     entityType: "recognition",
     entityId: post.id,
     summary: own ? "Deleted their post" : `Removed a post by ${post.sender.name}`,
-    metadata: { authorId: post.senderId, message: post.message, imageUrls: post.imageUrls },
+    metadata: { authorId: post.senderId, kind: post.kind, message: post.message, imageUrls: post.imageUrls },
     siteId: me.siteId,
   });
   revalidatePath("/");
@@ -332,6 +335,15 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid comment." };
+  }
+  // Answers to a question are private, so a question has no public comments.
+  const target = await prisma.recognition.findUnique({
+    where: { id: parsed.data.recognitionId },
+    select: { kind: true },
+  });
+  if (!target) return { ok: false, error: "That post no longer exists." };
+  if (target.kind === "question") {
+    return { ok: false, error: "Questions take private answers, not comments." };
   }
   // Replies are one level deep: a reply to a reply joins the same thread.
   let parentId: string | null = null;
