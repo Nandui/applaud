@@ -3,17 +3,13 @@ import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AwardBadge, ValueSeal } from "@/components/value-seal";
-import { FramedAvatar } from "@/components/user-avatar";
 import { CountUp } from "@/components/fx/count-up";
 import { CELEBRATION_EMOJI, CELEBRATION_LABELS, type ProfileData } from "@/lib/profile";
-import { RARITY, bannerCss, frameArt, type Cosmetic, type CosmeticKind } from "@/lib/cosmetics";
 import { formatNumber } from "@/lib/format";
-import { isLight } from "@/lib/contrast";
 
 /**
  * The parts of a profile's Showcase tab: what this person has earned (awards,
- * values they've been recognised for, milestones) and what they've collected
- * in the profile shop. Each is a plain titled section, like the rest of the
+ * values they've been recognized for, milestones). Each is a plain titled section, like the rest of the
  * app; sections with nothing in them are left out.
  */
 
@@ -145,114 +141,5 @@ export function Milestones({ data }: { data: ProfileData }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-const GROUPS: { kind: CosmeticKind; title: string }[] = [
-  { kind: "frame", title: "Frames" },
-  { kind: "banner", title: "Banners" },
-  { kind: "theme", title: "Colours" },
-];
-
-/**
- * Everything they've picked up in the profile shop, like a Steam inventory:
- * frames shown on their own avatar, banners as strips, colours as swatches.
- * What they wear right now is marked in their colour.
- */
-export function Collection({
-  data,
-  accent,
-}: {
-  data: ProfileData;
-  accent: string;
-}) {
-  const { user, custom } = data;
-  return (
-    <div className="space-y-4">
-      {GROUPS.map(({ kind, title }) => {
-        const items = data.collection.filter((c) => c.kind === kind);
-        if (items.length === 0) return null;
-        return (
-          <div key={kind}>
-            <h3 className="text-muted mb-2 text-xs font-semibold">{title}</h3>
-            <ul
-              className={cn(
-                "grid gap-2",
-                kind === "banner" ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-4 sm:grid-cols-6",
-              )}
-            >
-              {items.map((item) => (
-                <CollectionItem
-                  key={item.id}
-                  item={item}
-                  wearing={custom[kind] === item.id}
-                  accent={accent}
-                  name={user.name}
-                  avatarUrl={user.avatarUrl}
-                />
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function CollectionItem({
-  item,
-  wearing,
-  accent,
-  name,
-  avatarUrl,
-}: {
-  item: Cosmetic;
-  wearing: boolean;
-  accent: string;
-  name: string;
-  avatarUrl: string | null;
-}) {
-  const rarity = RARITY[item.rarity];
-  return (
-    <li className="min-w-0">
-      <span
-        className={cn(
-          "bg-surface relative block w-full overflow-hidden rounded-xl border",
-          item.kind === "banner" ? "aspect-[3/1]" : "aspect-square",
-          wearing ? "border-2" : "border-border",
-        )}
-        style={wearing ? { borderColor: accent } : undefined}
-      >
-        {item.kind === "frame" ? (
-          <span className="flex h-full items-center justify-center">
-            <FramedAvatar
-              name={name}
-              avatarUrl={avatarUrl}
-              frame={frameArt(item)}
-              className="size-11 text-sm"
-              gapClassName="bg-surface"
-            />
-          </span>
-        ) : item.kind === "banner" ? (
-          <span className="absolute inset-0" style={{ background: bannerCss(item) }} />
-        ) : (
-          <span className="flex h-full items-center justify-center">
-            <span className="size-9 rounded-full" style={{ backgroundColor: item.style ?? undefined }} />
-          </span>
-        )}
-        {wearing ? (
-          <span
-            className="absolute top-1 left-1 rounded-full px-1.5 text-[0.6rem] leading-4 font-bold"
-            style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#ffffff" }}
-          >
-            Wearing
-          </span>
-        ) : null}
-      </span>
-      <span className="mt-1 block truncate text-xs font-semibold">{item.name}</span>
-      <span className="block text-[0.65rem] font-semibold" style={{ color: rarity.color }}>
-        {rarity.label}
-      </span>
-    </li>
   );
 }

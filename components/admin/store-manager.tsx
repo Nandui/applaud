@@ -22,7 +22,7 @@ import {
   type Rarity,
   type StoreCategory,
 } from "@/lib/cosmetics";
-import { DEFAULT_FIT, clampFit, formatFit, parseFit, sameFit, type FrameFit } from "@/lib/frame-fit";
+import { DEFAULT_FIT, clampFit, formatFit, frameOverhang, parseFit, sameFit, type FrameFit } from "@/lib/frame-fit";
 import { measureFrame } from "@/lib/frame-measure";
 import {
   addCosmeticsInBulk,
@@ -185,6 +185,13 @@ function FitSlider({
   );
 }
 
+/** Preview avatars; `outer` is the photo plus its gap in px (on a wide screen). */
+const PREVIEW_SIZES = [
+  { label: "Comments", className: "size-9", xl: false, outer: 42 },
+  { label: "Feed", className: "size-14", xl: false, outer: 62 },
+  { label: "Profile", className: "size-28 text-3xl", xl: true, outer: 128 },
+];
+
 /**
  * How an uploaded frame sits on the avatar: previews at the sizes the app uses,
  * an Auto-fit that finds the picture's see-through hole, and sliders to nudge.
@@ -202,6 +209,7 @@ function FrameFitControls({
 }) {
   const [measuring, setMeasuring] = useState(false);
   const art = `${imageUrl}#fit=${formatFit(fit)}`;
+  const overhang = frameOverhang(fit);
   const set = (patch: Partial<FrameFit>) => onChange(clampFit({ ...fit, ...patch }));
 
   async function autoFit() {
@@ -234,16 +242,28 @@ function FrameFitControls({
           </Button>
         </div>
       </div>
-      <div className="bg-surface flex items-center justify-center gap-6 rounded-md py-4">
-        {["size-9", "size-14", "size-20"].map((size) => (
-          <FramedAvatar
-            key={size}
-            name={sample.name}
-            avatarUrl={sample.avatarUrl}
-            frame={art}
-            className={size}
-            gapClassName="bg-surface"
-          />
+      {/* The sizes people see it at: comments, the feed, and the profile
+          header. Each gets room for how far the frame reaches past the photo. */}
+      <div className="bg-surface flex flex-wrap items-end justify-center gap-x-4 gap-y-2 overflow-hidden rounded-md px-2 py-3">
+        {PREVIEW_SIZES.map((p) => (
+          <span key={p.label} className="flex flex-col items-center gap-2">
+            <span
+              className="flex"
+              style={{
+                padding: `${overhang.top * p.outer}px ${overhang.right * p.outer}px ${overhang.bottom * p.outer}px ${overhang.left * p.outer}px`,
+              }}
+            >
+              <FramedAvatar
+                name={sample.name}
+                avatarUrl={sample.avatarUrl}
+                frame={art}
+                className={p.className}
+                gapClassName="bg-surface"
+                xl={p.xl}
+              />
+            </span>
+            <span className="text-muted text-[0.7rem]">{p.label}</span>
+          </span>
         ))}
       </div>
       <div className="space-y-1.5">

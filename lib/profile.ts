@@ -2,7 +2,6 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { parseProfile, resolveLook } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
-import { COSMETIC_KINDS, RARITIES } from "@/lib/cosmetics";
 import { serviceMonths } from "@/lib/service";
 
 export const CELEBRATION_LABELS: Record<string, string> = {
@@ -110,23 +109,11 @@ export const getProfileData = cache(async (userId: string) => {
   const pointsEarned = earn._sum.amount ?? 0;
   const custom = parseProfile(user.profile);
 
-  // What they've bought or claimed in the shop, for the profile's collection:
-  // frames, then banners, then colours, rarest first within each.
-  const owned = new Set(custom.owned);
-  const collection = catalogue
-    .filter((c) => owned.has(c.id))
-    .sort(
-      (a, b) =>
-        COSMETIC_KINDS.indexOf(a.kind) - COSMETIC_KINDS.indexOf(b.kind) ||
-        RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity),
-    );
-
   return {
     user,
     custom,
     look: resolveLook(custom, catalogue),
     catalogue,
-    collection,
     stats: {
       receivedCount,
       givenCount,

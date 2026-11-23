@@ -182,3 +182,20 @@ export function detectFrameFit(rgba: ArrayLike<number>, width: number, height: n
     y: (minY + artH / 2) / height,
   });
 }
+
+/**
+ * How far a fitted frame picture reaches past the avatar on each side, as a
+ * multiple of the avatar's diameter (0 where it stays inside). Pictures are
+ * taken as square, which frame art nearly always is. The profile header uses
+ * it to make room, so a big frame isn't cut off at the screen edge or drawn
+ * over the name.
+ */
+export function frameOverhang(fit: FrameFit): { left: number; right: number; top: number; bottom: number } {
+  const past = (n: number) => round(Math.max(0, n - 0.5));
+  return {
+    left: past(fit.x * fit.size),
+    right: past((1 - fit.x) * fit.size),
+    top: past(fit.y * fit.size),
+    bottom: past((1 - fit.y) * fit.size),
+  };
+}
