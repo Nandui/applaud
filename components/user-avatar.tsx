@@ -99,8 +99,18 @@ export function FramedAvatar({
 }) {
   const shiny = frame && (shine === "epic" || shine === "legendary");
   const shineClass = cn("frame-shine", shine === "legendary" && "frame-shine-legendary");
+  const picture = frame ? isFrameImage(frame) : false;
   return (
-    <span className="relative inline-flex shrink-0 rounded-full">
+    // --gap: the space between photo and frame. Uploaded frame pictures are
+    // fitted to the photo itself (their see-through middle hugs it), so they
+    // look the same at every size; the gap is then left clear instead of
+    // painted, or it would show through soft edges as a pale ring.
+    <span
+      className={cn(
+        "relative inline-flex shrink-0 rounded-full",
+        xl ? "[--gap:6px] sm:[--gap:8px]" : large ? "[--gap:6px]" : "[--gap:3px]",
+      )}
+    >
       {shiny && shine === "legendary" ? (
         <span
           aria-hidden
@@ -109,15 +119,12 @@ export function FramedAvatar({
         />
       ) : null}
       <span
-        className={cn(
-          "bg-background relative rounded-full",
-          xl ? "p-[6px] sm:p-[8px]" : large ? "p-[6px]" : "p-[3px]",
-          gapClassName,
-        )}
+        className={cn("bg-background relative rounded-full p-[var(--gap)]", gapClassName)}
+        style={picture ? { background: "transparent" } : undefined}
       >
         <UserAvatar name={name} avatarUrl={avatarUrl} className={className} />
       </span>
-      {frame && isFrameImage(frame) ? (
+      {frame && picture ? (
         <FrameImage art={frame} shineClassName={shiny ? shineClass : undefined} drawnAt={xl ? 320 : 160} />
       ) : frame ? (
         <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg", xl && "frame-ring-xl")}>
@@ -151,7 +158,8 @@ function FrameImage({
       aria-hidden
       className="pointer-events-none absolute top-1/2 left-1/2 block"
       style={{
-        width: `${fit.size * 100}%`,
+        // fit.size is in photo widths (the photo is the box minus its gap).
+        width: `calc((100% - 2 * var(--gap)) * ${fit.size})`,
         transform: `translate(${-fit.x * 100}%, ${-fit.y * 100}%)`,
       }}
     >

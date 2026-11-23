@@ -80,12 +80,20 @@ test("ornaments outside the ring don't move the centre", () => {
   near(fit.y, 80 / 140, 0.01, "y");
 });
 
-test("a broken ring centres the artwork instead", () => {
-  const broken = (x: number, y: number) => ring(50, 50, 30, 40)(x, y) && !(y > 45 && y < 55 && x > 80);
+test("a hairline break in the ring is bridged, so the hole is still found", () => {
+  const broken = (x: number, y: number) => ring(50, 50, 30, 40)(x, y) && !(y > 47 && y < 53 && x > 80);
   const fit = detectFrameFit(picture(140, 100, broken), 140, 100)!;
   near(fit.x, 50 / 140, 0.02, "x");
   near(fit.y, 0.5, 0.02, "y");
-  near(fit.size, (1.2 * 140) / 80, 0.05, "size");
+  // The hole is 60 across.
+  near(fit.size, 140 / 60, 0.1, "size");
+});
+
+test("a ring with a wide opening centres the artwork instead", () => {
+  const open = (x: number, y: number) => ring(50, 50, 30, 40)(x, y) && !(y > 30 && y < 70 && x > 70);
+  const fit = detectFrameFit(picture(140, 100, open), 140, 100)!;
+  near(fit.y, 0.5, 0.02, "y");
+  near(fit.size, (1.2 * 140) / 80, 0.15, "size");
 });
 
 test("a fully opaque picture isn't a frame", () => {
