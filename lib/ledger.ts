@@ -7,7 +7,7 @@ export const LEDGER_TYPE_META: Record<
   RECOGNITION: { label: "Recognition", tone: "earn" },
   AWARD: { label: "Award", tone: "earn" },
   REDEMPTION: { label: "Redemption", tone: "spend" },
-  EXPIRY: { label: "Expiry", tone: "spend" },
+  EXPIRY: { label: "Expired at year end", tone: "spend" },
   ADJUSTMENT: { label: "Adjustment", tone: "neutral" },
   BOOST: { label: "Boost", tone: "earn" },
   SHOP: { label: "Profile shop", tone: "spend" },

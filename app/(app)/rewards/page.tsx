@@ -18,6 +18,7 @@ import { MarkSeen } from "@/components/app-shell/new-items";
 import { fulfilmentLabel } from "@/lib/fulfilment";
 import { getActiveClaims } from "@/lib/claims";
 import { ClaimsStrip } from "@/components/rewards/active-claims";
+import { WalletExpiryNote } from "@/components/rewards/wallet-expiry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
@@ -36,6 +37,7 @@ export default async function RewardsPage({
   const me = await requireUser();
   const renderedAt = visitStamp();
 
+  const settings = await getOrgSettings();
   const [user, catalogue, claims, economy, myClaims] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: me.id },
@@ -66,7 +68,7 @@ export default async function RewardsPage({
       },
     }),
     getMonthlyClaimCounts(),
-    getOrgSettings().then(getEconomyStatus),
+    getEconomyStatus(settings),
     getActiveClaims(me.id),
   ]);
   // Monthly stock and the company budget decide what can be claimed right now.
@@ -155,6 +157,7 @@ export default async function RewardsPage({
               ? `Enough for ${affordable} reward${affordable === 1 ? "" : "s"} right now.`
               : "Keep collecting recognitions to unlock your first reward."}
           </p>
+          <WalletExpiryNote balance={balance} enabled={settings.walletPointsExpireYearEnd} className="mt-2" />
         </div>
       </section>
 
