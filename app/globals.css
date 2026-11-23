@@ -258,8 +258,14 @@
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--deco-w) - 0.5px), #000 calc(100% - var(--deco-w)));
 }
 /* Bigger avatars wear a chunkier ring. */
-.frame-ring-lg {
+.frame-ring-lg,
+.frame-ring-xl {
   --deco-w: 6px;
+}
+@media (width >= 40rem) {
+  .frame-ring-xl {
+    --deco-w: 8px;
+  }
 }
 .frame-spark {
   background: conic-gradient(from 0deg, #7c5cff, #c6f432, #7c5cff);

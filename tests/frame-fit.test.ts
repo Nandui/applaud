@@ -4,6 +4,7 @@ import {
   DEFAULT_FIT,
   detectFrameFit,
   formatFit,
+  frameOverhang,
   parseFit,
   splitFrameImage,
   withFit,
@@ -89,4 +90,16 @@ test("a broken ring centres the artwork instead", () => {
 
 test("a fully opaque picture isn't a frame", () => {
   assert.equal(detectFrameFit(picture(10, 10, () => true), 10, 10), null);
+});
+
+test("frameOverhang: how far a frame reaches past the avatar", () => {
+  // The default 120% centred frame sticks out 10% of the diameter all round.
+  assert.deepEqual(frameOverhang(DEFAULT_FIT), { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1 });
+  // A frame that fits the avatar exactly doesn't stick out.
+  assert.deepEqual(frameOverhang({ size: 1, x: 0.5, y: 0.5 }), { left: 0, right: 0, top: 0, bottom: 0 });
+  // A big frame with ornaments on top (hole low in the picture) reaches far up, less down.
+  const o = frameOverhang({ size: 2, x: 0.5, y: 0.625 });
+  assert.equal(o.top, 0.75);
+  assert.equal(o.bottom, 0.25);
+  assert.equal(o.left, 0.5);
 });

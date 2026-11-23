@@ -6,6 +6,8 @@ import { isAdmin } from "@/lib/auth/types";
 import { getProfileData } from "@/lib/profile";
 import { getCardsByIds, getGivenCards, getPostCards, getReceivedCards } from "@/lib/recognition/queries";
 import { isLight, wornItem } from "@/lib/profile-custom";
+import { isFrameImage } from "@/lib/cosmetics";
+import { frameOverhang, splitFrameImage } from "@/lib/frame-fit";
 import { FramedAvatar } from "@/components/user-avatar";
 import { RecognitionCard } from "@/components/feed/recognition-card";
 import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
@@ -14,7 +16,6 @@ import { AccountSheet } from "@/components/app-shell/account-sheet";
 import { Managers } from "@/components/profile/profile-parts";
 import {
   AwardShelf,
-  Collection,
   Milestones,
   ShowcaseSection,
   ShowcaseStats,
@@ -47,7 +48,7 @@ const secondaryButton =
  * their theme colour behind the name (a card on desktop). Under that their
  * counts, then tabs. The first tab, Showcase, gathers what they've earned
  * (pinned recognitions, awards, values they're recognized for, their
- * shop collection, latest recognition and milestones); the others list their
+ * latest recognition and milestones); the others list their
  * recognitions received and given, and their posts. It moves a little: the
  * banner drifts, rarer frames shimmer, the counts ease up and the header
  * rises in (see "Profile motion" in globals.css).
@@ -85,6 +86,11 @@ export default async function ProfilePage({
   const accent = look.theme;
   const onAccent = isLight(accent) ? "#0a0a0a" : "#ffffff";
   const frameRarity = wornItem(custom, "frame", data.catalogue)?.rarity ?? null;
+  // How far an uploaded frame picture reaches past the avatar, to make room for it.
+  const overhang =
+    look.frame && isFrameImage(look.frame)
+      ? frameOverhang(splitFrameImage(look.frame).fit)
+      : { left: 0, bottom: 0 };
   // Each block of the header rises in a beat after the one above it.
   const rise = (i: number) => ({ "--rise": i }) as React.CSSProperties;
   // The theme colour washes in behind the header, strongest at the top where
@@ -132,15 +138,25 @@ export default async function ProfilePage({
           }
         >
           <div className="rise-in relative -mt-16 flex items-end justify-between gap-3 sm:-mt-20" style={rise(0)}>
-            <FramedAvatar
-              name={user.name}
-              avatarUrl={user.avatarUrl}
-              frame={look.frame}
-              className="size-28 text-3xl sm:size-36 sm:text-4xl"
-              gapClassName="[background:var(--hero-gap)]"
-              large
-              shine={frameRarity}
-            />
+            {/* --d is the avatar's outer size (photo + gap) at each breakpoint;
+                a big uploaded frame gets room on the left and below. */}
+            <span
+              className="flex shrink-0 [--d:124px] sm:[--d:160px]"
+              style={{
+                marginLeft: `calc(var(--d) * ${overhang.left})`,
+                marginBottom: `calc(var(--d) * ${overhang.bottom})`,
+              }}
+            >
+              <FramedAvatar
+                name={user.name}
+                avatarUrl={user.avatarUrl}
+                frame={look.frame}
+                className="size-28 text-3xl sm:size-36 sm:text-4xl"
+                gapClassName="[background:var(--hero-gap)]"
+                xl
+                shine={frameRarity}
+              />
+            </span>
             <div className="flex gap-2 pb-1">
               {isMe ? (
                 <>
@@ -229,22 +245,6 @@ export default async function ProfilePage({
               <ValueShelf data={data} />
             </ShowcaseSection>
           ) : null}
-
-          <ShowcaseSection
-            title="Collection"
-            count={data.collection.length}
-            action={isMe ? { label: "Store", href: "/shop", color: accent } : undefined}
-          >
-            {data.collection.length > 0 ? (
-              <Collection data={data} accent={accent} />
-            ) : (
-              <p className="text-muted text-sm">
-                {isMe
-                  ? "Frames, banners and colours you get in the Store show up here."
-                  : `${firstName} hasn't picked up any frames, banners or colours yet.`}
-              </p>
-            )}
-          </ShowcaseSection>
 
           {pinnedCards.length === 0 && cards.length > 0 ? (
             <ShowcaseSection

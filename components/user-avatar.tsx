@@ -77,6 +77,7 @@ export function FramedAvatar({
   className,
   gapClassName,
   large = false,
+  xl = false,
   shine,
 }: {
   name: string;
@@ -86,8 +87,13 @@ export function FramedAvatar({
   className?: string;
   /** The gap between avatar and frame (matches what's behind it). */
   gapClassName?: string;
-  /** Profile-sized: thicker frame. */
+  /** Big (feed hero, ~80-112px): thicker gap and frame. */
   large?: boolean;
+  /**
+   * The profile header avatar (112px on phones, 144px wider): gap and frame
+   * grow with it, so a frame's fit looks the same as everywhere else.
+   */
+  xl?: boolean;
   /** The frame's rarity, to add its shimmer (see above). */
   shine?: Rarity | null;
 }) {
@@ -102,13 +108,19 @@ export function FramedAvatar({
           style={{ "--aura": `${RARITY.legendary.color}66` } as React.CSSProperties}
         />
       ) : null}
-      <span className={cn("bg-background relative rounded-full", large ? "p-[6px]" : "p-[3px]", gapClassName)}>
+      <span
+        className={cn(
+          "bg-background relative rounded-full",
+          xl ? "p-[6px] sm:p-[8px]" : large ? "p-[6px]" : "p-[3px]",
+          gapClassName,
+        )}
+      >
         <UserAvatar name={name} avatarUrl={avatarUrl} className={className} />
       </span>
       {frame && isFrameImage(frame) ? (
-        <FrameImage art={frame} shineClassName={shiny ? shineClass : undefined} />
+        <FrameImage art={frame} shineClassName={shiny ? shineClass : undefined} drawnAt={xl ? 320 : 160} />
       ) : frame ? (
-        <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg")}>
+        <span aria-hidden className={cn("frame-ring", frame, large && "frame-ring-lg", xl && "frame-ring-xl")}>
           {shiny ? <span className={cn(shineClass, "inset-0")} /> : null}
         </span>
       ) : null}
@@ -120,11 +132,20 @@ export function FramedAvatar({
  * An uploaded frame picture, sized and shifted by its fit so its hole sits on
  * the avatar, with its shimmer (masked to the picture) when it has one.
  */
-function FrameImage({ art, shineClassName }: { art: FrameArt; shineClassName?: string }) {
+function FrameImage({
+  art,
+  shineClassName,
+  drawnAt,
+}: {
+  art: FrameArt;
+  shineClassName?: string;
+  /** Roughly the widest it's drawn here, in CSS pixels, so it stays sharp. */
+  drawnAt: number;
+}) {
   const { src: original, fit } = splitFrameImage(art);
-  // Frames are drawn a little wider than the avatar; the largest is the 96px
-  // profile avatar, so a 160px copy covers every place they appear.
-  const src = optimizedImage(original, 160);
+  // Frames are drawn a little wider than the avatar: a 160px copy covers
+  // feeds and lists, the profile header's 144px avatar asks for a bigger one.
+  const src = optimizedImage(original, drawnAt);
   return (
     <span
       aria-hidden
@@ -139,7 +160,7 @@ function FrameImage({ art, shineClassName }: { art: FrameArt; shineClassName?: s
       {shineClassName ? (
         <span
           className={cn(shineClassName, "frame-shine-image inset-0")}
-          style={{ "--frame-mask": `url("${cssImageUrl(original, 160)}")` } as React.CSSProperties}
+          style={{ "--frame-mask": `url("${cssImageUrl(original, drawnAt)}")` } as React.CSSProperties}
         />
       ) : null}
     </span>
