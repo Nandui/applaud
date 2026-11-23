@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Trophy } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { isManager, isAdmin } from "@/lib/auth/types";
@@ -12,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { FramedAvatar, UserAvatar } from "@/components/user-avatar";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
+import { AwardBadge } from "@/components/value-seal";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Awards" };
@@ -42,7 +42,7 @@ export default async function AwardsPage() {
       select: {
         id: true,
         nominee: { select: { id: true, name: true, avatarUrl: true, profile: true } },
-        program: { select: { name: true } },
+        program: { select: { name: true, icon: true, color: true } },
       },
     }),
     // Review queue: admins see all pending; managers see the pending nominations
@@ -127,7 +127,7 @@ export default async function AwardsPage() {
                       frame={lookOf(w.nominee.profile, catalogue).frame}
                       className="size-16"
                     />
-                    <span className="absolute -right-1 -bottom-1 text-xl">🏆</span>
+                    <AwardBadge award={w.program} size={28} className="absolute -right-1.5 -bottom-1" />
                   </span>
                   <span className="w-full truncate text-xs font-semibold">{w.nominee.name.split(" ")[0]}</span>
                   <span className="text-muted -mt-1 w-full truncate text-[0.65rem]">{w.program.name}</span>
@@ -145,9 +145,7 @@ export default async function AwardsPage() {
         {programs.map((p) => (
           <article key={p.id} className="border-border flex flex-col gap-3 rounded-xl border p-4">
             <div className="flex items-start gap-3">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
-                <Trophy className="size-6" />
-              </span>
+              <AwardBadge award={p} size="sm" />
               <div className="min-w-0 flex-1">
                 <h3 className="text-[1.05rem] leading-tight font-bold">{p.name}</h3>
                 <p className="text-muted mt-0.5 text-[0.82rem]">

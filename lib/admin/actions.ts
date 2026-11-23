@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { isProjectBlobUrl } from "@/lib/blob";
-import { VALUE_ICON_NAMES } from "@/lib/value-icons";
+import { badgeLookError } from "@/lib/value-icons";
 import { writeAudit } from "@/lib/audit";
 import { isTestEmail, TEST_EMAIL_DOMAIN } from "@/lib/test-accounts";
 
@@ -60,8 +60,8 @@ export async function saveValue(
   const active = String(formData.get("active") ?? "true") === "true";
   if (name.length < 2) return { ok: false, error: "Name is too short." };
   if (imageUrl && !isProjectBlobUrl(imageUrl)) return { ok: false, error: "Unrecognised picture URL." };
-  if (icon && !VALUE_ICON_NAMES.includes(icon)) return { ok: false, error: "Pick an icon from the list." };
-  if (color && !/^#[0-9a-f]{6}$/i.test(color)) return { ok: false, error: "Pick a colour." };
+  const lookError = badgeLookError(icon, color);
+  if (lookError) return { ok: false, error: lookError };
 
   const data = {
     name,

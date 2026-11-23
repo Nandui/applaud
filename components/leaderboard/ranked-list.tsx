@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { FramedAvatar } from "@/components/user-avatar";
+import { HoloBadge } from "@/components/value-seal";
 
 export type RankedRow = {
   id: string;
@@ -12,8 +13,12 @@ export type RankedRow = {
   secondary?: string;
 };
 
-const MEDAL = ["#fbbf24", "#cbd5e1", "#f59e0b"];
-const MEDAL_EMOJI = ["🥇", "🥈", "🥉"];
+/** Top three wear holo hexagon medals: gold, silver, bronze. */
+const MEDALS = [
+  { color: "#f5b400", rim: "gold" },
+  { color: "#94a3b8", rim: "silver" },
+  { color: "#c2703a", rim: "bronze" },
+] as const;
 
 /**
  * A plain ranked list: rank number, framed avatar, name and score, with medals
@@ -74,27 +79,24 @@ function Row({ row, rank, me }: { row: RankedRow; rank: number; me: boolean }) {
           me && "bg-primary/10",
         )}
       >
-        <span
-          data-numeric
-          className={cn(
-            "w-6 shrink-0 text-center text-[0.95rem] font-bold",
-            medal < 0 && (me ? "text-primary" : "text-muted"),
-          )}
-          style={medal >= 0 ? { color: MEDAL[medal] } : undefined}
-        >
-          {rank}
-        </span>
-        <span className="relative">
-          <FramedAvatar
-            name={row.name}
-            avatarUrl={row.avatarUrl}
-            frame={row.frame ?? null}
-            className="size-11 text-sm"
-          />
-          {medal >= 0 && (
-            <span className="absolute -right-1.5 -bottom-1 text-base leading-none">{MEDAL_EMOJI[medal]}</span>
-          )}
-        </span>
+        {medal >= 0 ? (
+          <span className="-mx-1 flex w-8 shrink-0 justify-center" aria-label={`Rank ${rank}`}>
+            <HoloBadge color={MEDALS[medal].color} rim={MEDALS[medal].rim} label={rank} size={30} />
+          </span>
+        ) : (
+          <span
+            data-numeric
+            className={cn("w-6 shrink-0 text-center text-[0.95rem] font-bold", me ? "text-primary" : "text-muted")}
+          >
+            {rank}
+          </span>
+        )}
+        <FramedAvatar
+          name={row.name}
+          avatarUrl={row.avatarUrl}
+          frame={row.frame ?? null}
+          className="size-11 text-sm"
+        />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 font-semibold">
             <span className="truncate">{row.name}</span>
