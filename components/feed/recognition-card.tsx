@@ -10,7 +10,6 @@ import {
 import Link from "next/link";
 import {
   Sparkles,
-  Lock,
   Heart,
   MessageCircle,
   SmilePlus,
@@ -473,7 +472,6 @@ export function RecognitionCard({
               {isPost && !card.sender.jobTitle ? "" : "· "}
               {card.createdAtLabel}
             </time>
-            {card.visibility === "private" && <Lock className="size-3.5 shrink-0" aria-label="Private" />}
           </p>
         </div>
         {(canPin || canDelete) && (

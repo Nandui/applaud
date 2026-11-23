@@ -47,7 +47,6 @@ const createSchema = z.object({
   valueId: z.string().min(1, "Choose a value."),
   message: z.string().trim().min(3, "Write a short message.").max(500),
   points: z.coerce.number().int().min(0).max(100_000),
-  visibility: z.enum(["public", "private"]).default("public"),
   imageUrls: z
     .array(attachmentUrl)
     .max(MAX_RECOGNITION_IMAGES, `Attach at most ${MAX_RECOGNITION_IMAGES} images.`)
@@ -71,14 +70,13 @@ export async function createRecognition(
     valueId: formData.get("valueId"),
     message: formData.get("message"),
     points: formData.get("points") ?? 0,
-    visibility: formData.get("visibility") ?? "public",
     imageUrls: formData.getAll("imageUrls").map(String),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const { valueId, message, points, visibility, imageUrls } = parsed.data;
+  const { valueId, message, points, imageUrls } = parsed.data;
   const recipientIds = [...new Set(parsed.data.recipientIds)];
   const settings = await getOrgSettings();
 
@@ -125,7 +123,8 @@ export async function createRecognition(
           senderId: me.id,
           valueId,
           message,
-          visibility,
+          // Every recognition is public; the column is kept for old rows.
+          visibility: "public",
           imageUrls,
           recipients: {
             create: recipientIds.map((userId) => ({ userId, points })),
@@ -164,7 +163,7 @@ export async function createRecognition(
     entityType: "recognition",
     entityId: createdId,
     summary: `Posted a recognition (${recipientIds.length} recipient${recipientIds.length === 1 ? "" : "s"}, ${points} pts each)`,
-    metadata: { recipientIds, points, visibility, valueId },
+    metadata: { recipientIds, points, valueId },
     siteId: me.siteId,
   });
   revalidatePath("/");
@@ -391,7 +390,7 @@ export async function toggleCommentReaction(formData: FormData): Promise<ActionR
     where: { id: commentId },
     select: { id: true, recognitionId: true },
   });
-  if (!comment || !(await canSeeRecognition(comment.recognitionId, me.id))) {
+  if (!comment || !(await canSeeRecognition(comment.recognitionId))) {
     return { ok: false, error: "That comment no longer exists." };
   }
 

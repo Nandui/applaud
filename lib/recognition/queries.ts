@@ -65,7 +65,6 @@ export type FeedCard = {
   imageUrls: string[];
   boostType: string | null;
   system: boolean;
-  visibility: string;
   createdAtLabel: string;
   createdAtFull: string;
   sender: {
@@ -136,7 +135,6 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
     imageUrls: r.imageUrls,
     boostType: r.boostType,
     system: r.system,
-    visibility: r.visibility,
     createdAtLabel: shortTime(r.createdAt),
     createdAtFull: fullTimestamp(r.createdAt),
     sender: {
@@ -167,7 +165,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
   };
 }
 
-/** Recognitions a given user has received, respecting the viewer's visibility. */
+/** Recognitions a given user has received. Every recognition is public. */
 export async function getReceivedCards(
   userId: string,
   viewerId: string,
@@ -177,11 +175,6 @@ export async function getReceivedCards(
   const rows = await prisma.recognition.findMany({
     where: {
       recipients: { some: { userId } },
-      OR: [
-        { visibility: "public" },
-        { senderId: viewerId },
-        { recipients: { some: { userId: viewerId } } },
-      ],
     },
     orderBy: { createdAt: "desc" },
     take,
@@ -190,7 +183,7 @@ export async function getReceivedCards(
   return rows.map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
-/** Recognitions a user has sent (non-system), respecting the viewer's visibility. */
+/** Recognitions a user has sent (non-system). Every recognition is public. */
 export async function getGivenCards(
   userId: string,
   viewerId: string,
@@ -202,11 +195,6 @@ export async function getGivenCards(
       senderId: userId,
       system: false,
       kind: "recognition",
-      OR: [
-        { visibility: "public" },
-        { senderId: viewerId },
-        { recipients: { some: { userId: viewerId } } },
-      ],
     },
     orderBy: { createdAt: "desc" },
     take,
@@ -233,7 +221,7 @@ export async function getPostCards(
 
 /**
  * Specific recognitions by id (a profile's pinned shout-outs), in the given
- * order, dropping any the viewer isn't allowed to see.
+ * order, dropping any that no longer exist.
  */
 export async function getCardsByIds(ids: string[], viewerId: string): Promise<FeedCard[]> {
   if (ids.length === 0) return [];
@@ -241,11 +229,6 @@ export async function getCardsByIds(ids: string[], viewerId: string): Promise<Fe
   const rows = await prisma.recognition.findMany({
     where: {
       id: { in: ids },
-      OR: [
-        { visibility: "public" },
-        { senderId: viewerId },
-        { recipients: { some: { userId: viewerId } } },
-      ],
     },
     include: feedInclude,
   });
@@ -256,17 +239,11 @@ export async function getCardsByIds(ids: string[], viewerId: string): Promise<Fe
     .map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
-/** Feed visible to a viewer: public shout-outs and posts + their own sent/received private shout-outs. */
+/** The feed: every recognition and post, newest first. All of them are public. */
 export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
   const catalogue = await getCatalogue();
   const rows = await prisma.recognition.findMany({
-    where: {
-      OR: [
-        { visibility: "public" },
-        { senderId: viewerId },
-        { recipients: { some: { userId: viewerId } } },
-      ],
-    },
+    where: {},
     orderBy: { createdAt: "desc" },
     take,
     include: feedInclude,

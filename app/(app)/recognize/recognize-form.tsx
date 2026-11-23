@@ -12,8 +12,6 @@ import {
   ImagePlus,
   Loader2,
   ChevronRight,
-  Lock,
-  Globe,
 } from "lucide-react";
 import { createRecognition, type ActionResult } from "@/lib/recognition/actions";
 import type { AllowanceStatus } from "@/lib/points";
@@ -49,7 +47,7 @@ type RecipientOption = {
  * The Send flow, in the same plain Instagram pattern as the rest of the app:
  * 1. Who: a searchable people list with round checks and a Next button.
  * 2. New shout-out: the recipients up top, the message, the value as a grid
- *    of badges, then settings rows (photo, GIF, who can see it, points).
+ *    of badges, then settings rows (photo, GIF, points). Every recognition is public.
  * Points use the keypad sheet. Every step stays mounted inside one <form> so
  * all fields still post to `createRecognition` exactly as before.
  */
@@ -110,7 +108,6 @@ export function RecognizeForm({
   const [message, setMessage] = useState("");
   const [valueId, setValueId] = useState<string>("");
   const [rawPoints, setPoints] = useState<number>(0);
-  const [isPrivate, setIsPrivate] = useState(false);
   const [search, setSearch] = useState("");
   const [keypadOpen, setKeypadOpen] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -199,7 +196,6 @@ export function RecognizeForm({
           setValueId("");
           setPoints(0);
           clear();
-          setIsPrivate(false);
           setStep("to");
           router.refresh();
         }}
@@ -215,7 +211,6 @@ export function RecognizeForm({
       ))}
       <input type="hidden" name="valueId" value={valueId} />
       <input type="hidden" name="points" value={points} />
-      <input type="hidden" name="visibility" value={isPrivate ? "private" : "public"} />
       {images.map((img) => (
         <input key={img.url} type="hidden" name="imageUrls" value={img.url} />
       ))}
@@ -481,17 +476,6 @@ export function RecognizeForm({
           </div>
           <button
             type="button"
-            onClick={() => setIsPrivate((p) => !p)}
-            aria-pressed={isPrivate}
-            className="flex w-full items-center gap-3 py-3.5 text-left"
-          >
-            {isPrivate ? <Lock className="size-5.5" /> : <Globe className="size-5.5" />}
-            <span className="flex-1">Who can see it</span>
-            <span className="text-muted text-[0.95rem]">{isPrivate ? "Only them" : "Everyone"}</span>
-            <ChevronRight className="text-muted size-4.5" />
-          </button>
-          <button
-            type="button"
             onClick={() => setKeypadOpen(true)}
             disabled={allowance.remaining === 0}
             className="flex w-full items-center gap-3 py-3.5 text-left disabled:opacity-40"
@@ -517,11 +501,6 @@ export function RecognizeForm({
             e.target.value = "";
           }}
         />
-        {isPrivate && (
-          <p className="text-muted mt-2 text-xs">
-            Only you and {selected.length === 1 ? "them" : "the people you tagged"} will see it.
-          </p>
-        )}
 
         {/* Primary action in the thumb zone */}
         <div className="pb-safe sticky bottom-0 z-20 -mx-4 mt-6 bg-gradient-to-t from-[var(--background)] from-60% to-transparent px-4 pt-6 md:mx-0 md:px-0">
