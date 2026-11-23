@@ -349,6 +349,9 @@ function UserFormDialog({
                 type="date"
                 defaultValue={editing?.birthday ?? ""}
               />
+              <p className="text-muted text-xs">
+                People add this once themselves and can&apos;t change it. Correct it here.
+              </p>
             </div>
           </div>
           <div className="border-border flex items-center justify-between rounded-lg border p-3">

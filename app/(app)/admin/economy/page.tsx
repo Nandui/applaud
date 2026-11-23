@@ -24,7 +24,7 @@ export default async function AdminEconomyPage() {
   await requireAdmin();
   const settings = await getOrgSettings();
 
-  const [people, rewards, claims, status] = await Promise.all([
+  const [people, rewards, claims, status, birthdayRule, birthdaysByMonth] = await Promise.all([
     prisma.user.groupBy({
       by: ["pointsRank"],
       _count: { _all: true },
@@ -38,7 +38,16 @@ export default async function AdminEconomyPage() {
     }),
     getMonthlyClaimCounts(),
     getEconomyStatus(settings),
+    prisma.milestoneRule.findFirst({
+      where: { type: "birthday" },
+      select: { points: true, active: true },
+    }),
+    // Birthdays per month of the year, for the busiest-month cost.
+    prisma.$queryRaw<{ month: number; n: bigint }[]>`
+      SELECT EXTRACT(MONTH FROM "birthday")::int AS month, COUNT(*) AS n
+      FROM "User" WHERE "active" AND "birthday" IS NOT NULL GROUP BY 1`,
   ]);
+  const busiestBirthdayMonth = Math.max(0, ...birthdaysByMonth.map((b) => Number(b.n)));
 
   // Unknown ranks count as staff, as they do when giving.
   const headcount = Object.fromEntries(POINTS_RANKS.map((r) => [r, 0])) as RankHeadcount;
@@ -88,6 +97,33 @@ export default async function AdminEconomyPage() {
         }}
         headcount={headcount}
       />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Birthday points</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm">
+          {birthdayRule?.active ? (
+            <p>
+              <b data-numeric>{formatNumber(birthdayRule.points)} points</b> (
+              {centsToEuros(pointsToCents(birthdayRule.points, rate))}) to each person on their birthday,
+              from the bonus pool. The busiest month has{" "}
+              <b data-numeric>{formatNumber(busiestBirthdayMonth)}</b> birthday
+              {busiestBirthdayMonth === 1 ? "" : "s"}, so at most{" "}
+              {centsToEuros(pointsToCents(birthdayRule.points * busiestBirthdayMonth, rate))} in a month.
+            </p>
+          ) : (
+            <p>Switched off: nobody gets points on their birthday.</p>
+          )}
+          <p className="text-muted">
+            Set the amount and switch it on or off in{" "}
+            <Link href="/admin/milestones" className="text-primary font-medium">
+              Milestones
+            </Link>
+            . People add their own birthday in the app.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

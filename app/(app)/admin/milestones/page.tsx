@@ -15,13 +15,15 @@ export const metadata = { title: "Milestones" };
 export default async function AdminMilestonesPage() {
   await requireAdmin();
 
-  const [rules, celebrations] = await Promise.all([
+  const [rules, celebrations, people, withBirthday] = await Promise.all([
     prisma.milestoneRule.findMany({ orderBy: { type: "asc" } }),
     prisma.celebration.findMany({
       orderBy: { createdAt: "desc" },
       take: 10,
       include: { user: { select: { name: true } } },
     }),
+    prisma.user.count({ where: { active: true } }),
+    prisma.user.count({ where: { active: true, birthday: { not: null } } }),
   ]);
 
   const ruleRows: RuleRow[] = rules.map((r) => ({
@@ -30,6 +32,10 @@ export default async function AdminMilestonesPage() {
     points: r.points,
     active: r.active,
     config: (r.config ?? {}) as Record<string, unknown>,
+    note:
+      r.type === "birthday"
+        ? `${withBirthday} of ${people} active people have added their birthday.`
+        : undefined,
   }));
 
   return (

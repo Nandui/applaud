@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  Cake,
   ChevronLeft,
   Gift,
   Heart,
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Wordmark } from "@/components/app-shell/brand";
 import { Confetti } from "@/components/fx/confetti";
+import { BirthdayForm } from "@/components/birthday/birthday-form";
 import { finishTour } from "@/lib/onboarding-actions";
 import { TOUR_DISMISSED_KEY, WELCOME_POINTS } from "@/lib/onboarding";
 import { formatNumber } from "@/lib/format";
@@ -47,11 +49,16 @@ export function TourProvider({
   onboarded,
   firstName,
   allowance,
+  askBirthday,
+  birthdayPoints,
   children,
 }: {
   onboarded: boolean;
   firstName: string;
   allowance: number;
+  /** No birthday saved yet: the tour asks for it (lib/birthday.ts). */
+  askBirthday: boolean;
+  birthdayPoints: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -97,6 +104,8 @@ export function TourProvider({
               replay={replay}
               firstName={firstName}
               allowance={allowance}
+              askBirthday={askBirthday}
+              birthdayPoints={birthdayPoints}
               onClose={close}
             />
           ) : null}
@@ -114,7 +123,10 @@ type Step = {
   visual: React.ReactNode;
 };
 
-function steps(firstName: string, allowance: number, replay: boolean): Step[] {
+/** The birthday step draws itself (BirthdayForm) and has its own buttons. */
+const BIRTHDAY_STEP: Step = { key: "birthday", icon: Cake, title: "", body: null, visual: null };
+
+function steps(firstName: string, allowance: number, replay: boolean, askBirthday: boolean): Step[] {
   return [
     {
       key: "welcome",
@@ -130,6 +142,7 @@ function steps(firstName: string, allowance: number, replay: boolean): Step[] {
       ),
       visual: <WelcomeVisual replay={replay} />,
     },
+    ...(askBirthday ? [BIRTHDAY_STEP] : []),
     {
       key: "feed",
       icon: House,
@@ -193,16 +206,22 @@ function Tour({
   replay,
   firstName,
   allowance,
+  askBirthday,
+  birthdayPoints,
   onClose,
 }: {
   replay: boolean;
   firstName: string;
   allowance: number;
+  askBirthday: boolean;
+  birthdayPoints: number;
   onClose: (finished: boolean) => void;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
-  const all = steps(firstName, allowance, replay);
+  // Fixed when the tour opens, so saving the birthday (which refreshes the
+  // page and drops askBirthday) doesn't shift the steps under the person.
+  const [all] = useState(() => steps(firstName, allowance, replay, askBirthday));
   const [i, setI] = useState(0);
   const [dir, setDir] = useState(1);
   const [claimed, setClaimed] = useState<{ awarded: number; balance: number } | null>(null);
@@ -312,7 +331,7 @@ function Tour({
         </button>
       </div>
 
-      <div className="relative min-h-[25.5rem] overflow-hidden sm:px-6">
+      <div className={cn("relative min-h-[25.5rem] overflow-hidden sm:px-6", step.key === "birthday" && "sm:pb-6")}>
         <AnimatePresence mode="popLayout" initial={false} custom={dir}>
           <motion.div
             key={step.key}
@@ -323,26 +342,39 @@ function Tour({
             transition={{ duration: reduce ? 0.12 : 0.24, ease: "easeOut" }}
             className="pt-3"
           >
+            {step.key === "birthday" ? (
+              <>
+                <StepTag icon={step.icon} n={i + 1} of={all.length} />
+                <div className="mt-3">
+                  <BirthdayForm
+                    tall
+                    points={birthdayPoints}
+                    skipLabel="Skip for now"
+                    onSkip={() => go(i + 1)}
+                    onSaved={() => {
+                      router.refresh();
+                      go(i + 1);
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+            <>
             <div className="bg-surface-2/70 relative flex h-44 items-center justify-center overflow-hidden rounded-2xl">
               {step.visual}
             </div>
-            <div className="mt-5 flex items-center gap-2">
-              <span className="bg-primary/12 text-primary flex size-8 items-center justify-center rounded-lg">
-                <step.icon className="size-4.5" strokeWidth={2.2} />
-              </span>
-              <span className="text-muted text-xs font-semibold tracking-wide uppercase">
-                {i + 1} of {all.length}
-              </span>
-            </div>
+            <StepTag icon={step.icon} n={i + 1} of={all.length} className="mt-5" />
             <DialogTitle className="mt-3 text-[1.4rem] leading-tight font-bold">{step.title}</DialogTitle>
             <DialogDescription className="text-muted mt-2 text-[0.95rem] leading-relaxed">
               {step.body}
             </DialogDescription>
+            </>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      <div className="mt-5 flex flex-col gap-2 sm:px-6 sm:pb-6">
+      <div className={cn("mt-5 flex flex-col gap-2 sm:px-6 sm:pb-6", step.key === "birthday" && "hidden")}>
         {last ? (
           <button
             type="button"
@@ -362,6 +394,29 @@ function Tour({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function StepTag({
+  icon: Icon,
+  n,
+  of,
+  className,
+}: {
+  icon: LucideIcon;
+  n: number;
+  of: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      <span className="bg-primary/12 text-primary flex size-8 items-center justify-center rounded-lg">
+        <Icon className="size-4.5" strokeWidth={2.2} />
+      </span>
+      <span className="text-muted text-xs font-semibold tracking-wide uppercase">
+        {n} of {of}
+      </span>
     </div>
   );
 }

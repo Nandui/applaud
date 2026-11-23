@@ -11,6 +11,7 @@ import { updateMyProfile, setMyAvatar, type ProfileActionResult } from "@/lib/pr
 import { BIO_MAX, PRONOUNS_MAX } from "@/lib/profile-limits";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { UserAvatar } from "@/components/user-avatar";
+import { BirthdayProfileRow } from "@/components/birthday/birthday-prompt";
 
 /**
  * Edit profile, the Instagram screen: Cancel / Done header, the picture with
@@ -21,11 +22,15 @@ export function ProfileEditor({
   user,
   pronouns: initialPronouns,
   bio: initialBio,
+  birthday,
+  birthdayPoints,
   look,
 }: {
   user: { id: string; name: string; avatarUrl: string | null; jobTitle: string | null };
   pronouns: string;
   bio: string;
+  birthday: string | null;
+  birthdayPoints: number;
   look: { frame: string; banner: string; theme: string };
 }) {
   const router = useRouter();
@@ -158,8 +163,12 @@ export function ProfileEditor({
             {bio.length}/{BIO_MAX}
           </p>
         </Row>
+        <BirthdayProfileRow birthday={birthday} points={birthdayPoints} />
       </div>
-      <p className="text-muted px-1 pt-2 text-xs">Your name and job title are set by your admin.</p>
+      <p className="text-muted px-1 pt-2 text-xs">
+        Your name and job title are set by your admin. Your birthday can only be added once; only an
+        admin can change it after that, and only admins see the year.
+      </p>
 
       <h2 className="mt-8 mb-2 px-1 text-sm font-bold">Your look</h2>
       <div className="border-border divide-border divide-y border-y">

@@ -12,6 +12,8 @@ export type SessionUser = {
   avatarUrl?: string | null;
   /** Finished the first-sign-in app tour (lib/onboarding.ts). */
   onboarded?: boolean;
+  /** Has a date of birth saved (lib/birthday.ts). */
+  hasBirthday?: boolean;
 };
 
 // Access hierarchy: staff < manager < admin. `operations` and `ceo` are
