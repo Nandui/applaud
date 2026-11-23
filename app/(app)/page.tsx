@@ -14,13 +14,15 @@ import { getActiveClaims } from "@/lib/claims";
 import { ClaimsHomeRow } from "@/components/rewards/active-claims";
 import { BirthdayHomeCard } from "@/components/birthday/birthday-prompt";
 import { getBirthdayPoints } from "@/lib/birthday-points";
+import { getOrgSettings } from "@/lib/org-settings";
+import { WalletExpiryHomeRow } from "@/components/rewards/wallet-expiry";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const me = await requireUser();
   const askBirthday = (me.onboarded ?? true) && !(me.hasBirthday ?? true);
-  const [cards, wallet, catalogue, myClaims, birthdayPoints] = await Promise.all([
+  const [cards, wallet, catalogue, myClaims, birthdayPoints, settings] = await Promise.all([
     getFeedCards(me.id),
     prisma.user.findUnique({
       where: { id: me.id },
@@ -29,6 +31,7 @@ export default async function FeedPage() {
     getCatalogue(),
     getActiveClaims(me.id),
     askBirthday ? getBirthdayPoints() : 0,
+    getOrgSettings(),
   ]);
   const myFrame = lookOf(wallet?.profile, catalogue).frame;
   const viewer = {
@@ -90,6 +93,12 @@ export default async function FeedPage() {
       {askBirthday ? <BirthdayHomeCard points={birthdayPoints} /> : null}
 
       <ClaimsHomeRow claims={myClaims} />
+
+      {/* December only: spend your points before 31 Dec. */}
+      <WalletExpiryHomeRow
+        balance={wallet?.walletBalance ?? 0}
+        enabled={settings.walletPointsExpireYearEnd}
+      />
 
       {cards.length === 0 ? (
         <div className="flex flex-col items-center gap-4 px-6 py-20 text-center">

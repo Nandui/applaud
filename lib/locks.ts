@@ -8,6 +8,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 const LOCK_KEYS = {
   rewardBudget: 7_001,
   bonusPool: 7_002,
+  walletExpiry: 7_003,
 } as const;
 
 export async function lockPool(

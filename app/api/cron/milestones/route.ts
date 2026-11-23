@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runMilestones } from "@/lib/milestones/run";
 import { backfillGoogleAvatars } from "@/lib/google-avatar";
+import { runYearEndExpiry } from "@/lib/wallet-expiry";
 
 export const dynamic = "force-dynamic";
 
@@ -23,5 +24,11 @@ export async function GET(req: Request) {
     console.error("Google picture backfill failed:", error);
     return null;
   });
-  return NextResponse.json({ ok: true, ...result, googlePhotos });
+  // Catch-up for the year-end wallet expiry, in case its own cron was missed
+  // (a no-op on every other day).
+  const walletExpiry = await runYearEndExpiry().catch((error) => {
+    console.error("Year-end wallet expiry failed:", error);
+    return null;
+  });
+  return NextResponse.json({ ok: true, ...result, googlePhotos, walletExpiry });
 }

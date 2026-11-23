@@ -19,7 +19,6 @@ export default async function AdminSettingsPage() {
       <SettingsForm
         settings={{
           appName: settings.appName,
-          pointsExpiryMonths: settings.pointsExpiryMonths,
           allowSelfRecognition: settings.allowSelfRecognition,
           autoCreateGoogleUsers: settings.autoCreateGoogleUsers,
         }}

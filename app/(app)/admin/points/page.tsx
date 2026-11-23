@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/guards";
 import { getOrgSettings } from "@/lib/org-settings";
 import { getPointsMonth, monthKey, monthRef, shiftMonth } from "@/lib/points-analytics";
-import { centsToEuros, ECONOMY_TIMEZONE, pointsToCents, resetsInLabel } from "@/lib/economy";
+import { centsToEuros, ECONOMY_TIMEZONE, pointsToCents, resetsInLabel, walletYear } from "@/lib/economy";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,7 +111,18 @@ export default async function AdminPointsPage({
           sub="Boosts, approved awards and milestones"
           meter={pct(d.bonusUsed, d.bonusPool)}
         />
-        <Stat label="Points in wallets now" value={formatNumber(d.walletPoints)} sub={`${euros(d.walletPoints)} if all spent on rewards`} />
+        <Stat
+          label="Points in wallets now"
+          value={formatNumber(d.walletPoints)}
+          sub={
+            settings.walletPointsExpireYearEnd
+              ? `${euros(d.walletPoints)} if all spent · unspent expire 31 Dec ${walletYear().year}`
+              : `${euros(d.walletPoints)} if all spent on rewards`
+          }
+        />
+        {d.expired > 0 ? (
+          <Stat label="Expired at year end" value={formatNumber(d.expired)} sub="Unspent on 31 Dec, never cost anything" />
+        ) : null}
       </div>
 
       <Card>

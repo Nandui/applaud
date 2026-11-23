@@ -18,14 +18,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 export type EconomyFormData = EconomyInputs & {
   maxPointsPerShoutoutStaff: number;
   maxPointsPerShoutoutManager: number;
+  walletPointsExpireYearEnd: boolean;
 };
 
-type Field = keyof EconomyFormData;
+/** Wallet totals for the year-end expiry card. */
+export type WalletStats = {
+  /** Points sitting in wallets now, and how many people hold any. */
+  points: number;
+  people: number;
+  /** The year whose points expire next, and days until then. */
+  year: number;
+  daysLeft: number;
+  /** What expired at the end of last year (null before the first expiry). */
+  lastYear: { year: number; points: number; people: number } | null;
+};
+
+type Field = Exclude<keyof EconomyFormData, "walletPointsExpireYearEnd">;
+
 
 /**
  * Every economy setting in one form, with the money maths recalculated as you
@@ -35,10 +50,13 @@ type Field = keyof EconomyFormData;
 export function EconomyForm({
   settings,
   headcount,
+  wallets,
 }: {
   settings: EconomyFormData;
   headcount: RankHeadcount;
+  wallets: WalletStats;
 }) {
+  const [expireYearEnd, setExpireYearEnd] = useState(settings.walletPointsExpireYearEnd);
   const [state, formAction, pending] = useActionState<ActionResult | undefined, FormData>(
     updateEconomySettings,
     undefined,
@@ -165,8 +183,8 @@ export function EconomyForm({
               `Per person, ${euros(num("maxPointsPerShoutoutManager"))}. 0 = no limit.`,
             )}
             <p className="text-muted text-xs sm:col-span-2">
-              Unused points to give disappear at midnight on the 1st, Irish time. Wallets (points
-              people received) never expire.
+              Unused points to give disappear at midnight on the 1st, Irish time. Points people
+              received sit in their wallet until the end of the year (see Wallets below).
             </p>
           </CardContent>
         </Card>
@@ -181,6 +199,59 @@ export function EconomyForm({
               "Bonus points per month",
               `${euros(inputs.monthlyBonusPool)}. Pays for CEO and Operations boosts, approved awards (e.g. Employee of the Month) and milestones. Instant awards come from the giver's own allowance instead.`,
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Wallets</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <input type="hidden" name="walletPointsExpireYearEnd" value={String(expireYearEnd)} />
+            <div className="border-border flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div>
+                <Label htmlFor="walletPointsExpireYearEnd" className="text-sm font-medium">
+                  Unspent points expire at the end of the year
+                </Label>
+                <p className="text-muted text-xs">
+                  At midnight on 31 Dec, Irish time, whatever is left in each wallet is taken off
+                  and shows as &ldquo;Expired at year end&rdquo; in their history. Points received
+                  from 1 Jan are new. Reward claims already made are not affected.
+                </p>
+              </div>
+              <Switch
+                id="walletPointsExpireYearEnd"
+                checked={expireYearEnd}
+                onCheckedChange={setExpireYearEnd}
+              />
+            </div>
+            <dl className="space-y-1.5 text-sm">
+              <Line
+                label="In wallets now"
+                value={`${formatNumber(wallets.points)} pts`}
+                sub={`${euros(wallets.points)} · ${formatNumber(wallets.people)} ${wallets.people === 1 ? "person" : "people"}`}
+              />
+              <Line
+                label={expireYearEnd ? `Expires on 31 Dec ${wallets.year}` : "Year-end expiry"}
+                value={
+                  expireYearEnd
+                    ? `in ${formatNumber(wallets.daysLeft)} ${wallets.daysLeft === 1 ? "day" : "days"}`
+                    : "Off: points never expire"
+                }
+              />
+              {wallets.lastYear ? (
+                <Line
+                  label={`Expired at the end of ${wallets.lastYear.year}`}
+                  value={`${formatNumber(wallets.lastYear.points)} pts`}
+                  sub={`${formatNumber(wallets.lastYear.people)} ${wallets.lastYear.people === 1 ? "person" : "people"}`}
+                />
+              ) : null}
+            </dl>
+            <p className="text-muted text-xs">
+              {expireYearEnd
+                ? "People see “Points you don’t spend expire on 31 Dec” under their balance, and through December a reminder on Home with how many points and days they have left. Expired points were never claimed, so they never cost anything."
+                : "Wallets keep their points from year to year."}
+            </p>
           </CardContent>
         </Card>
 
@@ -227,7 +298,8 @@ export function EconomyForm({
           </div>
           <p className="text-muted text-xs">
             Profile Store items cost the company nothing, and points can sit in wallets across
-            months, so the monthly cap on reward claims is what guarantees the budget.
+            months{expireYearEnd ? " (until 31 Dec)" : ""}, so the monthly cap on reward claims is
+            what guarantees the budget.
           </p>
         </CardContent>
       </Card>
