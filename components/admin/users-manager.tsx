@@ -339,13 +339,16 @@ function UserFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="hireDate">Hire date</Label>
+              <Label htmlFor="hireDate">Start date</Label>
               <Input
                 id="hireDate"
                 name="hireDate"
                 type="date"
                 defaultValue={editing?.hireDate ?? ""}
               />
+              <p className="text-muted text-xs">
+                Earns their years-of-service medal at 1, 3, 5, 10, 15 and 20 years.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="birthday">Birthday</Label>

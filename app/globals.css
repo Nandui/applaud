@@ -654,3 +654,69 @@
     animation: value-holo-foil 5.5s ease-in-out infinite;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Service medals: years of service (components/service-medal.tsx). A struck
+ * metal medal on a ribbon, unlike the holo hexagons, so it reads as an
+ * honour. Gold and up catch the light every few seconds; Diamond and Legend
+ * also glow. Locked medals (not earned yet) are greyed out.
+ * ------------------------------------------------------------------------- */
+.service-medal {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+  vertical-align: middle;
+  filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28));
+}
+.service-medal[data-mini] {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.3));
+}
+.service-medal:is([data-tier="diamond"], [data-tier="legend"]):not([data-mini], [data-locked]) {
+  filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28))
+    drop-shadow(0 0 calc(var(--s) * 0.14) color-mix(in srgb, var(--glow) 70%, transparent));
+}
+.service-medal[data-locked] {
+  filter: grayscale(1);
+  opacity: 0.32;
+}
+.service-medal-shine {
+  opacity: 0;
+}
+@keyframes service-medal-shine {
+  0%,
+  62% {
+    transform: skewX(-18deg) translateX(0);
+    opacity: 0;
+  }
+  64% {
+    opacity: 1;
+  }
+  88%,
+  100% {
+    transform: skewX(-18deg) translateX(190px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .service-medal:is([data-tier="gold"], [data-tier="platinum"], [data-tier="diamond"], [data-tier="legend"]):not(
+      [data-mini],
+      [data-locked]
+    )
+    .service-medal-shine {
+    animation: service-medal-shine 6s ease-in-out infinite;
+  }
+  .service-medal[data-tier="legend"]:not([data-mini], [data-locked]) {
+    animation: service-medal-glow 3.2s ease-in-out infinite;
+  }
+}
+@keyframes service-medal-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28))
+      drop-shadow(0 0 calc(var(--s) * 0.1) color-mix(in srgb, var(--glow) 55%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 calc(var(--s) * 0.05) calc(var(--s) * 0.06) rgb(0 0 0 / 0.28))
+      drop-shadow(0 0 calc(var(--s) * 0.22) color-mix(in srgb, #f5c542 75%, transparent));
+  }
+}
