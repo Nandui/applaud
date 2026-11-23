@@ -10,7 +10,6 @@ import {
 import Link from "next/link";
 import {
   Sparkles,
-  Heart,
   MessageCircle,
   SmilePlus,
   Ellipsis,
@@ -67,12 +66,8 @@ type Viewer = {
   frame?: string | null;
 };
 
-/** The one-tap reaction: a plain Instagram-style like. */
-const QUICK_EMOJI = "❤️";
 /** Messages longer than this also appear in full as a caption under the quote card. */
 const QUOTE_MAX = 160;
-/** Hold the applaud button this long to open the reaction tray (iMessage tapback). */
-const LONG_PRESS_MS = 380;
 
 /** Fixed display order for reaction chips so reacting never reshuffles them. */
 function reactionRank(emoji: string): number {
@@ -253,9 +248,6 @@ export function RecognitionCard({
   const [reactOpen, setReactOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [burst, setBurst] = useState(0);
-  const lastTap = useRef(0);
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressed = useRef(false);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Optimistic state so claps and comments land instantly, then reconcile with
@@ -281,42 +273,8 @@ export function RecognitionCard({
 
   const myReaction = reactions.find((r) => r.reacted)?.emoji ?? null;
 
-  /** The applaud button: claps, or takes back whatever I reacted with. */
-  function quickReact() {
-    if (longPressed.current) {
-      longPressed.current = false;
-      return;
-    }
-    if (!myReaction) setBurst((b) => b + 1);
-    react(myReaction ?? QUICK_EMOJI);
-  }
-
-  function startPress() {
-    longPressed.current = false;
-    pressTimer.current = setTimeout(() => {
-      longPressed.current = true;
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(8);
-      setReactOpen(true);
-    }, LONG_PRESS_MS);
-  }
-  function endPress() {
-    if (pressTimer.current) clearTimeout(pressTimer.current);
-    pressTimer.current = null;
-  }
-
-  /** Double-tap the post to like it (never un-likes, like Instagram). */
-  function onBodyTap() {
-    const now = Date.now();
-    if (now - lastTap.current < 300) {
-      setBurst((b) => b + 1);
-      if (!myReaction) react(QUICK_EMOJI);
-      lastTap.current = 0;
-    } else {
-      lastTap.current = now;
-    }
-  }
-
   function pickReaction(emoji: string) {
+    // Picking the emoji you already gave takes it back.
     if (emoji !== myReaction) setBurst((b) => b + 1);
     react(emoji);
     setReactOpen(false);
@@ -538,15 +496,13 @@ export function RecognitionCard({
         )}
       </header>
 
-      {/* The picture: their photo/GIF, or the recipient's own banner and frame.
-          Double-tap applauds. */}
+      {/* The picture: their photo/GIF, or the recipient's own banner and frame. */}
       <div
         className={cn(
           "relative -mx-4 mt-3 overflow-hidden select-none md:mx-0",
           // Posts have no "Recognised for" band underneath to round off.
           isPost ? "md:rounded-2xl" : "md:rounded-t-2xl",
         )}
-        onClick={onBodyTap}
       >
         {isPoll || isQuestion ? (
           <PostBanner
@@ -573,15 +529,15 @@ export function RecognitionCard({
           <BannerHero card={card} />
         )}
 
-        {/* Applause burst on double-tap / clap */}
-        {burst > 0 && (
+        {/* Burst of the emoji you just reacted with */}
+        {burst > 0 && myReaction && (
           <span
             key={burst}
             aria-hidden
             onAnimationEnd={() => setBurst((b) => (b === burst ? 0 : b))}
             className="like-burst pointer-events-none absolute inset-0 m-auto flex size-28 items-center justify-center text-8xl drop-shadow-xl"
           >
-            {myReaction ?? QUICK_EMOJI}
+            {myReaction}
           </span>
         )}
       </div>
@@ -639,27 +595,48 @@ export function RecognitionCard({
 
       {/* Action row */}
       <div data-tour="post-actions" className="-ml-2.5 mt-1 flex items-center">
-        <button
-          type="button"
-          onClick={quickReact}
-          onPointerDown={startPress}
-          onPointerUp={endPress}
-          onPointerLeave={endPress}
-          onContextMenu={(e) => e.preventDefault()}
-          aria-label={myReaction ? `Remove your ${myReaction}` : "Like (hold for more reactions)"}
-          aria-pressed={!!myReaction}
-          className="press flex size-11 items-center justify-center rounded-full"
-        >
-          <span key={myReaction ?? "none"} className="like-pop text-[1.5rem] leading-none">
-            {!myReaction ? (
-              <Heart className="size-6.5" strokeWidth={1.8} />
-            ) : myReaction === QUICK_EMOJI ? (
-              <Heart className="size-6.5 fill-[#ff3040] text-[#ff3040]" strokeWidth={1.8} />
-            ) : (
-              myReaction
-            )}
-          </span>
-        </button>
+        {/* The one reaction control: tap to pick an emoji, pick yours again to take it back. */}
+        <Popover open={reactOpen} onOpenChange={setReactOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={myReaction ? `Your reaction ${myReaction}, tap to change` : "React"}
+              aria-pressed={!!myReaction}
+              className="press flex size-11 items-center justify-center rounded-full"
+            >
+              <span key={myReaction ?? "none"} className="like-pop text-[1.5rem] leading-none">
+                {myReaction ?? <SmilePlus className="size-6.5" strokeWidth={1.8} />}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="start"
+            sideOffset={6}
+            className="w-auto rounded-full p-1.5 shadow-float"
+          >
+            <div className="flex gap-0.5">
+              {REACTION_EMOJIS.map((emoji, i) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => pickReaction(emoji)}
+                  style={{ "--tray": i } as React.CSSProperties}
+                  aria-label={myReaction === emoji ? `Remove your ${emoji}` : `React ${emoji}`}
+                  className={cn(
+                    "tray-in rounded-full p-1.5 text-[1.8rem] leading-none",
+                    myReaction === emoji && "bg-primary/20",
+                  )}
+                >
+                  {/* Hover lift on the inner span so it doesn't fight the entrance animation. */}
+                  <span className="block transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.35] active:scale-[0.85]">
+                    {emoji}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
 
         {!isQuestion && (
         <button
@@ -680,45 +657,6 @@ export function RecognitionCard({
         </button>
         )}
 
-        {/* Tray anchors here; holding the applaud button opens it too. */}
-        <Popover open={reactOpen} onOpenChange={setReactOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Pick a reaction"
-              className="press flex size-11 items-center justify-center rounded-full"
-            >
-              <SmilePlus className="size-6" strokeWidth={1.8} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="top"
-            align="start"
-            sideOffset={6}
-            className="w-auto rounded-full p-1.5 shadow-float"
-          >
-            <div className="flex gap-0.5">
-              {REACTION_EMOJIS.map((emoji, i) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => pickReaction(emoji)}
-                  style={{ "--tray": i } as React.CSSProperties}
-                  aria-label={`React ${emoji}`}
-                  className={cn(
-                    "tray-in rounded-full p-1.5 text-[1.8rem] leading-none",
-                    myReaction === emoji && "bg-primary/20",
-                  )}
-                >
-                  {/* Hover lift on the inner span so it doesn't fight the entrance animation. */}
-                  <span className="block transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.35] active:scale-[0.85]">
-                    {emoji}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
 
         {boostMode && myBoostType && (
           <button
@@ -736,7 +674,7 @@ export function RecognitionCard({
         )}
       </div>
 
-      {/* "Liked by Sorcha and 3 others" */}
+      {/* "👏❤️ Sorcha and 3 others" */}
       {totalReactions > 0 && leadReactor && (
         <button
           type="button"
@@ -746,7 +684,7 @@ export function RecognitionCard({
           {sortedReactions.slice(0, 3).map((r) => (
             <Fragment key={r.emoji}>{r.emoji}</Fragment>
           ))}{" "}
-          Liked by <span className="font-semibold">{leadReactor.name}</span>
+          <span className="font-semibold">{leadReactor.name}</span>
           {totalReactions > 1 && (
             <>
               {" "}and{" "}
