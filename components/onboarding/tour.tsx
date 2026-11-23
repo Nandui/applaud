@@ -46,6 +46,7 @@ export function useTour() {
  * their profile, which pays nothing.
  */
 export function TourProvider({
+  userId,
   onboarded,
   firstName,
   allowance,
@@ -53,6 +54,9 @@ export function TourProvider({
   birthdayPoints,
   children,
 }: {
+  /** "Not now" is remembered per person, so switching accounts (or a test
+   *  account, or an admin restarting the tour) still opens it. */
+  userId: string;
   onboarded: boolean;
   firstName: string;
   allowance: number;
@@ -63,6 +67,7 @@ export function TourProvider({
 }) {
   const [open, setOpen] = useState(false);
   const [replay, setReplay] = useState(onboarded);
+  const dismissedKey = `${TOUR_DISMISSED_KEY}:${userId}`;
 
   // First visit: open once the page has painted, unless they closed it
   // earlier in this browser session.
@@ -70,12 +75,12 @@ export function TourProvider({
     if (onboarded) return;
     let dismissed = false;
     try {
-      dismissed = sessionStorage.getItem(TOUR_DISMISSED_KEY) === "1";
+      dismissed = sessionStorage.getItem(dismissedKey) === "1";
     } catch {}
     if (dismissed) return;
     const t = setTimeout(() => setOpen(true), 400);
     return () => clearTimeout(t);
-  }, [onboarded]);
+  }, [onboarded, dismissedKey]);
 
   const openTour = useCallback(() => {
     setReplay(onboarded);
@@ -87,11 +92,11 @@ export function TourProvider({
       setOpen(false);
       if (!finished && !onboarded) {
         try {
-          sessionStorage.setItem(TOUR_DISMISSED_KEY, "1");
+          sessionStorage.setItem(dismissedKey, "1");
         } catch {}
       }
     },
-    [onboarded],
+    [onboarded, dismissedKey],
   );
 
   return (

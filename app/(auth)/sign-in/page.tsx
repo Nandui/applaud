@@ -3,6 +3,7 @@ import { Wordmark } from "@/components/app-shell/brand";
 import { devSignInEnabled, googleSignInEnabled } from "@/lib/auth/mode";
 import { IDLE_TIMEOUT_MINUTES } from "@/lib/auth/idle";
 import { SignInForm } from "./sign-in-form";
+import { TEST_EMAIL_DOMAIN } from "@/lib/test-accounts";
 
 export const metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
@@ -54,17 +55,19 @@ export default async function SignInPage({
 }
 
 async function sampleUsers() {
+  // Throwaway "brand-new person" accounts aren't good role samples.
+  const real = { NOT: { email: { endsWith: `@${TEST_EMAIL_DOMAIN}` } } };
   const [admin, manager, staff] = await Promise.all([
     prisma.user.findFirst({
-      where: { role: "admin", active: true },
+      where: { role: "admin", active: true, ...real },
       orderBy: { name: "asc" },
     }),
     prisma.user.findFirst({
-      where: { role: "manager", active: true },
+      where: { role: "manager", active: true, ...real },
       orderBy: { name: "asc" },
     }),
     prisma.user.findMany({
-      where: { role: "staff", active: true },
+      where: { role: "staff", active: true, ...real },
       orderBy: { name: "asc" },
       take: 2,
     }),

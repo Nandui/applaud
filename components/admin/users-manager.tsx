@@ -12,9 +12,11 @@ import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { Pencil, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Upload, Loader2, RotateCcw, FlaskConical } from "lucide-react";
 import {
   deleteUser,
+  removeTestAccounts,
+  restartOnboarding,
   saveUser,
   setUserActive,
   type ActionResult,
@@ -61,6 +63,10 @@ export type UserRow = {
   active: boolean;
   /** Created on their first Google sign-in; role and site not checked yet. */
   needsReview: boolean;
+  /** Finished the first-sign-in app tour. */
+  onboarded: boolean;
+  /** Throwaway account from "Try as a brand-new person" (lib/test-accounts.ts). */
+  isTest: boolean;
 };
 
 type Option = { id: string; name: string };
@@ -421,6 +427,95 @@ function DeleteUserDialog({
   );
 }
 
+/**
+ * Puts someone back to a brand-new account's first sign-in (tour, welcome
+ * points, New tags, optionally the birthday step). For testing; the welcome
+ * points are taken back so they're never paid twice.
+ */
+function RestartOnboardingDialog({
+  user,
+  onOpenChange,
+}: {
+  user: UserRow | null;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [pending, start] = useTransition();
+  const [clearBirthday, setClearBirthday] = useState(true);
+
+  return (
+    <Dialog open={!!user} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Restart first sign-in</DialogTitle>
+          <DialogDescription>
+            {user
+              ? `${user.name} gets the app tour again on their next page load, and the Store and Rewards show everything as New. Any welcome points they got are taken back now and paid again when they finish the tour, so they never get them twice. Use it to test the new-account experience.`
+              : null}
+          </DialogDescription>
+        </DialogHeader>
+        {user?.birthday ? (
+          <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm">
+            <span>
+              <span className="block font-medium">Clear their birthday too</span>
+              <span className="text-muted block text-xs">
+                So the tour asks for it again. Saved now: {user.birthday}
+              </span>
+            </span>
+            <Switch checked={clearBirthday} onCheckedChange={setClearBirthday} />
+          </label>
+        ) : null}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (!user) return;
+              const fd = new FormData();
+              fd.set("id", user.id);
+              fd.set("clearBirthday", String(Boolean(user.birthday) && clearBirthday));
+              start(async () => {
+                const res = await restartOnboarding(fd);
+                if (res.ok) {
+                  toast.success(res.message ?? "Done.");
+                  onOpenChange(false);
+                } else toast.error(res.error);
+              });
+            }}
+          >
+            <RotateCcw className="size-4" />
+            {pending ? "Restarting…" : "Restart"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RemoveTestAccountsButton({ count }: { count: number }) {
+  const [pending, start] = useTransition();
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={pending}
+      title="Removes every account made with “Try as a brand-new person”"
+      onClick={() =>
+        start(async () => {
+          const res = await removeTestAccounts();
+          if (res.ok) toast.success(res.message ?? "Done.");
+          else toast.error(res.error);
+        })
+      }
+    >
+      {pending ? <Loader2 className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
+      Remove {count} test {count === 1 ? "account" : "accounts"}
+    </Button>
+  );
+}
+
 function ActiveToggle({ row }: { row: UserRow }) {
   const [pending, start] = useTransition();
   return (
@@ -462,6 +557,7 @@ export function UsersManager({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [deleting, setDeleting] = useState<UserRow | null>(null);
+  const [restarting, setRestarting] = useState<UserRow | null>(null);
 
   const columns: ColumnDef<UserRow>[] = [
     {
@@ -488,6 +584,14 @@ export function UsersManager({
                   title="Created on their first Google sign-in. Edit to check role and site."
                 >
                   New
+                </span>
+              )}
+              {row.original.isTest && (
+                <span
+                  className="bg-warning/15 text-warning shrink-0 rounded-full px-1.5 py-px text-[10px] font-semibold uppercase"
+                  title="Throwaway account made with “Try as a brand-new person” on the sign-in page."
+                >
+                  Test
                 </span>
               )}
             </div>
@@ -556,6 +660,15 @@ export function UsersManager({
           >
             <Pencil className="size-3.5" /> Edit
           </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            title="Restart first sign-in: app tour, welcome points, birthday"
+            aria-label={`Restart first sign-in for ${row.original.name}`}
+            onClick={() => setRestarting(row.original)}
+          >
+            <RotateCcw className="size-3.5" />
+          </Button>
           {row.original.id !== currentUserId && (
             <Button
               size="xs"
@@ -571,7 +684,8 @@ export function UsersManager({
     },
   ];
 
-  const toReview = rows.filter((r) => r.needsReview).length;
+  const toReview = rows.filter((r) => r.needsReview && !r.isTest).length;
+  const tests = rows.filter((r) => r.isTest).length;
 
   return (
     <>
@@ -590,15 +704,18 @@ export function UsersManager({
         searchPlaceholder="Search people…"
         pageSize={12}
         toolbar={
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> New user
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {tests > 0 && <RemoveTestAccountsButton count={tests} />}
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> New user
+            </Button>
+          </div>
         }
       />
       <UserFormDialog
@@ -608,6 +725,13 @@ export function UsersManager({
         editing={editing}
         sites={sites}
         managers={managers}
+      />
+      <RestartOnboardingDialog
+        key={restarting?.id ?? "none"}
+        user={restarting}
+        onOpenChange={(o) => {
+          if (!o) setRestarting(null);
+        }}
       />
       <DeleteUserDialog
         user={deleting}

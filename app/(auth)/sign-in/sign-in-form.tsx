@@ -8,12 +8,14 @@ import {
   UserCog,
   Crown,
   Wrench,
+  Sparkles,
   User as UserIcon,
 } from "lucide-react";
 import {
   authenticate,
   googleSignIn,
   quickSignIn,
+  signInAsNewcomer,
   type AuthState,
 } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
@@ -144,6 +146,8 @@ function DevSignIn({ samples, divider }: { samples: Sample[]; divider: boolean }
           </Button>
         </form>
 
+        <NewcomerSignIn />
+
         {samples.length > 0 ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
@@ -186,5 +190,40 @@ function DevSignIn({ samples, divider }: { samples: Sample[]; divider: boolean }
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * Dev only: sign in as a brand-new throwaway account to try the first sign-in
+ * (app tour, welcome points, birthday) as many times as needed.
+ */
+function NewcomerSignIn() {
+  return (
+    <form action={signInAsNewcomer}>
+      <NewcomerButton />
+    </form>
+  );
+}
+
+function NewcomerButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="border-primary/40 text-primary active:bg-primary/10 flex w-full items-center gap-3 rounded-2xl border border-dashed px-3 py-2.5 text-left transition-colors disabled:opacity-60"
+    >
+      <span className="bg-primary/10 flex size-9 shrink-0 items-center justify-center rounded-full">
+        <Sparkles className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">
+          {pending ? "Creating a test account…" : "Try as a brand-new person"}
+        </span>
+        <span className="text-muted block text-xs">
+          A fresh test account each time, to see the first sign-in
+        </span>
+      </span>
+    </button>
   );
 }
