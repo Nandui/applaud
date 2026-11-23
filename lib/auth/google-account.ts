@@ -48,7 +48,7 @@ export function nameFromGoogle(
 }
 
 /** The site with the most active people (ties by name), or null if there are no sites. */
-async function defaultSiteId(): Promise<string | null> {
+export async function defaultSiteId(): Promise<string | null> {
   const sites = await prisma.site.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
