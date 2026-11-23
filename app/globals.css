@@ -542,3 +542,100 @@
     animation-delay: 0.3s;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Value badges: hexagon holo collectibles (components/value-seal.tsx).
+ * --c is the value's colour, --s the badge size. A silver rim, a face in the
+ * value's colour (or the uploaded picture) and a holographic foil that slowly
+ * sweeps across, like the glint on epic and legendary frames.
+ * ------------------------------------------------------------------------- */
+.value-holo {
+  --hex: polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--s);
+  height: var(--s);
+  filter: drop-shadow(0 calc(var(--s) * 0.08) calc(var(--s) * 0.1) color-mix(in srgb, var(--c) 45%, transparent));
+}
+.value-holo-rim {
+  position: absolute;
+  inset: 0;
+  clip-path: var(--hex);
+  background: conic-gradient(
+    from 210deg,
+    #ffffff,
+    color-mix(in srgb, var(--c) 35%, white),
+    #c9c9d6,
+    #ffffff,
+    color-mix(in srgb, var(--c) 50%, white),
+    #e7e7ef,
+    #ffffff
+  );
+}
+.value-holo-face {
+  position: absolute;
+  inset: calc(var(--s) * 0.075);
+  clip-path: var(--hex);
+  overflow: hidden;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--c) 70%, white) 0%,
+    var(--c) 45%,
+    color-mix(in srgb, var(--c) 55%, #1a0b3d) 100%
+  );
+}
+.value-holo-foil,
+.value-holo-shine {
+  position: absolute;
+  inset: 0;
+  background-size: 260% 260%;
+  background-position: 30% 50%;
+}
+.value-holo-foil {
+  mix-blend-mode: overlay;
+  opacity: 0.9;
+  background-image: linear-gradient(
+    115deg,
+    transparent 18%,
+    #ff6ad5 32%,
+    #7af6ff 44%,
+    #fff27a 54%,
+    #9b7bff 64%,
+    transparent 80%
+  );
+}
+.value-holo-shine {
+  background-image: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 0.55) 48%, transparent 58%);
+}
+.value-holo-icon {
+  position: relative;
+  width: 46%;
+  height: 46%;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
+}
+.value-holo-spark {
+  position: absolute;
+  top: 4%;
+  right: 6%;
+  width: 18%;
+  height: 18%;
+  color: #fff;
+  filter: drop-shadow(0 0 3px #fff);
+}
+@keyframes value-holo-foil {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .value-holo:not([data-size="xs"]) :is(.value-holo-foil, .value-holo-shine) {
+    animation: value-holo-foil 5.5s ease-in-out infinite;
+  }
+}
