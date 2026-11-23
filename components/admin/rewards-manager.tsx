@@ -4,13 +4,12 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useActionState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Upload } from "lucide-react";
+import { LayoutList, Loader2, Pencil, Plus, Table2, Upload } from "lucide-react";
 import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import {
   saveReward,
   setRewardActive,
-  reorderReward,
   loadSuggestedRewards,
   type ActionResult,
 } from "@/lib/rewards/actions";
@@ -55,6 +54,7 @@ import {
   promoState,
   type PromoTag,
 } from "@/lib/reward-promo";
+import { RewardsLayoutEditor, type BudgetContext } from "@/components/admin/rewards-layout";
 import {
   FULFILMENT_UNITS,
   FULFILMENT_UNIT_LABELS,
@@ -80,6 +80,7 @@ export type RewardRow = {
   fulfilment: string;
   type: string;
   sortOrder: number;
+  featuredOrder: number | null;
   kind: string;
   discountText: string | null;
   promoTag: string | null;
@@ -592,17 +593,6 @@ function RewardFormDialog({
               </p>
             </div>
           ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor="sortOrder">Sort order</Label>
-            <Input
-              id="sortOrder"
-              name="sortOrder"
-              type="number"
-              defaultValue={editing?.sortOrder ?? 0}
-              className="w-1/2 font-mono"
-            />
-            <p className="text-muted text-xs">Lower numbers appear first on the store.</p>
-          </div>
           <div className="border-border flex items-center justify-between rounded-lg border p-3">
             <div>
               <Label htmlFor="active-switch">Visible in store</Label>
@@ -646,29 +636,6 @@ function VisibleToggle({ row }: { row: RewardRow }) {
   );
 }
 
-function ReorderButtons({ row }: { row: RewardRow }) {
-  const [pending, start] = useTransition();
-  function move(direction: "up" | "down") {
-    const fd = new FormData();
-    fd.set("id", row.id);
-    fd.set("direction", direction);
-    start(async () => {
-      const res = await reorderReward(fd);
-      if (!res.ok) toast.error(res.error);
-    });
-  }
-  return (
-    <div className="flex gap-1">
-      <Button size="xs" variant="outline" disabled={pending} onClick={() => move("up")} aria-label="Move up">
-        <ArrowUp className="size-3.5" />
-      </Button>
-      <Button size="xs" variant="outline" disabled={pending} onClick={() => move("down")} aria-label="Move down">
-        <ArrowDown className="size-3.5" />
-      </Button>
-    </div>
-  );
-}
-
 function LoadSuggestedButton() {
   const [pending, start] = useTransition();
   return (
@@ -693,11 +660,14 @@ export function RewardsManager({
   rows,
   sites,
   economy,
+  budget,
 }: {
   rows: RewardRow[];
   sites: SiteOption[];
   economy: EconomyContext;
+  budget: BudgetContext;
 }) {
+  const [view, setView] = useState<"layout" | "table">("layout");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RewardRow | null>(null);
   const siteName = (id: string | null) =>
@@ -823,12 +793,6 @@ export function RewardsManager({
       cell: ({ row }) => <VisibleToggle row={row.original} />,
     },
     {
-      id: "order",
-      header: "Order",
-      enableSorting: false,
-      cell: ({ row }) => <ReorderButtons row={row.original} />,
-    },
-    {
       id: "actions",
       header: () => <span className="sr-only">Actions</span>,
       enableSorting: false,
@@ -849,27 +813,60 @@ export function RewardsManager({
     },
   ];
 
+  const actions = (
+    <div className="flex gap-2">
+      <LoadSuggestedButton />
+      <Button
+        size="sm"
+        onClick={() => {
+          setEditing(null);
+          setOpen(true);
+        }}
+      >
+        <Plus className="size-4" /> New offering
+      </Button>
+    </div>
+  );
+
   return (
     <>
-      <DataTable
-        columns={columns}
-        data={rows}
-        searchPlaceholder="Search offerings…"
-        toolbar={
-          <div className="flex gap-2">
-            <LoadSuggestedButton />
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditing(null);
-                setOpen(true);
-              }}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-secondary inline-flex rounded-lg p-1" role="group" aria-label="View">
+          {(
+            [
+              ["layout", "Page layout", LayoutList],
+              ["table", "Table", Table2],
+            ] as const
+          ).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={view === key}
+              onClick={() => setView(key)}
+              className={cn(
+                "flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors",
+                view === key ? "bg-background shadow-sm" : "text-muted hover:text-foreground",
+              )}
             >
-              <Plus className="size-4" /> New offering
-            </Button>
-          </div>
-        }
-      />
+              <Icon className="size-4" /> {label}
+            </button>
+          ))}
+        </div>
+        {view === "layout" ? actions : null}
+      </div>
+      {view === "layout" ? (
+        <RewardsLayoutEditor
+          rows={rows}
+          sites={sites}
+          budget={budget}
+          onEdit={(row) => {
+            setEditing(row);
+            setOpen(true);
+          }}
+        />
+      ) : (
+        <DataTable columns={columns} data={rows} searchPlaceholder="Search offerings…" toolbar={actions} />
+      )}
       <RewardFormDialog
         key={editing?.id ?? "new"}
         open={open}

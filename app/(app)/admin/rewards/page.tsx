@@ -18,7 +18,7 @@ export default async function AdminRewardsPage() {
   const settings = await getOrgSettings();
   const [rewards, sites, claims, status] = await Promise.all([
     prisma.reward.findMany({
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { pointsCost: "asc" }, { name: "asc" }],
       select: {
         id: true,
         name: true,
@@ -34,6 +34,7 @@ export default async function AdminRewardsPage() {
         fulfilment: true,
         type: true,
         sortOrder: true,
+        featuredOrder: true,
         kind: true,
         discountText: true,
         promoTag: true,
@@ -62,7 +63,7 @@ export default async function AdminRewardsPage() {
     <div>
       <PageHeader
         title="Rewards"
-        description="Create and edit what staff can redeem, plus standing staff discounts. Labels such as Featured or Last chance put a reward in the Featured row of the shop. Set the conversion and budget in Economy. Claims stop for the month once the rewards budget is used, and per-month stock refills on the 1st. Hide an offering instead of deleting it."
+        description="Create and edit what staff can redeem, plus standing staff discounts, and arrange them: Page layout shows the staff Rewards page section by section with a live phone preview. Labels such as Featured or Last chance put a reward in the Featured row of the shop. Set the conversion and budget in Economy. Claims stop for the month once the rewards budget is used, and per-month stock refills on the 1st. Hide an offering instead of deleting it."
       />
       <div className="mb-6">
         <BudgetCard status={status} />
@@ -74,6 +75,7 @@ export default async function AdminRewardsPage() {
           pointsPerEuro: settings.pointsPerEuro,
           monthlyRewardBudgetCents: settings.monthlyRewardBudgetCents,
         }}
+        budget={{ spentCents: status.spentCents, budgetCents: status.budgetCents, resetsOn: status.resetsOn }}
       />
     </div>
   );

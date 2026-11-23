@@ -69,6 +69,12 @@ const REPAIRS: Repair[] = [
       ),
     ],
   },
+  {
+    name: "20261123230000_reward_featured_order",
+    checksum: "2d9530339e8a7459851670c641a90c175a9910eac48353759dc9bed0878c1a5c",
+    check: `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'Reward' AND column_name = 'featuredOrder') AS ok`,
+    statements: [`ALTER TABLE "Reward" ADD COLUMN IF NOT EXISTS "featuredOrder" INTEGER`],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {
