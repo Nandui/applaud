@@ -34,6 +34,9 @@ export async function updateEconomySettings(
   const monthlyRewardBudgetCents = parseEurosToCents(String(formData.get("monthlyRewardBudget") ?? ""));
   const monthlyAllowanceStaff = whole("monthlyAllowanceStaff");
   const monthlyAllowanceManager = whole("monthlyAllowanceManager");
+  const monthlyAllowanceCentreManager = whole("monthlyAllowanceCentreManager");
+  const monthlyAllowanceOperations = whole("monthlyAllowanceOperations");
+  const monthlyAllowanceCeo = whole("monthlyAllowanceCeo");
   const maxPointsPerShoutoutStaff = whole("maxPointsPerShoutoutStaff");
   const maxPointsPerShoutoutManager = whole("maxPointsPerShoutoutManager");
   const monthlyBonusPool = whole("monthlyBonusPool");
@@ -47,6 +50,9 @@ export async function updateEconomySettings(
   if (
     monthlyAllowanceStaff === null ||
     monthlyAllowanceManager === null ||
+    monthlyAllowanceCentreManager === null ||
+    monthlyAllowanceOperations === null ||
+    monthlyAllowanceCeo === null ||
     maxPointsPerShoutoutStaff === null ||
     maxPointsPerShoutoutManager === null ||
     monthlyBonusPool === null
@@ -59,6 +65,9 @@ export async function updateEconomySettings(
     monthlyRewardBudgetCents,
     monthlyAllowanceStaff,
     monthlyAllowanceManager,
+    monthlyAllowanceCentreManager,
+    monthlyAllowanceOperations,
+    monthlyAllowanceCeo,
     maxPointsPerShoutoutStaff,
     maxPointsPerShoutoutManager,
     monthlyBonusPool,

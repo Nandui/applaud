@@ -6,8 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
 import { getOrgSettings } from "@/lib/org-settings";
-import { allowanceForRole, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
-import { maxPointsPerShoutout } from "@/lib/economy";
+import { allowanceForRank, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from "@/lib/points";
+import { maxPointsForRank } from "@/lib/ranks";
 import {
   MAX_RECOGNITION_IMAGES,
   MAX_POST_LENGTH,
@@ -100,7 +100,7 @@ export async function createRecognition(
   });
   if (!value) return { ok: false, error: "That value is unavailable." };
 
-  const perShoutoutMax = maxPointsPerShoutout(me.role, settings);
+  const perShoutoutMax = maxPointsForRank(me.pointsRank, settings);
   if (perShoutoutMax > 0 && points > perShoutoutMax) {
     return { ok: false, error: `A recognition can carry at most ${perShoutoutMax} points per person.` };
   }
@@ -112,7 +112,7 @@ export async function createRecognition(
     await prisma.$transaction(async (tx) => {
       if (totalPoints > 0) {
         const used = await getMonthlyAllowanceUsage(me.id, new Date(), tx);
-        const allowance = allowanceForRole(me.role, settings);
+        const allowance = allowanceForRank(me.pointsRank, settings);
         if (used + totalPoints > allowance) {
           throw new AllowanceError(
             `That's more than you have left to give this month (${Math.max(0, allowance - used)}).`,

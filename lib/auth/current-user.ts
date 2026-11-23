@@ -28,6 +28,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
       name: true,
       email: true,
       role: true,
+      pointsRank: true,
       siteId: true,
       avatarUrl: true,
     },
@@ -39,6 +40,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     name: dbUser.name,
     email: dbUser.email,
     role: (dbUser.role ?? "staff") as Role,
+    pointsRank: dbUser.pointsRank,
     siteId: dbUser.siteId,
     avatarUrl: dbUser.avatarUrl,
   };

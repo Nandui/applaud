@@ -1,5 +1,6 @@
 "use server";
 
+import { isPointsRank, rankForRole } from "@/lib/ranks";
 import { backfillGoogleAvatars, isGooglePictureUrl } from "@/lib/google-avatar";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -227,6 +228,8 @@ export async function saveUser(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const jobTitle = String(formData.get("jobTitle") ?? "").trim();
   const role = String(formData.get("role") ?? "staff");
+  // Older forms don't post a rank: fall back to the one that matches the role.
+  const pointsRank = String(formData.get("pointsRank") ?? "") || rankForRole(role);
   const siteId = String(formData.get("siteId") ?? "").trim();
   // Zero or more managers, each a real user; the select posts one entry per pick.
   const managerIds = [
@@ -247,6 +250,7 @@ export async function saveUser(
     return { ok: false, error: "Enter a valid email." };
   }
   if (!ROLES.includes(role)) return { ok: false, error: "Invalid role." };
+  if (!isPointsRank(pointsRank)) return { ok: false, error: "Invalid points rank." };
   if (!siteId) return { ok: false, error: "Pick a site." };
   if (id && managerIds.includes(id)) {
     return { ok: false, error: "A user can't be their own manager." };
@@ -267,6 +271,7 @@ export async function saveUser(
     email,
     jobTitle: jobTitle || null,
     role,
+    pointsRank,
     siteId,
     active,
     hireDate,
@@ -319,6 +324,7 @@ export async function saveUser(
     metadata: {
       email,
       role,
+      pointsRank,
       siteId,
       active,
       jobTitle: jobTitle || null,

@@ -11,6 +11,8 @@
  *    company-wide budget (OrgSettings.monthlyRewardBudgetCents).
  */
 
+import { POINTS_RANKS, allowanceForRank, type PointsRank, type RankAllowances } from "@/lib/ranks";
+
 /**
  * Default conversion: 100 points = €1, so one point is one euro cent. Admins
  * can change it (OrgSettings.pointsPerEuro); euros only ever appear in Admin.
@@ -152,29 +154,14 @@ export function resetsInLabel(ref: Date = new Date(), tz: string = ECONOMY_TIMEZ
   return `resets in ${days} days`;
 }
 
-type ShoutoutLimits = {
-  maxPointsPerShoutoutStaff: number;
-  maxPointsPerShoutoutManager: number;
-};
-
-/**
- * The most points one person can get from a single shout-out by this sender.
- * Stops two friends handing each other their whole allowance every month.
- * 0 means "no limit".
- */
-export function maxPointsPerShoutout(role: string, settings: ShoutoutLimits): number {
-  return role === "staff"
-    ? settings.maxPointsPerShoutoutStaff
-    : settings.maxPointsPerShoutoutManager;
-}
-
-export type EconomyInputs = {
+export type EconomyInputs = RankAllowances & {
   pointsPerEuro: number;
   monthlyRewardBudgetCents: number;
-  monthlyAllowanceStaff: number;
-  monthlyAllowanceManager: number;
   monthlyBonusPool: number;
 };
+
+/** Active people per points rank. */
+export type RankHeadcount = Record<PointsRank, number>;
 
 /**
  * The budget maths for a month: the most points that could be created (every
@@ -182,18 +169,16 @@ export type EconomyInputs = {
  * cash, and how it compares with the rewards budget. The budget cap on claims
  * still protects the money when the worst case is higher.
  */
-export function economyForecast(
-  inputs: EconomyInputs,
-  headcount: { staff: number; managers: number },
-) {
-  const staffPoints = headcount.staff * inputs.monthlyAllowanceStaff;
-  const managerPoints = headcount.managers * inputs.monthlyAllowanceManager;
-  const maxPoints = staffPoints + managerPoints + inputs.monthlyBonusPool;
+export function economyForecast(inputs: EconomyInputs, headcount: RankHeadcount) {
+  const byRank = Object.fromEntries(
+    POINTS_RANKS.map((rank) => [rank, headcount[rank] * allowanceForRank(rank, inputs)]),
+  ) as Record<PointsRank, number>;
+  const allowancePoints = POINTS_RANKS.reduce((sum, rank) => sum + byRank[rank], 0);
+  const maxPoints = allowancePoints + inputs.monthlyBonusPool;
   const maxCents = pointsToCents(maxPoints, inputs.pointsPerEuro);
-  const people = headcount.staff + headcount.managers;
+  const people = POINTS_RANKS.reduce((sum, rank) => sum + headcount[rank], 0);
   return {
-    staffPoints,
-    managerPoints,
+    byRank,
     bonusPoints: inputs.monthlyBonusPool,
     maxPoints,
     maxCents,

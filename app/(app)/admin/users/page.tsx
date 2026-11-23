@@ -28,6 +28,7 @@ export default async function AdminUsersPage() {
         avatarUrl: true,
         jobTitle: true,
         role: true,
+        pointsRank: true,
         siteId: true,
         hireDate: true,
         birthday: true,
@@ -54,6 +55,7 @@ export default async function AdminUsersPage() {
     avatarUrl: u.avatarUrl,
     jobTitle: u.jobTitle,
     role: u.role,
+    pointsRank: u.pointsRank,
     siteId: u.siteId ?? "",
     siteName: u.site?.name ?? "—",
     managerIds: u.managers.map((m) => m.manager.id),
@@ -70,7 +72,7 @@ export default async function AdminUsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Manage people, sites, managers, company roles, and app roles."
+        description="Manage people, sites, managers, company roles, app roles and points ranks."
         action={googleSignInEnabled ? <GooglePhotosButton /> : undefined}
       />
       <UsersManager
