@@ -347,7 +347,7 @@ function UserFormDialog({
                 defaultValue={editing?.hireDate ?? ""}
               />
               <p className="text-muted text-xs">
-                Earns their service medals: 6 months, every year to 5, then 10, 15 and 20 years.
+                Earns their service medals: every year up to 10, then 15 and 20 years.
               </p>
             </div>
             <div className="space-y-1.5">

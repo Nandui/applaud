@@ -11,11 +11,11 @@ import type { ProfileData } from "@/lib/profile";
 
 /**
  * Length of service on a profile: a plaque with their medal under the name
- * (from six months on), and in the Showcase the whole ladder of medals with
+ * (from one year on), and in the Showcase the whole ladder of medals with
  * the ones still to come greyed out and when the next one arrives.
  */
 
-/** The plaque under the name. Nothing before someone's first six months. */
+/** The plaque under the name. Nothing before someone's first year. */
 export function ServicePlaque({ service }: { service: NonNullable<ProfileData["service"]> }) {
   const tier = serviceTier(service.months);
   if (!tier) return null;
@@ -66,7 +66,7 @@ export function ServiceLadder({
 
   return (
     <div>
-      <ol className="grid grid-cols-5 gap-x-1 gap-y-3 sm:grid-cols-9">
+      <ol className="grid grid-cols-6 gap-x-1 gap-y-3 sm:grid-cols-12">
         {SERVICE_TIERS.map((t) => {
           const earned = service.months >= t.months;
           return (
@@ -75,7 +75,7 @@ export function ServiceLadder({
                 months={t.key === "legend" && earned ? service.months : t.months}
                 tier={t.key === "legend" && earned ? undefined : t}
                 locked={!earned}
-                size={50}
+                size={46}
               />
               <span className={earned ? "text-xs font-bold" : "text-muted text-xs"}>
                 {ladderLabel(t.months)}

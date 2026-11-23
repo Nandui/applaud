@@ -1,8 +1,8 @@
 /**
  * Length of service: each person's start date (User.hireDate, set in
- * Admin > Users) earns them a service medal at 6 months, then every year up
- * to 5, then at 10, 15 and 20 years, each in a rarer metal. The early steps
- * are close together because many people stay a few years. Shown big on
+ * Admin > Users) earns them a service medal every year up to 10, then at 15
+ * and 20 years, each in a rarer metal or stone. The steps are yearly because
+ * many people stay a few years. Shown big on
  * their profile and small next to their name in the feed
  * (components/service-medal.tsx).
  */
@@ -12,8 +12,11 @@ export type ServiceTierKey =
   | "bronze"
   | "copper"
   | "silver"
-  | "rosegold"
   | "gold"
+  | "rosegold"
+  | "emerald"
+  | "sapphire"
+  | "ruby"
   | "platinum"
   | "diamond"
   | "legend";
@@ -29,12 +32,15 @@ export type ServiceTier = {
 };
 
 export const SERVICE_TIERS: readonly ServiceTier[] = [
-  { key: "steel", months: 6, name: "Steel", accent: "#6d7887" },
-  { key: "bronze", months: 12, name: "Bronze", accent: "#c47a3a" },
-  { key: "copper", months: 24, name: "Copper", accent: "#d0643a" },
-  { key: "silver", months: 36, name: "Silver", accent: "#8a93a8" },
-  { key: "rosegold", months: 48, name: "Rose gold", accent: "#d4837a" },
+  { key: "steel", months: 12, name: "Steel", accent: "#6d7887" },
+  { key: "bronze", months: 24, name: "Bronze", accent: "#c47a3a" },
+  { key: "copper", months: 36, name: "Copper", accent: "#d0643a" },
+  { key: "silver", months: 48, name: "Silver", accent: "#8a93a8" },
   { key: "gold", months: 60, name: "Gold", accent: "#e2a91c" },
+  { key: "rosegold", months: 72, name: "Rose gold", accent: "#d4837a" },
+  { key: "emerald", months: 84, name: "Emerald", accent: "#169a6a" },
+  { key: "sapphire", months: 96, name: "Sapphire", accent: "#2b4fc7" },
+  { key: "ruby", months: 108, name: "Ruby", accent: "#c4203f" },
   { key: "platinum", months: 120, name: "Platinum", accent: "#7d8ba3" },
   { key: "diamond", months: 180, name: "Diamond", accent: "#1f8fd6" },
   { key: "legend", months: 240, name: "Legend", accent: "#b98a12" },

@@ -62,6 +62,27 @@ const METALS: Record<ServiceTierKey, Metal> = {
     ribbon: ["#5b1d3a", "#f6c3bb"],
     glow: "#d4837a",
   },
+  emerald: {
+    rim: ["#fff4c2", "#e2a91c", "#7c5302"],
+    face: ["#1fb07a", "#04452c"],
+    relief: ["#fff6cf", "#f3c94f"],
+    ribbon: ["#0b4a33", "#f5c542"],
+    glow: "#169a6a",
+  },
+  sapphire: {
+    rim: ["#fff4c2", "#e2a91c", "#7c5302"],
+    face: ["#3d6bf0", "#0c1d63"],
+    relief: ["#fff6cf", "#f3c94f"],
+    ribbon: ["#0c1d63", "#f5c542"],
+    glow: "#2b4fc7",
+  },
+  ruby: {
+    rim: ["#fff4c2", "#e2a91c", "#7c5302"],
+    face: ["#e3304f", "#5c0718"],
+    relief: ["#fff6cf", "#f3c94f"],
+    ribbon: ["#5c0718", "#f5c542"],
+    glow: "#c4203f",
+  },
   gold: {
     rim: ["#fff4c2", "#e2a91c", "#7c5302"],
     face: ["#d79b12", "#875900"],

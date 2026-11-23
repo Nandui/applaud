@@ -658,7 +658,7 @@
 /* ---------------------------------------------------------------------------
  * Service medals: years of service (components/service-medal.tsx). A struck
  * metal medal on a ribbon, unlike the holo hexagons, so it reads as an
- * honour. Gold and up catch the light every few seconds; Diamond and Legend
+ * honour. Gold (5 years) and up catch the light every few seconds; Diamond and Legend
  * also glow. Locked medals (not earned yet) are greyed out.
  * ------------------------------------------------------------------------- */
 .service-medal {
@@ -698,7 +698,7 @@
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .service-medal:is([data-tier="gold"], [data-tier="platinum"], [data-tier="diamond"], [data-tier="legend"]):not(
+  .service-medal:not([data-tier="steel"], [data-tier="bronze"], [data-tier="copper"], [data-tier="silver"]):not(
       [data-mini],
       [data-locked]
     )

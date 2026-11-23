@@ -180,7 +180,7 @@ function BannerHero({ card }: { card: FeedCard }) {
   );
 }
 
-/** A small service medal after someone's name, from six months on. */
+/** A small service medal after someone's name, from one year on. */
 function NameMedal({ months }: { months: number | null }) {
   if (!months) return null;
   return <ServiceMedal months={months} size={18} className="ml-1 -translate-y-px" />;
