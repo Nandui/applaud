@@ -10,16 +10,11 @@ import { TYPING_FRESH_MS, type TypingUser } from "@/lib/recognition/live-config"
 /** Most comments one poll returns; the rest come on the next poll. */
 const MAX_COMMENTS = 100;
 
-/** Whether the viewer may see this post (same rule as the feed). */
-export async function canSeeRecognition(recognitionId: string, viewerId: string) {
+/** Whether the viewer may see this post. Everything is public, so: whether it exists. */
+export async function canSeeRecognition(recognitionId: string) {
   const row = await prisma.recognition.findFirst({
     where: {
       id: recognitionId,
-      OR: [
-        { visibility: "public" },
-        { senderId: viewerId },
-        { recipients: { some: { userId: viewerId } } },
-      ],
     },
     select: { id: true },
   });
