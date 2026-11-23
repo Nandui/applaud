@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allowanceForRank, maxPointsForRank, rankForRole } from "../lib/ranks";
+import { allowanceForRank, maxPointsForRank, rankForRole, shopIsFreeFor, shopPriceFor } from "../lib/ranks";
 import { economyForecast } from "../lib/economy";
 
 const allowances = {
@@ -49,4 +49,16 @@ test("the worst-case month adds every rank's allowances", () => {
   assert.equal(f.byRank.ceo, 5000);
   assert.equal(f.maxPoints, 32000 + 7200 + 6000 + 3000 + 5000 + 4400);
   assert.equal(f.maxCents, f.maxPoints);
+});
+
+test("the profile shop is free for every rank above staff", () => {
+  for (const rank of ["manager", "centre_manager", "operations", "ceo"]) {
+    assert.equal(shopIsFreeFor(rank), true, rank);
+    assert.equal(shopPriceFor(rank, 50), 0, rank);
+  }
+  assert.equal(shopIsFreeFor("staff"), false);
+  assert.equal(shopPriceFor("staff", 50), 50);
+  // Unknown or missing ranks count as staff and pay.
+  assert.equal(shopPriceFor("admin", 50), 50);
+  assert.equal(shopPriceFor(null, 50), 50);
 });

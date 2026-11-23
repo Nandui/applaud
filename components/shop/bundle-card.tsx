@@ -13,6 +13,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { PerkNote } from "@/components/shop/shop-item";
 
 /**
  * "Buy all" for a Store category: every item in it you don't own yet, at the
@@ -25,6 +26,8 @@ export function BundleCard({
   price,
   total,
   balance,
+  perk = null,
+  listPrice = price,
 }: {
   categoryId: string;
   categoryName: string;
@@ -34,10 +37,15 @@ export function BundleCard({
   /** How many items are for sale in the category, owned or not. */
   total: number;
   balance: number;
+  /** Their rank label when the shop is free for them (every rank above Staff). */
+  perk?: string | null;
+  /** What Staff would pay for the same items, struck through when it's free for them. */
+  listPrice?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const short = price - balance;
+  const perkFree = perk !== null && listPrice > 0;
 
   if (items.length === 0) {
     return <p className="text-muted text-sm">You own everything in {categoryName}.</p>;
@@ -71,8 +79,11 @@ export function BundleCard({
                 : `The ${items.length} you don't have yet`}
             </span>
           </span>
-          <span className="bg-primary text-primary-fg shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold" data-numeric>
-            {price === 0 ? "Free" : pts(price)}
+          <span className="flex shrink-0 items-center gap-2" data-numeric>
+            {perkFree ? <span className="text-muted text-sm line-through">{pts(listPrice)}</span> : null}
+            <span className="bg-primary text-primary-fg rounded-full px-3 py-1.5 text-sm font-semibold">
+              {price === 0 ? (perkFree ? "Free for you" : "Free") : pts(price)}
+            </span>
           </span>
         </button>
       </SheetTrigger>
@@ -81,7 +92,9 @@ export function BundleCard({
           <p className="text-muted text-xs font-semibold">Bundle</p>
           <SheetTitle className="text-xl font-bold">All of {categoryName}</SheetTitle>
           <SheetDescription>
-            Same price as buying each one. They go in your collection, and you pick what to wear.
+            {perkFree
+              ? "They go in your collection, and you pick what to wear."
+              : "Same price as buying each one. They go in your collection, and you pick what to wear."}
           </SheetDescription>
         </SheetHeader>
         <ul className="max-h-60 space-y-1.5 overflow-y-auto px-4">
@@ -90,13 +103,14 @@ export function BundleCard({
               <span className="min-w-0 truncate">
                 {item.name} <span className="text-muted">· {KIND_LABELS[item.kind].one}</span>
               </span>
-              <span className="text-muted shrink-0" data-numeric>
+              <span className={perkFree && item.price > 0 ? "text-muted shrink-0 line-through" : "text-muted shrink-0"} data-numeric>
                 {item.price === 0 ? "Free" : pts(item.price)}
               </span>
             </li>
           ))}
         </ul>
         <div className="pb-safe mt-4 space-y-2 px-4 pb-4">
+          {perkFree && perk ? <PerkNote perk={perk} price={listPrice} items={items.length} /> : null}
           <button
             type="button"
             disabled={pending || short > 0}
@@ -114,8 +128,14 @@ export function BundleCard({
                   : `Buy all for ${pts(price)}`}
           </button>
           <p className="text-muted text-center text-xs" data-numeric>
-            You have {formatNumber(balance)} pts
-            {short <= 0 ? ` · ${formatNumber(balance - price)} left after` : ""}
+            {perkFree ? (
+              "Nothing comes off your points."
+            ) : (
+              <>
+                You have {formatNumber(balance)} pts
+                {short <= 0 ? ` · ${formatNumber(balance - price)} left after` : ""}
+              </>
+            )}
           </p>
         </div>
       </SheetContent>
