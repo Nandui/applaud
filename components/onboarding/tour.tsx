@@ -144,9 +144,16 @@ function steps(firstName: string, allowance: number, replay: boolean): Step[] {
       body: (
         <>
           Tap <b className="text-foreground">Send</b>, pick who you&apos;re thanking and the value they
-          showed, then add points. You get{" "}
-          <b className="text-foreground">{formatNumber(allowance)} points</b> to give every month.
-          They reset on the 1st, so give them away.
+          showed
+          {allowance > 0 ? (
+            <>
+              , then add points. You get{" "}
+              <b className="text-foreground">{formatNumber(allowance)} points</b> to give every month.
+              They reset on the 1st, so give them away.
+            </>
+          ) : (
+            <>. Your recognitions don&apos;t carry points, but they still go in the feed for everyone to see.</>
+          )}
         </>
       ),
       visual: <RecognizeVisual />,

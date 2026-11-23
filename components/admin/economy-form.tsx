@@ -12,7 +12,7 @@ import {
   type EconomyInputs,
   type RankHeadcount,
 } from "@/lib/economy";
-import { POINTS_RANKS, RANK_ALLOWANCE_FIELD, RANK_LABELS } from "@/lib/ranks";
+import { GIVING_RANKS, POINTS_RANKS, RANK_ALLOWANCE_FIELD, RANK_LABELS } from "@/lib/ranks";
 import { formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -129,7 +129,7 @@ export function EconomyForm({
               </Link>
               .
             </p>
-            {POINTS_RANKS.map((rank) => {
+            {GIVING_RANKS.map((rank) => {
               const key = RANK_ALLOWANCE_FIELD[rank];
               const people = headcount[rank];
               const each = euros(inputs[key]);
@@ -145,6 +145,14 @@ export function EconomyForm({
                 </div>
               );
             })}
+            <p className="text-muted text-sm sm:col-span-2">
+              <span className="text-foreground font-medium">Backoffice</span> always gets 0 points to give
+              {headcount.backoffice > 0
+                ? ` (${formatNumber(headcount.backoffice)} ${headcount.backoffice === 1 ? "person" : "people"})`
+                : ""}
+              . They can still recognise people without points, post, comment and react, and spend
+              points they receive.
+            </p>
             <div className="border-border border-t sm:col-span-2" />
             {field(
               "maxPointsPerShoutoutStaff",

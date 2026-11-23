@@ -71,35 +71,45 @@ export default async function MePage() {
         </div>
       </section>
 
-      {/* Allowance */}
-      <section className="bg-surface flex items-center gap-4 rounded-2xl p-5">
-        <svg viewBox="0 0 80 80" className="size-20 shrink-0 -rotate-90" aria-hidden>
-          <circle cx="40" cy="40" r={R} fill="none" stroke="var(--color-surface-3)" strokeWidth="9" />
-          <circle
-            cx="40"
-            cy="40"
-            r={R}
-            fill="none"
-            stroke="var(--color-primary)"
-            strokeWidth="9"
-            strokeLinecap="round"
-            strokeDasharray={C}
-            strokeDashoffset={C * (1 - remainingPct / 100)}
-          />
-        </svg>
-        <div className="min-w-0">
-          <p className="text-muted text-sm font-semibold">Left to give this month</p>
-          <p className="mt-0.5">
-            <span data-numeric className="text-3xl font-bold">
-              {formatNumber(allowance.remaining)}
-            </span>{" "}
-            <span className="text-muted text-sm">/ {formatNumber(allowance.total)} pts</span>
+      {/* Allowance. Backoffice gets none, so say what they can do instead. */}
+      {allowance.total === 0 ? (
+        <section className="bg-surface rounded-2xl p-5">
+          <p className="text-muted text-sm font-semibold">Points to give</p>
+          <p className="mt-1 text-[0.95rem] leading-snug">
+            Your rank doesn&apos;t get points to give each month. You can still recognise people
+            without points, post, comment and react, and points you receive are yours to spend.
           </p>
-          <p className="text-muted mt-1 text-xs leading-snug">
-            Use it or lose it: unused points don&apos;t roll over, and it {allowance.resetsIn}.
-          </p>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="bg-surface flex items-center gap-4 rounded-2xl p-5">
+          <svg viewBox="0 0 80 80" className="size-20 shrink-0 -rotate-90" aria-hidden>
+            <circle cx="40" cy="40" r={R} fill="none" stroke="var(--color-surface-3)" strokeWidth="9" />
+            <circle
+              cx="40"
+              cy="40"
+              r={R}
+              fill="none"
+              stroke="var(--color-primary)"
+              strokeWidth="9"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - remainingPct / 100)}
+            />
+          </svg>
+          <div className="min-w-0">
+            <p className="text-muted text-sm font-semibold">Left to give this month</p>
+            <p className="mt-0.5">
+              <span data-numeric className="text-3xl font-bold">
+                {formatNumber(allowance.remaining)}
+              </span>{" "}
+              <span className="text-muted text-sm">/ {formatNumber(allowance.total)} pts</span>
+            </p>
+            <p className="text-muted mt-1 text-xs leading-snug">
+              Use it or lose it: unused points don&apos;t roll over, and it {allowance.resetsIn}.
+            </p>
+          </div>
+        </section>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div className="bg-surface rounded-2xl p-4">

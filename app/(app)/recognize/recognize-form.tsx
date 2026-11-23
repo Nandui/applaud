@@ -485,7 +485,11 @@ export function RecognizeForm({
             </span>
             <span className="flex-1">Points</span>
             <span data-numeric className={cn("text-[0.95rem]", points > 0 ? "text-primary font-bold" : "text-muted")}>
-              {points > 0 ? `+${pts(points)} each` : `${pts(allowance.remaining)} left to give`}
+              {points > 0
+                ? `+${pts(points)} each`
+                : allowance.total === 0
+                  ? "None to give on your rank"
+                  : `${pts(allowance.remaining)} left to give`}
             </span>
             <ChevronRight className="text-muted size-4.5" />
           </button>
