@@ -7,7 +7,10 @@ import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Loader2, Pencil, Plus, Upload } from "lucide-react";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
-import { ValueSeal } from "@/components/value-seal";
+import { DEFAULT_VALUE_COLOR, ValueSeal } from "@/components/value-seal";
+import { ValueIcon } from "@/components/value-icon";
+import { VALUE_ICON_NAMES } from "@/lib/value-icons";
+import { cn } from "@/lib/utils";
 import { saveValue, setValueActive, type ActionResult } from "@/lib/admin/actions";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+/** Quick colour picks that look good as holo badges in both themes. */
+const COLOR_SWATCHES = [
+  "#0e9aa7",
+  "#5b4dff",
+  "#16a34a",
+  "#e11d48",
+  "#0ea5e9",
+  "#f59e0b",
+  "#d946ef",
+  "#f97316",
+  "#64748b",
+];
 
 export type ValueRow = {
   id: string;
@@ -52,6 +68,8 @@ function ValueFormDialog({
   const [uploading, setUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(editing?.name ?? "");
+  const [icon, setIcon] = useState(editing?.icon ?? "Award");
+  const [color, setColor] = useState(editing?.color ?? DEFAULT_VALUE_COLOR);
 
   async function handleImageFile(file: File) {
     if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
@@ -94,17 +112,19 @@ function ValueFormDialog({
           {editing && <input type="hidden" name="id" value={editing.id} />}
           <input type="hidden" name="active" value={String(active)} />
           <input type="hidden" name="imageUrl" value={imageUrl} />
+          <input type="hidden" name="icon" value={icon} />
+          <input type="hidden" name="color" value={color} />
 
           <div className="bg-surface-2 flex items-center gap-4 rounded-xl p-4">
             <ValueSeal
-              value={{ name: name || "Value", icon: editing?.icon ?? null, color: editing?.color ?? null, imageUrl: imageUrl || null }}
+              value={{ name: name || "Value", icon, color, imageUrl: imageUrl || null }}
               size="lg"
             />
             <div className="min-w-0 space-y-1.5">
-              <p className="text-sm font-semibold">Badge picture</p>
+              <p className="text-sm font-semibold">Badge picture (optional)</p>
               <p className="text-muted text-xs">
-                The picture is the badge: it shows on every recognition for this value. A square picture works
-                best.
+                The badge is drawn from the icon and colour below. Upload a square picture to fill the hexagon
+                instead.
               </p>
               <input
                 ref={imageInputRef}
@@ -145,6 +165,56 @@ function ValueFormDialog({
             </div>
           </div>
 
+          {!imageUrl && (
+            <div className="space-y-1.5">
+              <Label>Icon</Label>
+              <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-9">
+                {VALUE_ICON_NAMES.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    title={n}
+                    aria-label={n}
+                    aria-pressed={icon === n}
+                    onClick={() => setIcon(n)}
+                    className={cn(
+                      "flex aspect-square items-center justify-center rounded-lg border-2 transition-colors",
+                      icon === n ? "border-primary bg-primary/10" : "bg-surface border-transparent",
+                    )}
+                  >
+                    <ValueIcon icon={n} className="size-5" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="value-color">Colour</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              {COLOR_SWATCHES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={`Colour ${c}`}
+                  aria-pressed={color.toLowerCase() === c}
+                  onClick={() => setColor(c)}
+                  className={cn(
+                    "ring-offset-background size-8 rounded-full ring-offset-2 transition",
+                    color.toLowerCase() === c ? "ring-foreground ring-2" : "",
+                  )}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+              <input
+                id="value-color"
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="border-border size-8 cursor-pointer rounded-full border bg-transparent p-0"
+                title="Any colour"
+              />
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
             <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />

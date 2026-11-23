@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ValueSeal } from "@/components/value-seal";
 import { CELEBRATION_EMOJI, CELEBRATION_LABELS, type ProfileData } from "@/lib/profile";
 import { CountUp } from "@/components/fx/count-up";
@@ -31,6 +32,8 @@ type Highlight = {
   circle: React.ReactNode;
   background: string;
   count?: number;
+  /** Badge brings its own shape (value hexagons): no circle around it. */
+  bare?: boolean;
 };
 
 /**
@@ -48,8 +51,9 @@ export function Highlights({ data }: { data: ProfileData }) {
     ...data.valueTags.map((t) => ({
       key: `value-${t.value.id}`,
       label: t.value.name,
-      circle: <ValueSeal value={t.value} size="sm" ribbon={false} className="size-full [&>span]:size-full [&>span]:ring-0" />,
+      circle: <ValueSeal value={t.value} size="md" ribbon={false} />,
       background: "transparent",
+      bare: true,
       count: t.count,
     })),
     ...data.celebrations.map((c) => ({
@@ -65,13 +69,22 @@ export function Highlights({ data }: { data: ProfileData }) {
     <ul className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4" aria-label="Highlights">
       {items.map((h) => (
         <li key={h.key} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-          <span className="border-border relative flex size-16 items-center justify-center rounded-full border p-[3px]">
-            <span
-              className="flex size-full items-center justify-center rounded-full"
-              style={{ background: h.background }}
-            >
-              {h.circle}
-            </span>
+          <span
+            className={cn(
+              "relative flex size-16 items-center justify-center rounded-full",
+              !h.bare && "border-border border p-[3px]",
+            )}
+          >
+            {h.bare ? (
+              h.circle
+            ) : (
+              <span
+                className="flex size-full items-center justify-center rounded-full"
+                style={{ background: h.background }}
+              >
+                {h.circle}
+              </span>
+            )}
             {h.count && h.count > 1 ? (
               <span
                 data-numeric

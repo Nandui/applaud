@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { isProjectBlobUrl } from "@/lib/blob";
+import { VALUE_ICON_NAMES } from "@/lib/value-icons";
 import { writeAudit } from "@/lib/audit";
 import { isTestEmail, TEST_EMAIL_DOMAIN } from "@/lib/test-accounts";
 
@@ -53,16 +54,22 @@ export async function saveValue(
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const imageUrl = String(formData.get("imageUrl") ?? "").trim();
+  const icon = String(formData.get("icon") ?? "").trim();
+  const color = String(formData.get("color") ?? "").trim();
   const order = Math.floor(Number(formData.get("order") ?? 0));
   const active = String(formData.get("active") ?? "true") === "true";
   if (name.length < 2) return { ok: false, error: "Name is too short." };
   if (imageUrl && !isProjectBlobUrl(imageUrl)) return { ok: false, error: "Unrecognised picture URL." };
+  if (icon && !VALUE_ICON_NAMES.includes(icon)) return { ok: false, error: "Pick an icon from the list." };
+  if (color && !/^#[0-9a-f]{6}$/i.test(color)) return { ok: false, error: "Pick a colour." };
 
   const data = {
     name,
     description: description || null,
-    // The badge picture defines the look; icon/colour are no longer edited
-    // and stay as stored (they only show for values without a picture).
+    // The holo badge is drawn from icon + colour; an uploaded picture fills
+    // the hexagon instead of the icon (the colour still tints the glow).
+    ...(icon ? { icon } : {}),
+    ...(color ? { color: color.toLowerCase() } : {}),
     imageUrl: imageUrl || null,
     order: Number.isFinite(order) ? order : 0,
     active,
