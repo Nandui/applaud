@@ -625,6 +625,21 @@
   color: #fff;
   filter: drop-shadow(0 0 3px #fff);
 }
+.value-holo-label {
+  position: relative;
+  color: #fff;
+  font-weight: 800;
+  font-size: calc(var(--s) * 0.44);
+  line-height: 1;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+}
+/* Gold rim: awards and first place. Bronze: third place. */
+.value-holo[data-rim="gold"] .value-holo-rim {
+  background: conic-gradient(from 200deg, #fff6d1, #d9a521, #fff3c4, #a8780e, #ffe49a, #c99419, #fff6d1);
+}
+.value-holo[data-rim="bronze"] .value-holo-rim {
+  background: conic-gradient(from 200deg, #ffe2c4, #b86b2e, #ffd2a8, #8a4a1c, #f3b07a, #a75d27, #ffe2c4);
+}
 @keyframes value-holo-foil {
   0%,
   100% {
@@ -635,7 +650,7 @@
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .value-holo:not([data-size="xs"]) :is(.value-holo-foil, .value-holo-shine) {
+  .value-holo:not([data-tiny]) :is(.value-holo-foil, .value-holo-shine) {
     animation: value-holo-foil 5.5s ease-in-out infinite;
   }
 }

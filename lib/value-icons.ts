@@ -47,3 +47,10 @@ export const VALUE_ICON_NAMES = Object.keys(VALUE_ICONS);
 export function valueIcon(name?: string | null): LucideIcon {
   return (name && VALUE_ICONS[name]) || Award;
 }
+
+/** Check posted badge picks (icon name, hex colour); returns an error or null. */
+export function badgeLookError(icon: string, color: string): string | null {
+  if (icon && !VALUE_ICON_NAMES.includes(icon)) return "Pick an icon from the list.";
+  if (color && !/^#[0-9a-f]{6}$/i.test(color)) return "Pick a colour.";
+  return null;
+}
