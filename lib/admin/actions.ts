@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
+import { isTestEmail, TEST_EMAIL_DOMAIN } from "@/lib/test-accounts";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -382,6 +383,33 @@ export async function applyGooglePhotos(): Promise<ActionResult> {
 }
 
 /**
+ * Hard-deletes a user when nothing references them; otherwise deactivates and
+ * detaches them from their site (see deleteUser). True when archived.
+ */
+async function removeUserRecord(id: string): Promise<boolean> {
+  // Clear both directions of the manager join: nobody should keep pointing at a
+  // removed manager, and no leftover row should stand between them and the
+  // hard-delete (or, in turn, between their site and its removal).
+  await prisma.userManager.deleteMany({
+    where: { OR: [{ userId: id }, { managerId: id }] },
+  });
+
+  let archived = false;
+  try {
+    await prisma.user.delete({ where: { id } });
+  } catch (e) {
+    if (!isForeignKeyError(e)) throw e;
+    archived = true;
+    await prisma.user.update({
+      where: { id },
+      data: { active: false, siteId: null },
+    });
+  }
+
+  return archived;
+}
+
+/**
  * Removes a person. Hard-deletes when nothing references them so they leave
  * the directory outright and their site's user count drops. Recognitions,
  * ledger rows, redemptions and the rest all restrict the delete, so a person
@@ -402,24 +430,7 @@ export async function deleteUser(formData: FormData): Promise<ActionResult> {
   });
   if (!user) return { ok: false, error: "That user no longer exists." };
 
-  // Clear both directions of the manager join: nobody should keep pointing at a
-  // removed manager, and no leftover row should stand between them and the
-  // hard-delete (or, in turn, between their site and its removal).
-  await prisma.userManager.deleteMany({
-    where: { OR: [{ userId: id }, { managerId: id }] },
-  });
-
-  let archived = false;
-  try {
-    await prisma.user.delete({ where: { id } });
-  } catch (e) {
-    if (!isForeignKeyError(e)) throw e;
-    archived = true;
-    await prisma.user.update({
-      where: { id },
-      data: { active: false, siteId: null },
-    });
-  }
+  const archived = await removeUserRecord(id);
 
   await writeAudit({
     actor: admin,
@@ -439,5 +450,110 @@ export async function deleteUser(formData: FormData): Promise<ActionResult> {
     message: archived
       ? `${user.name} removed. Their recognition history meant the record was archived, not deleted.`
       : `${user.name} removed.`,
+  };
+}
+
+// ---------- Testing the first sign-in ----------
+
+/**
+ * Admin > Users: put someone back to how a brand-new account starts, to try
+ * the first-sign-in experience again. The app tour opens for them on their
+ * next page load, the Store and Rewards show everything as New, and (if asked)
+ * the birthday step comes back.
+ *
+ * Their welcome points are taken back in the same transaction, so finishing
+ * the tour again pays them once more and nobody ends up with extra points:
+ * safe to use on real accounts on production. Their wallet can dip below zero
+ * if they've already spent those points; finishing the tour brings it back.
+ */
+export async function restartOnboarding(formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const clearBirthday = String(formData.get("clearBirthday") ?? "") === "true";
+  if (!id) return { ok: false, error: "Missing user." };
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, name: true, siteId: true },
+  });
+  if (!user) return { ok: false, error: "That user no longer exists." };
+
+  const takenBack = await prisma.$transaction(async (tx) => {
+    // Net welcome points they hold now (earlier restarts left a matching
+    // negative row), so repeated restarts never take back more than was paid.
+    const welcome = await tx.rewardLedger.aggregate({
+      where: { userId: id, type: "WELCOME" },
+      _sum: { amount: true },
+    });
+    const net = welcome._sum.amount ?? 0;
+    if (net > 0) {
+      await tx.rewardLedger.create({
+        data: {
+          userId: id,
+          amount: -net,
+          type: "WELCOME",
+          sourceType: "onboarding",
+          sourceId: id,
+          note: "Welcome points taken back: app tour restarted by an admin",
+        },
+      });
+    }
+    await tx.user.update({
+      where: { id },
+      data: {
+        onboardedAt: null,
+        shopSeenAt: null,
+        rewardsSeenAt: null,
+        claimsSeenAt: null,
+        ...(clearBirthday ? { birthday: null } : {}),
+        ...(net > 0 ? { walletBalance: { decrement: net } } : {}),
+      },
+    });
+    return Math.max(net, 0);
+  });
+
+  await writeAudit({
+    actor: admin,
+    action: "user.onboarding_restarted",
+    entityType: "user",
+    entityId: id,
+    summary: `Restarted the first sign-in for ${user.name}${clearBirthday ? " (birthday cleared)" : ""}${takenBack ? `, took back ${takenBack} welcome points` : ""}`,
+    metadata: { clearBirthday, takenBack },
+    siteId: user.siteId,
+  });
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    message: `${user.name} will see the first sign-in again on their next page load.${takenBack ? ` ${takenBack} welcome points taken back until they finish the tour.` : ""}`,
+  };
+}
+
+/**
+ * Admin > Users: remove every throwaway test account (lib/test-accounts.ts)
+ * made with "Try as a new person" on the sign-in page. Same as removing each
+ * one by hand: deleted outright, or archived if they did anything.
+ */
+export async function removeTestAccounts(): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const tests = await prisma.user.findMany({
+    where: { email: { endsWith: `@${TEST_EMAIL_DOMAIN}` }, siteId: { not: null } },
+    select: { id: true, email: true },
+  });
+  const ids = tests.filter((t) => isTestEmail(t.email) && t.id !== admin.id).map((t) => t.id);
+  if (ids.length === 0) return { ok: true, message: "There are no test accounts." };
+  for (const id of ids) await removeUserRecord(id);
+  await writeAudit({
+    actor: admin,
+    action: "user.deleted",
+    entityType: "user",
+    entityId: admin.id,
+    summary: `Removed ${ids.length} test ${ids.length === 1 ? "account" : "accounts"}`,
+    metadata: { ids },
+  });
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/sites");
+  return {
+    ok: true,
+    message: `Removed ${ids.length} test ${ids.length === 1 ? "account" : "accounts"}.`,
   };
 }

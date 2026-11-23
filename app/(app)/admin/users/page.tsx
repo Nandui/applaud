@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { UsersManager, type UserRow } from "@/components/admin/users-manager";
 import { GooglePhotosButton } from "@/components/admin/google-photos-button";
 import { googleSignInEnabled } from "@/lib/auth/mode";
+import { isTestEmail } from "@/lib/test-accounts";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Users" };
@@ -34,6 +35,7 @@ export default async function AdminUsersPage() {
         birthday: true,
         active: true,
         needsReview: true,
+        onboardedAt: true,
         site: { select: { name: true } },
         managers: {
           orderBy: { manager: { name: "asc" } },
@@ -64,6 +66,8 @@ export default async function AdminUsersPage() {
     birthday: isoDate(u.birthday),
     active: u.active,
     needsReview: u.needsReview,
+    onboarded: u.onboardedAt !== null,
+    isTest: isTestEmail(u.email),
   }));
 
   const managers = users.map((u) => ({ id: u.id, name: u.name }));
