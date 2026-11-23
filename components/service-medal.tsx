@@ -2,11 +2,11 @@
 
 import { useId } from "react";
 import { cn } from "@/lib/utils";
-import { serviceTier, yearsLabel, type ServiceTier, type ServiceTierKey } from "@/lib/service";
+import { medalFigure, serviceLabel, serviceTier, type ServiceTier, type ServiceTierKey } from "@/lib/service";
 
 /**
- * Years-of-service medals: a struck metal medal on a striped ribbon, a laurel
- * wreath round the number of years. Deliberately unlike the holo hexagons
+ * Length-of-service medals: a struck metal medal on a striped ribbon, a laurel
+ * wreath round the months or years. Deliberately unlike the holo hexagons
  * used for values and awards, so it reads as an honour rather than a sticker.
  * Each tier is a rarer metal; gold and up catch the light now and then, and
  * the top two glow. All motion is off with reduced motion (globals.css,
@@ -27,6 +27,13 @@ type Metal = {
 };
 
 const METALS: Record<ServiceTierKey, Metal> = {
+  steel: {
+    rim: ["#f1f4f7", "#8d98a6", "#3f4752"],
+    face: ["#6d7887", "#2f3742"],
+    relief: ["#ffffff", "#cdd5df"],
+    ribbon: ["#2f3742", "#9aa5b3"],
+    glow: "#6d7887",
+  },
   bronze: {
     rim: ["#ffd9b3", "#c47a3a", "#6e3812"],
     face: ["#b8692c", "#6b3410"],
@@ -34,12 +41,26 @@ const METALS: Record<ServiceTierKey, Metal> = {
     ribbon: ["#7a2e1c", "#e0a060"],
     glow: "#c47a3a",
   },
+  copper: {
+    rim: ["#ffd0b8", "#d0643a", "#6e2410"],
+    face: ["#c2552c", "#6a1f0c"],
+    relief: ["#ffe0d0", "#f0a07a"],
+    ribbon: ["#0f5c5c", "#f0a07a"],
+    glow: "#d0643a",
+  },
   silver: {
     rim: ["#ffffff", "#c3c8d3", "#6c7384"],
     face: ["#a9afbd", "#5c6375"],
     relief: ["#ffffff", "#d3d7e0"],
     ribbon: ["#1f2e5c", "#e8ebf2"],
     glow: "#8a93a8",
+  },
+  rosegold: {
+    rim: ["#ffe4e0", "#e2938a", "#8a4a47"],
+    face: ["#d8847c", "#7e3c3c"],
+    relief: ["#fff0ec", "#f6c3bb"],
+    ribbon: ["#5b1d3a", "#f6c3bb"],
+    glow: "#d4837a",
   },
   gold: {
     rim: ["#fff4c2", "#e2a91c", "#7c5302"],
@@ -77,7 +98,7 @@ const LEAVES: [number, number, number][] = (() => {
   const R = 24.5;
   for (const side of [-1, 1]) {
     for (let i = 0; i < 6; i++) {
-      // From the lower side (θ=46°) round to the shoulder (θ=146°), leaving room for "YEARS".
+      // From the lower side (θ=46°) round to the shoulder (θ=146°), leaving room for "YEARS" under the number.
       const theta = ((46 + i * 20) * Math.PI) / 180;
       const nx = side * Math.sin(theta);
       const ny = Math.cos(theta);
@@ -101,35 +122,38 @@ function round(n: number) {
 }
 
 export function ServiceMedal({
-  years,
+  months,
   size = 64,
   tier: tierOverride,
   locked = false,
   className,
 }: {
-  /** Whole years of service. */
-  years: number;
+  /** Whole months of service. */
+  months: number;
   /** Width in px; the medal with its ribbon is 1.2× as tall. */
   size?: number;
-  /** Draw this tier instead of the one `years` earns (the ladder of medals). */
+  /** Draw this tier instead of the one `months` earns (the ladder of medals). */
   tier?: ServiceTier;
   /** Not earned yet: greyed out. */
   locked?: boolean;
   className?: string;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const tier = tierOverride ?? serviceTier(years);
+  const tier = tierOverride ?? serviceTier(months);
   if (!tier) return null;
   const m = METALS[tier.key];
   // Below 32px only the medal itself is drawn: no ribbon, no wreath.
   const mini = size < 32;
   // Tiers only show their milestone; Legends show their real count.
-  const shown = tier.key === "legend" && !tierOverride ? Math.max(years, tier.years) : tier.years;
-  const digits = String(shown).length;
+  const served = tier.key === "legend" && !tierOverride ? Math.max(months, tier.months) : tier.months;
+  const figure = medalFigure(served);
+  // Too small for "MONTHS" under the number, so half a year reads "½".
+  const shown = mini && served < 12 ? "½" : String(figure.value);
+  const digits = shown.length;
   const id = (k: string) => `sm-${uid}-${k}`;
   const label = locked
-    ? `${tier.name} service medal, ${yearsLabel(tier.years)}: not earned yet`
-    : `${tier.name} service medal: ${yearsLabel(shown)} of service`;
+    ? `${tier.name} service medal, ${serviceLabel(tier.months)}: not earned yet`
+    : `${tier.name} service medal: ${serviceLabel(served)} of service`;
 
   return (
     <span
@@ -209,7 +233,7 @@ export function ServiceMedal({
         )}
 
         {/* Stars over the number: one for Platinum, two for Diamond, three for Legend. */}
-        {!mini && tier.years >= 10 && (
+        {!mini && starsFor(tier.key).length > 0 && (
           <g fill={`url(#${id("relief")})`}>
             {starsFor(tier.key).map((x) => (
               <path key={x} d={star(x, 29.5, 3.4)} />
@@ -244,8 +268,8 @@ export function ServiceMedal({
             {shown}
           </text>
           {!mini && (
-            <text x="50" y="72" fontSize="6.4" letterSpacing="1.4" fill={m.relief[0]} opacity="0.9">
-              {shown === 1 ? "YEAR" : "YEARS"}
+            <text x="50" y="72" fontSize={figure.unit.length > 5 ? 5.4 : 6.4} letterSpacing={figure.unit.length > 5 ? 1 : 1.4} fill={m.relief[0]} opacity="0.9">
+              {figure.unit}
             </text>
           )}
         </g>
@@ -262,7 +286,8 @@ export function ServiceMedal({
 function starsFor(key: ServiceTierKey): number[] {
   if (key === "legend") return [41, 50, 59];
   if (key === "diamond") return [45.5, 54.5];
-  return [50];
+  if (key === "platinum") return [50];
+  return [];
 }
 
 /** A five-pointed star centred on (cx, cy). */

@@ -6,7 +6,7 @@ import { AUTHORED_KINDS } from "@/lib/posts/kinds";
 import { audienceLabel, audienceLabels, audienceWhere } from "@/lib/posts/audience";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
-import { serviceYears } from "@/lib/service";
+import { serviceMonths } from "@/lib/service";
 import type { Cosmetic, FrameArt, Look } from "@/lib/cosmetics";
 import {
   summarizeCommentReactions,
@@ -107,8 +107,8 @@ export type FeedCard = {
     avatarUrl: string | null;
     jobTitle: string | null;
     look: Look;
-    /** Whole years of service, for their medal (null without a start date). */
-    serviceYears: number | null;
+    /** Whole months of service, for their medal (null without a start date). */
+    serviceMonths: number | null;
   };
   value: { name: string; icon: string | null; color: string | null; imageUrl: string | null } | null;
   recipients: {
@@ -117,7 +117,7 @@ export type FeedCard = {
     avatarUrl: string | null;
     points: number;
     look: Look;
-    serviceYears: number | null;
+    serviceMonths: number | null;
   }[];
   pointsEach: number;
   reactions: ReactionSummary[];
@@ -227,7 +227,7 @@ export function toFeedCard(
       avatarUrl: r.sender.avatarUrl,
       jobTitle: r.sender.jobTitle,
       look: lookOf(r.sender.profile, catalogue),
-      serviceYears: serviceYears(r.sender.hireDate),
+      serviceMonths: serviceMonths(r.sender.hireDate),
     },
     value: r.value
       ? { name: r.value.name, icon: r.value.icon, color: r.value.color, imageUrl: r.value.imageUrl }
@@ -238,7 +238,7 @@ export function toFeedCard(
       avatarUrl: rr.user.avatarUrl,
       points: rr.points,
       look: lookOf(rr.user.profile, catalogue),
-      serviceYears: serviceYears(rr.user.hireDate),
+      serviceMonths: serviceMonths(rr.user.hireDate),
     })),
     pointsEach: r.recipients[0]?.points ?? 0,
     reactions: [...grouped.entries()].map(([emoji, g]) => ({

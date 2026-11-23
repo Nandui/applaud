@@ -4,20 +4,20 @@ import {
   SERVICE_TIERS,
   anniversaryOf,
   nextServiceTier,
+  serviceLabel,
   serviceTier,
-  yearsLabel,
 } from "@/lib/service";
 import type { ProfileData } from "@/lib/profile";
 
 /**
- * Years of service on a profile: a plaque with their medal under the name
- * (from one year on), and in the Showcase the whole ladder of medals with the
- * ones still to come greyed out and when the next one arrives.
+ * Length of service on a profile: a plaque with their medal under the name
+ * (from six months on), and in the Showcase the whole ladder of medals with
+ * the ones still to come greyed out and when the next one arrives.
  */
 
-/** The plaque under the name. Nothing before someone's first year. */
+/** The plaque under the name. Nothing before someone's first six months. */
 export function ServicePlaque({ service }: { service: NonNullable<ProfileData["service"]> }) {
-  const tier = serviceTier(service.years);
+  const tier = serviceTier(service.months);
   if (!tier) return null;
   const accent = tier.accent;
   return (
@@ -28,15 +28,15 @@ export function ServicePlaque({ service }: { service: NonNullable<ProfileData["s
         borderColor: `color-mix(in srgb, ${accent} 45%, transparent)`,
       }}
     >
-      <ServiceMedal years={service.years} size={46} />
+      <ServiceMedal months={service.months} size={46} />
       <div className="min-w-0 leading-tight">
         <p
           className="text-[0.68rem] font-extrabold tracking-[0.14em] uppercase"
           style={{ color: `color-mix(in srgb, ${accent} 75%, var(--foreground))` }}
         >
-          {tier.name} · Years of service
+          {tier.name} · Service medal
         </p>
-        <p className="text-[1.05rem] font-extrabold tracking-tight">{yearsLabel(service.years)} with the team</p>
+        <p className="text-[1.05rem] font-extrabold tracking-tight">{serviceLabel(service.months)} with the team</p>
         <p className="text-muted text-xs">Since {format(service.since, "MMMM yyyy")}</p>
       </div>
     </div>
@@ -53,11 +53,11 @@ export function ServiceLadder({
   firstName: string;
   isMe: boolean;
 }) {
-  const next = nextServiceTier(service.years);
-  const current = serviceTier(service.years);
-  const nextOn = next ? anniversaryOf(service.since, next.years) : null;
+  const next = nextServiceTier(service.months);
+  const current = serviceTier(service.months);
+  const nextOn = next ? anniversaryOf(service.since, next.months) : null;
   // How far from the last medal (or the start date) to the next one.
-  const from = current ? anniversaryOf(service.since, current.years) : service.since;
+  const from = current ? anniversaryOf(service.since, current.months) : service.since;
   const progress =
     nextOn && nextOn > from
       ? Math.min(1, Math.max(0, (service.asOf.getTime() - from.getTime()) / (nextOn.getTime() - from.getTime())))
@@ -66,19 +66,19 @@ export function ServiceLadder({
 
   return (
     <div>
-      <ol className="grid grid-cols-6 gap-1">
+      <ol className="grid grid-cols-5 gap-x-1 gap-y-3 sm:grid-cols-9">
         {SERVICE_TIERS.map((t) => {
-          const earned = service.years >= t.years;
+          const earned = service.months >= t.months;
           return (
             <li key={t.key} className="flex flex-col items-center gap-1 text-center">
               <ServiceMedal
-                years={t.key === "legend" && earned ? service.years : t.years}
+                months={t.key === "legend" && earned ? service.months : t.months}
                 tier={t.key === "legend" && earned ? undefined : t}
                 locked={!earned}
-                size={52}
+                size={50}
               />
               <span className={earned ? "text-xs font-bold" : "text-muted text-xs"}>
-                {t.years === 20 ? "20+" : t.years} {t.years === 1 ? "yr" : "yrs"}
+                {ladderLabel(t.months)}
               </span>
             </li>
           );
@@ -91,7 +91,7 @@ export function ServiceLadder({
           </div>
           <p className="text-muted mt-2 text-sm">
             {current ? "Next" : isMe ? "Your first medal" : `${firstName}'s first medal`}:{" "}
-            <span className="text-foreground font-semibold">{next.name}</span> at {yearsLabel(next.years)}, on{" "}
+            <span className="text-foreground font-semibold">{next.name}</span> at {serviceLabel(next.months)}, on{" "}
             {format(nextOn, "d MMMM yyyy")}
           </p>
         </div>
@@ -102,4 +102,11 @@ export function ServiceLadder({
       )}
     </div>
   );
+}
+
+/** "6 mo", "1 yr", "5 yrs", "20+ yrs" under each medal of the ladder. */
+function ladderLabel(months: number): string {
+  if (months < 12) return `${months} mo`;
+  const years = months / 12;
+  return years >= 20 ? "20+ yrs" : `${years} ${years === 1 ? "yr" : "yrs"}`;
 }

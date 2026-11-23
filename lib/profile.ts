@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { parseProfile, resolveLook } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import { COSMETIC_KINDS, RARITIES } from "@/lib/cosmetics";
-import { serviceYears } from "@/lib/service";
+import { serviceMonths } from "@/lib/service";
 
 export const CELEBRATION_LABELS: Record<string, string> = {
   work_anniversary: "Work anniversary",
@@ -134,9 +134,9 @@ export const getProfileData = cache(async (userId: string) => {
     },
     valueTags,
     celebrations,
-    /** Years of service from their start date (null when no start date is set). */
+    /** Length of service from their start date (null when no start date is set). */
     service: user.hireDate
-      ? { since: user.hireDate, years: serviceYears(user.hireDate) ?? 0, asOf: new Date() }
+      ? { since: user.hireDate, months: serviceMonths(user.hireDate) ?? 0, asOf: new Date() }
       : null,
     awards: awards.map((a) => ({
       id: a.id,

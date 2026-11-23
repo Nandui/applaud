@@ -180,10 +180,10 @@ function BannerHero({ card }: { card: FeedCard }) {
   );
 }
 
-/** A small years-of-service medal after someone's name, from one year on. */
-function NameMedal({ years }: { years: number | null }) {
-  if (!years) return null;
-  return <ServiceMedal years={years} size={18} className="ml-1 -translate-y-px" />;
+/** A small service medal after someone's name, from six months on. */
+function NameMedal({ months }: { months: number | null }) {
+  if (!months) return null;
+  return <ServiceMedal months={months} size={18} className="ml-1 -translate-y-px" />;
 }
 
 /** The feed column is at most 576px wide; photos are resized to fit it. */
@@ -464,14 +464,14 @@ export function RecognitionCard({
             {isPost ? (
               <>
                 <Link href={`/profile/${card.sender.id}`}>{card.sender.name}</Link>
-                <NameMedal years={card.sender.serviceYears} />
+                <NameMedal months={card.sender.serviceMonths} />
               </>
             ) : (
               card.recipients.map((r, i) => (
                 <Fragment key={r.id}>
                   {i > 0 && (i === card.recipients.length - 1 ? " & " : ", ")}
                   <Link href={`/profile/${r.id}`}>{r.name}</Link>
-                  <NameMedal years={r.serviceYears} />
+                  <NameMedal months={r.serviceMonths} />
                 </Fragment>
               ))
             )}
