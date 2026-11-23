@@ -103,9 +103,12 @@ function artFor(name: string) {
 export function RewardArt({
   reward,
   className,
+  icon: Icon = Gift,
 }: {
   reward: Pick<RewardCardData, "name" | "imageUrl">;
   className?: string;
+  /** Shown on the coloured fallback when there's no picture. */
+  icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 }) {
   return reward.imageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -123,7 +126,7 @@ export function RewardArt({
         className,
       )}
     >
-      <Gift className="size-10 drop-shadow" strokeWidth={1.6} />
+      <Icon className="size-10 drop-shadow" strokeWidth={1.6} />
     </span>
   );
 }

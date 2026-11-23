@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/format";
 import { AppBar, appBarIconClass } from "@/components/app-shell/app-bar";
 import { RewardCard } from "@/components/rewards/reward-card";
-import { DiscountCard } from "@/components/rewards/discount-card";
+import { StaffDiscounts } from "@/components/rewards/discount-card";
 import { endsLabel, promoRank, promoState } from "@/lib/reward-promo";
 import { StoreTabs } from "@/components/shop/store-tabs";
 import { cn } from "@/lib/utils";
@@ -141,6 +141,9 @@ export default async function RewardsPage({
       {/* A filtered view doesn't show everything, so only the full list counts as seen. */}
       {!filtered ? <MarkSeen area="rewards" renderedAt={renderedAt} /> : null}
 
+      {/* Staff discounts lead the page: they're for everyone, every day. */}
+      {!filtered ? <StaffDiscounts discounts={discounts} /> : null}
+
       {/* Balance hero */}
       <section className="bg-surface mt-4 rounded-2xl p-4">
         <div>
@@ -162,20 +165,6 @@ export default async function RewardsPage({
       </section>
 
       {!filtered ? <ClaimsStrip claims={myClaims} /> : null}
-
-      {!filtered && discounts.length > 0 ? (
-        <section className="mt-6" aria-labelledby="discounts-heading">
-          <h2 id="discounts-heading" className="mb-2 flex items-baseline gap-2 text-[0.95rem] font-bold">
-            Staff discounts
-            <span className="text-muted text-xs font-medium">Always on, no points needed</span>
-          </h2>
-          <div className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">
-            {discounts.map((d) => (
-              <DiscountCard key={d.id} discount={d} />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {!filtered && featured.length > 0 ? (
         <section className="mt-6" aria-labelledby="featured-heading">

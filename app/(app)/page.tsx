@@ -12,6 +12,9 @@ import { RecognitionCard } from "@/components/feed/recognition-card";
 import { FramedAvatar } from "@/components/user-avatar";
 import { getActiveClaims } from "@/lib/claims";
 import { ClaimsHomeRow } from "@/components/rewards/active-claims";
+import { DiscountsHomeRow } from "@/components/rewards/discount-card";
+import { visibleRewardsWhere } from "@/lib/new-items";
+import { isNewSince } from "@/lib/seen";
 import { BirthdayHomeCard } from "@/components/birthday/birthday-prompt";
 import { getBirthdayPoints } from "@/lib/birthday-points";
 import { getOrgSettings } from "@/lib/org-settings";
@@ -22,16 +25,21 @@ export const dynamic = "force-dynamic";
 export default async function FeedPage() {
   const me = await requireUser();
   const askBirthday = (me.onboarded ?? true) && !(me.hasBirthday ?? true);
-  const [cards, wallet, catalogue, myClaims, birthdayPoints, settings] = await Promise.all([
+  const [cards, wallet, catalogue, myClaims, birthdayPoints, settings, discounts] = await Promise.all([
     getFeedCards(me.id),
     prisma.user.findUnique({
       where: { id: me.id },
-      select: { walletBalance: true, profile: true },
+      select: { walletBalance: true, profile: true, rewardsSeenAt: true },
     }),
     getCatalogue(),
     getActiveClaims(me.id),
     askBirthday ? getBirthdayPoints() : 0,
     getOrgSettings(),
+    prisma.reward.findMany({
+      where: { ...visibleRewardsWhere(me), kind: "discount" },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { name: true, discountText: true, listedAt: true },
+    }),
   ]);
   const myFrame = lookOf(wallet?.profile, catalogue).frame;
   const viewer = {
@@ -94,6 +102,14 @@ export default async function FeedPage() {
       {askBirthday ? <BirthdayHomeCard points={birthdayPoints} /> : null}
 
       <ClaimsHomeRow claims={myClaims} />
+
+      <DiscountsHomeRow
+        discounts={discounts.map((d) => ({
+          name: d.name,
+          discountText: d.discountText,
+          isNew: isNewSince(d.listedAt, wallet?.rewardsSeenAt ?? null),
+        }))}
+      />
 
       {/* December only: spend your points before 31 Dec. */}
       <WalletExpiryHomeRow
