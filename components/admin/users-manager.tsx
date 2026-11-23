@@ -301,7 +301,7 @@ function UserFormDialog({
             </div>
             <p className="text-muted col-span-2 -mt-1.5 text-xs">
               The app role decides what they can open. The points rank decides how many points
-              they can give each month (set in Economy).
+              they can give each month (set in Economy). Backoffice gets none to give.
             </p>
             <div className="col-span-2 space-y-1.5">
               <Label>Site</Label>
