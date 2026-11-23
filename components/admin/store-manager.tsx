@@ -185,10 +185,10 @@ function FitSlider({
   );
 }
 
-/** The small sizes; `outer` is the photo plus its gap in px. */
+/** The small sizes; `outer` is the photo's diameter in px. */
 const PREVIEW_SIZES = [
-  { label: "Comments", className: "size-9", outer: 42 },
-  { label: "Feed", className: "size-14", outer: 62 },
+  { label: "Comments", className: "size-9", outer: 36 },
+  { label: "Feed", className: "size-14", outer: 56 },
 ];
 
 /** One nudge with the arrow keys, as a share of the picture (Shift: 5×). */
@@ -269,9 +269,9 @@ function FitStage({
         onKeyDown={onKeyDown}
         className="focus-visible:ring-primary flex cursor-move touch-none justify-center py-3 outline-none select-none focus-visible:ring-2 focus-visible:ring-inset"
       >
-        {/* --d: the profile avatar's outer size (photo + gap), as on the profile page. */}
+        {/* --d: the profile photo's size, as on the profile page. */}
         <span
-          className="flex [--d:124px] sm:[--d:160px]"
+          className="flex [--d:112px] sm:[--d:144px]"
           style={{
             padding: `calc(var(--d) * ${overhang.top}) calc(var(--d) * ${overhang.right}) calc(var(--d) * ${overhang.bottom}) calc(var(--d) * ${overhang.left})`,
           }}
@@ -287,7 +287,7 @@ function FitStage({
             />
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed border-sky-500/90"
+              className="pointer-events-none absolute inset-[6px] rounded-full border-2 border-dashed border-sky-500/90 sm:inset-[8px]"
             />
           </span>
         </span>

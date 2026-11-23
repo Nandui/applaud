@@ -138,10 +138,10 @@ export default async function ProfilePage({
           }
         >
           <div className="rise-in relative -mt-16 flex items-end justify-between gap-3 sm:-mt-20" style={rise(0)}>
-            {/* --d is the avatar's outer size (photo + gap) at each breakpoint;
+            {/* --d is the photo's size at each breakpoint (frame fits are in photo widths);
                 a big uploaded frame gets room on the left and below. */}
             <span
-              className="flex shrink-0 [--d:124px] sm:[--d:160px]"
+              className="flex shrink-0 [--d:112px] sm:[--d:144px]"
               style={{
                 marginLeft: `calc(var(--d) * ${overhang.left})`,
                 marginBottom: `calc(var(--d) * ${overhang.bottom})`,

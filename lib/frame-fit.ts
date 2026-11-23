@@ -17,7 +17,7 @@
  */
 
 export type FrameFit = {
-  /** Picture width as a multiple of the avatar's diameter (including its gap). */
+  /** Picture width as a multiple of the avatar photo's diameter (the see-through middle hugs the photo). */
   size: number;
   /** The point of the picture (0..1 of its width) drawn on the avatar's centre. */
   x: number;
@@ -128,6 +128,108 @@ function holeCircle(label: Int32Array, id: number, width: number, height: number
 const CLEAR = 96;
 
 /**
+ * For each pixel, roughly how far (in pixels) it is from the nearest bit of
+ * artwork: 0 on the art, growing across see-through areas. Two-pass chamfer
+ * distance, close enough to round for closing small gaps.
+ */
+function distanceToArt(rgba: ArrayLike<number>, width: number, height: number): Float32Array {
+  const n = width * height;
+  const far = width + height;
+  const d = new Float32Array(n);
+  for (let i = 0; i < n; i++) d[i] = rgba[i * 4 + 3] <= CLEAR ? far : 0;
+  const D = Math.SQRT2;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (d[i] === 0) continue;
+      let v = d[i];
+      if (x > 0) v = Math.min(v, d[i - 1] + 1);
+      if (y > 0) {
+        v = Math.min(v, d[i - width] + 1);
+        if (x > 0) v = Math.min(v, d[i - width - 1] + D);
+        if (x < width - 1) v = Math.min(v, d[i - width + 1] + D);
+      }
+      d[i] = v;
+    }
+  }
+  for (let y = height - 1; y >= 0; y--) {
+    for (let x = width - 1; x >= 0; x--) {
+      const i = y * width + x;
+      if (d[i] === 0) continue;
+      let v = d[i];
+      if (x < width - 1) v = Math.min(v, d[i + 1] + 1);
+      if (y < height - 1) {
+        v = Math.min(v, d[i + width] + 1);
+        if (x < width - 1) v = Math.min(v, d[i + width + 1] + D);
+        if (x > 0) v = Math.min(v, d[i + width - 1] + D);
+      }
+      d[i] = v;
+    }
+  }
+  return d;
+}
+
+/**
+ * The biggest see-through patch the artwork encloses once every see-through
+ * pixel within `k` of the art counts as art (which closes gaps up to 2k wide),
+ * as a circle (see holeCircle). Null when nothing big enough is enclosed:
+ * specks inside the artwork aren't the hole.
+ */
+function enclosedHole(reach: Float32Array, k: number, width: number, height: number) {
+  const n = width * height;
+  // 0 = art, 1 = see-through, 2 = see-through and reachable from the edge, 3 = enclosed.
+  const cell = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (reach[i] > k) cell[i] = 1;
+
+  const stack: number[] = [];
+  const flood = (start: number, to: number, visit?: (i: number) => void) => {
+    stack.push(start);
+    cell[start] = to;
+    while (stack.length) {
+      const i = stack.pop()!;
+      visit?.(i);
+      const x = i % width;
+      const near = [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, i - width, i + width];
+      for (const j of near) {
+        if (j >= 0 && j < n && cell[j] === 1) {
+          cell[j] = to;
+          stack.push(j);
+        }
+      }
+    }
+  };
+
+  // Everything see-through that touches the edge is outside the ring.
+  for (let x = 0; x < width; x++) {
+    for (const i of [x, (height - 1) * width + x]) if (cell[i] === 1) flood(i, 2);
+  }
+  for (let y = 0; y < height; y++) {
+    for (const i of [y * width, y * width + width - 1]) if (cell[i] === 1) flood(i, 2);
+  }
+
+  // What's left see-through is enclosed. The biggest enclosed patch is the hole.
+  const label = new Int32Array(n).fill(-1);
+  let patch = 0;
+  let best = -1;
+  let bestArea = 0;
+  for (let i = 0; i < n; i++) {
+    if (cell[i] !== 1) continue;
+    let area = 0;
+    flood(i, 3, (j) => {
+      label[j] = patch;
+      area++;
+    });
+    if (area > bestArea) {
+      bestArea = area;
+      best = patch;
+    }
+    patch++;
+  }
+  if (best < 0 || bestArea < n * 0.03) return null;
+  return holeCircle(label, best, width, height);
+}
+
+/**
  * Work out a frame's fit from its pixels (RGBA, row by row, as a canvas gives
  * them): find the see-through hole the ring encloses, put the hole's centre on
  * the avatar's centre and size the picture so the hole is exactly the avatar.
@@ -139,73 +241,36 @@ const CLEAR = 96;
 export function detectFrameFit(rgba: ArrayLike<number>, width: number, height: number): FrameFit | null {
   const n = width * height;
   if (n === 0 || rgba.length < n * 4) return null;
-  // 0 = opaque, 1 = see-through, 2 = see-through and reachable from the edge.
-  const cell = new Uint8Array(n);
   let clear = 0;
-  for (let i = 0; i < n; i++) {
-    if (rgba[i * 4 + 3] <= CLEAR) {
-      cell[i] = 1;
-      clear++;
-    }
-  }
+  for (let i = 0; i < n; i++) if (rgba[i * 4 + 3] <= CLEAR) clear++;
   if (clear === 0) return null;
 
-  const stack: number[] = [];
-  const flood = (start: number, from: number, to: number, visit?: (i: number) => void) => {
-    stack.push(start);
-    cell[start] = to;
-    while (stack.length) {
-      const i = stack.pop()!;
-      visit?.(i);
-      const x = i % width;
-      const near = [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, i - width, i + width];
-      for (const j of near) {
-        if (j >= 0 && j < n && cell[j] === from) {
-          cell[j] = to;
-          stack.push(j);
-        }
-      }
-    }
-  };
-
-  // Everything see-through that touches the edge is outside the ring.
-  for (let x = 0; x < width; x++) {
-    for (const i of [x, (height - 1) * width + x]) if (cell[i] === 1) flood(i, 1, 2);
-  }
-  for (let y = 0; y < height; y++) {
-    for (const i of [y * width, y * width + width - 1]) if (cell[i] === 1) flood(i, 1, 2);
-  }
-
-  // What's left see-through is enclosed. The biggest enclosed patch is the hole.
-  const label = new Int32Array(n).fill(-1);
-  let patch = 0;
-  let best = -1;
-  let bestArea = 0;
-  for (let i = 0; i < n; i++) {
-    if (cell[i] !== 1) continue;
-    let area = 0;
-    flood(i, 1, 3, (j) => {
-      label[j] = patch;
-      area++;
-    });
-    if (area > bestArea) {
-      bestArea = area;
-      best = patch;
-    }
-    patch++;
-  }
-
-  // Specks inside the artwork aren't the hole; it has to be a real part of the picture.
-  if (best >= 0 && bestArea >= n * 0.03) {
-    const hole = holeCircle(label, best, width, height);
+  // Rings drawn from separate pieces (swooshes, snowflakes, a scarf) often
+  // leave hairline gaps, so the middle leaks out to the edge and isn't a hole.
+  // Close gaps of growing width by fattening the artwork, find the hole, then
+  // grow it back by the same amount.
+  const reach = distanceToArt(rgba, width, height);
+  const side = Math.min(width, height);
+  for (const k of [0, 0.01, 0.02, 0.035, 0.05].map((f) => Math.round(f * side))) {
+    if (!enclosedHole(reach, k, width, height)) continue;
+    // Just sealed, a gap still dents the hole's edge; seal it a bit more so
+    // the dent doesn't widen the circle.
+    const sealed = k === 0 ? 0 : Math.ceil(k * 1.5) + 1;
+    const tighter = enclosedHole(reach, sealed, width, height);
+    const used = tighter ? sealed : k;
+    const hole = tighter ?? enclosedHole(reach, k, width, height)!;
     return clampFit({
-      size: width / hole.d,
+      size: width / (hole.d + 2 * used),
       x: hole.cx / width,
       y: hole.cy / height,
     });
   }
 
-  // No enclosed hole: centre the visible artwork and draw it 20% bigger than the avatar.
+  // Still no enclosed hole: centre the visible artwork and draw it 20% bigger
+  // than the avatar.
+  const cell = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (rgba[i * 4 + 3] <= CLEAR) cell[i] = 1;
+
   let minX = width;
   let maxX = -1;
   let minY = height;
