@@ -146,11 +146,11 @@ function steps(userId: string, allowance: number, askBirthday: boolean): Step[] 
       route: "/",
       // An empty feed has no posts to point at, so fall back to the composer.
       targets: ["post-actions", "composer"],
-      title: "Like and comment",
+      title: "React and comment",
       body: (
         <>
-          Home is where recognitions and posts from the whole team land. Tap the <B>heart</B> to like,
-          hold it for more reactions, and tap the <B>bubble</B> to comment.
+          Home is where recognitions and posts from the whole team land. Tap the <B>smiley</B> to react
+          with an emoji, and tap the <B>bubble</B> to comment.
         </>
       ),
     },
