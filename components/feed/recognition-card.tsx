@@ -19,6 +19,7 @@ import {
   Trash2,
   BarChart3,
   MessageCircleQuestion,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { toggleReaction, toggleBoost, deletePost } from "@/lib/recognition/actions";
@@ -481,6 +482,12 @@ export function RecognitionCard({
               {isPost && !card.sender.jobTitle ? "" : "· "}
               {card.createdAtLabel}
             </time>
+            {card.audienceLabel && (
+              <span className="flex shrink-0 items-center gap-0.5">
+                · <MapPin className="size-3.5" />
+                {card.audienceLabel}
+              </span>
+            )}
           </p>
         </div>
         {(canPin || canDelete) && (

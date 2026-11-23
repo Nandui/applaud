@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { canViewerSee } from "@/lib/posts/audience";
 import { getCatalogue } from "@/lib/catalogue";
 import { commentInclude, toFeedComment, type FeedCardComment } from "@/lib/recognition/queries";
 import {
@@ -10,15 +11,12 @@ import { TYPING_FRESH_MS, type TypingUser } from "@/lib/recognition/live-config"
 /** Most comments one poll returns; the rest come on the next poll. */
 const MAX_COMMENTS = 100;
 
-/** Whether the viewer may see this post. Everything is public, so: whether it exists. */
-export async function canSeeRecognition(recognitionId: string) {
-  const row = await prisma.recognition.findFirst({
-    where: {
-      id: recognitionId,
-    },
-    select: { id: true },
-  });
-  return Boolean(row);
+/**
+ * Whether the viewer may see this post: it exists and, for a poll or
+ * question limited to certain sites, the viewer is at one of them.
+ */
+export async function canSeeRecognition(recognitionId: string, viewerId: string) {
+  return canViewerSee(recognitionId, viewerId);
 }
 
 /**

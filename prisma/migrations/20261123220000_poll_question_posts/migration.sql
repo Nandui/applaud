@@ -1,6 +1,7 @@
 -- AlterTable
 ALTER TABLE "Recognition" ADD COLUMN     "pollClosesAt" TIMESTAMP(3),
-ADD COLUMN     "pollShowResults" BOOLEAN NOT NULL DEFAULT true;
+ADD COLUMN     "pollShowResults" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "audienceSiteIds" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
 -- CreateTable
 CREATE TABLE "PollOption" (

@@ -271,6 +271,9 @@ export async function toggleReaction(formData: FormData): Promise<ActionResult> 
   });
   if (!parsed.success) return { ok: false, error: "Invalid reaction." };
   const { recognitionId, emoji } = parsed.data;
+  if (!(await canSeeRecognition(recognitionId, me.id))) {
+    return { ok: false, error: "That post no longer exists." };
+  }
 
   const existing = await prisma.reaction.findFirst({
     where: { recognitionId, userId: me.id },
@@ -341,7 +344,9 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
     where: { id: parsed.data.recognitionId },
     select: { kind: true },
   });
-  if (!target) return { ok: false, error: "That post no longer exists." };
+  if (!target || !(await canSeeRecognition(parsed.data.recognitionId, me.id))) {
+    return { ok: false, error: "That post no longer exists." };
+  }
   if (target.kind === "question") {
     return { ok: false, error: "Questions take private answers, not comments." };
   }
@@ -402,7 +407,7 @@ export async function toggleCommentReaction(formData: FormData): Promise<ActionR
     where: { id: commentId },
     select: { id: true, recognitionId: true },
   });
-  if (!comment || !(await canSeeRecognition(comment.recognitionId))) {
+  if (!comment || !(await canSeeRecognition(comment.recognitionId, me.id))) {
     return { ok: false, error: "That comment no longer exists." };
   }
 

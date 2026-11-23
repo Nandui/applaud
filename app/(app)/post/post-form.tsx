@@ -11,6 +11,7 @@ import {
   ImagePlus,
   Loader2,
   Lock,
+  MapPin,
   MessageCircleQuestion,
   PenLine,
   Plus,
@@ -58,10 +59,12 @@ export function PostForm({
   me,
   canAsk,
   initialType,
+  sites,
 }: {
   me: { name: string; avatarUrl: string | null; frame: FrameArt | null; banner: string };
   canAsk: boolean;
   initialType: ComposerType;
+  sites: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [type, setType] = useState<ComposerType>(initialType);
@@ -69,6 +72,8 @@ export function PostForm({
   const [choices, setChoices] = useState<string[]>(["", ""]);
   const [hours, setHours] = useState<number>(DEFAULT_POLL_HOURS);
   const [showResults, setShowResults] = useState(true);
+  // Polls and questions: the sites that see it; none picked = everyone.
+  const [siteIds, setSiteIds] = useState<string[]>([]);
   const { images, uploadingCount, full, handleFiles, removeImage, addGif } = useAttachments();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +124,8 @@ export function PostForm({
     <form action={formAction} className="mx-auto max-w-xl">
       {type === "post" &&
         images.map((img) => <input key={img.url} type="hidden" name="imageUrls" value={img.url} />)}
+      {type !== "post" &&
+        siteIds.map((id) => <input key={id} type="hidden" name="siteIds" value={id} />)}
       {type === "poll" && (
         <>
           <input type="hidden" name="hours" value={hours} />
@@ -174,7 +181,14 @@ export function PostForm({
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate text-[1.05rem] font-bold tracking-tight">{me.name}</span>
           <span className="text-muted mt-0.5 flex items-center gap-1 text-[0.82rem]">
-            {type === "question" ? (
+            {type !== "post" && siteIds.length > 0 ? (
+              <>
+                <MapPin className="size-3.5" />{" "}
+                <span className="truncate">
+                  Only {siteNames(siteIds, sites)}
+                </span>
+              </>
+            ) : type === "question" ? (
               <>
                 <Lock className="size-3.5" /> Only you see the answers
               </>
@@ -252,6 +266,10 @@ export function PostForm({
             </p>
           </div>
         </div>
+      )}
+
+      {type !== "post" && sites.length > 1 && (
+        <SitePicker sites={sites} picked={siteIds} setPicked={setSiteIds} />
       )}
 
       {type === "post" && (
@@ -413,6 +431,58 @@ function PollEditor({
         </span>
         <Switch checked={showResults} onCheckedChange={(v) => setShowResults(Boolean(v))} />
       </label>
+    </div>
+  );
+}
+
+function siteNames(ids: string[], sites: { id: string; name: string }[]): string {
+  const names = sites.filter((s) => ids.includes(s.id)).map((s) => s.name);
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
+}
+
+/** Who sees a poll or question: everyone, or only people at the picked sites. */
+function SitePicker({
+  sites,
+  picked,
+  setPicked,
+}: {
+  sites: { id: string; name: string }[];
+  picked: string[];
+  setPicked: (next: string[]) => void;
+}) {
+  const everyone = picked.length === 0;
+  const chip = (on: boolean) =>
+    cn(
+      "h-9 rounded-full border px-4 text-sm font-semibold transition-colors",
+      on ? "border-primary bg-primary text-primary-fg" : "border-border",
+    );
+  return (
+    <div className="mt-5">
+      <p className="text-muted mb-2 text-xs font-semibold tracking-wider uppercase">Who can see it</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setPicked([])} aria-pressed={everyone} className={chip(everyone)}>
+          Everyone
+        </button>
+        {sites.map((s) => {
+          const on = picked.includes(s.id);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setPicked(on ? picked.filter((id) => id !== s.id) : [...picked, s.id])}
+              className={chip(on)}
+            >
+              {s.name}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-muted mt-2 text-[0.82rem]">
+        {everyone
+          ? "Everyone in every site sees it. Pick sites to limit it to the people there."
+          : `Only people at ${siteNames(picked, sites)} see it. Admins can always see it.`}
+      </p>
     </div>
   );
 }

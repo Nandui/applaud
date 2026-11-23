@@ -3,6 +3,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { formatDistanceStrict } from "date-fns";
 import { shortTime, fullTimestamp } from "@/lib/datetime";
 import { AUTHORED_KINDS } from "@/lib/posts/kinds";
+import { audienceLabel, audienceLabels, audienceWhere } from "@/lib/posts/audience";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import type { Cosmetic, FrameArt, Look } from "@/lib/cosmetics";
@@ -119,6 +120,8 @@ export type FeedCard = {
   comments: FeedCardComment[];
   poll: FeedPoll | null;
   question: FeedQuestion | null;
+  /** "Bishopstown only" when a poll or question is limited to some sites. */
+  audienceLabel: string | null;
 };
 
 /**
@@ -181,7 +184,12 @@ function toFeedPoll(r: RawRecognition, viewerId: string, now: Date): FeedPoll {
   };
 }
 
-export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosmetic[]): FeedCard {
+export function toFeedCard(
+  r: RawRecognition,
+  viewerId: string,
+  catalogue: Cosmetic[],
+  siteNames: Map<string, string> = new Map(),
+): FeedCard {
   const kind = (KINDS as readonly string[]).includes(r.kind) ? (r.kind as FeedCard["kind"]) : "recognition";
   const grouped = new Map<
     string,
@@ -240,6 +248,7 @@ export function toFeedCard(r: RawRecognition, viewerId: string, catalogue: Cosme
       kind === "question"
         ? { answerCount: r._count.answers, myAnswer: r.answers[0]?.body ?? null }
         : null,
+    audienceLabel: audienceLabel(r.audienceSiteIds, siteNames),
   };
 }
 
@@ -287,14 +296,18 @@ export async function getPostCards(
   viewerId: string,
   take = 20,
 ): Promise<FeedCard[]> {
-  const catalogue = await getCatalogue();
+  const [catalogue, audience, siteNames] = await Promise.all([
+    getCatalogue(),
+    audienceWhere(viewerId),
+    audienceLabels(),
+  ]);
   const rows = await prisma.recognition.findMany({
-    where: { senderId: userId, kind: { in: [...AUTHORED_KINDS] } },
+    where: { AND: [{ senderId: userId, kind: { in: [...AUTHORED_KINDS] } }, audience] },
     orderBy: { createdAt: "desc" },
     take,
     include: feedInclude(viewerId),
   });
-  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue, siteNames));
 }
 
 /**
@@ -303,11 +316,9 @@ export async function getPostCards(
  */
 export async function getCardsByIds(ids: string[], viewerId: string): Promise<FeedCard[]> {
   if (ids.length === 0) return [];
-  const catalogue = await getCatalogue();
+  const [catalogue, audience] = await Promise.all([getCatalogue(), audienceWhere(viewerId)]);
   const rows = await prisma.recognition.findMany({
-    where: {
-      id: { in: ids },
-    },
+    where: { AND: [{ id: { in: ids } }, audience] },
     include: feedInclude(viewerId),
   });
   const byId = new Map(rows.map((r) => [r.id, r]));
@@ -317,14 +328,21 @@ export async function getCardsByIds(ids: string[], viewerId: string): Promise<Fe
     .map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
-/** The feed: every recognition and post, newest first. All of them are public. */
+/**
+ * The feed, newest first: every recognition and post, plus the polls and
+ * questions meant for the viewer's site (or for everyone).
+ */
 export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
-  const catalogue = await getCatalogue();
+  const [catalogue, audience, siteNames] = await Promise.all([
+    getCatalogue(),
+    audienceWhere(viewerId),
+    audienceLabels(),
+  ]);
   const rows = await prisma.recognition.findMany({
-    where: {},
+    where: audience,
     orderBy: { createdAt: "desc" },
     take,
     include: feedInclude(viewerId),
   });
-  return rows.map((r) => toFeedCard(r, viewerId, catalogue));
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue, siteNames));
 }

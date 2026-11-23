@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
+import { canViewerSee } from "@/lib/posts/audience";
 import { getCatalogue } from "@/lib/catalogue";
 import { lookOf } from "@/lib/profile-custom";
 import { shortTime, fullTimestamp } from "@/lib/datetime";
@@ -20,6 +21,20 @@ import {
 } from "@/lib/posts/kinds";
 
 export type PostActionResult = { ok: true; message?: string } | { ok: false; error: string };
+
+/** Picked sites must exist and be active; none picked = everyone. */
+async function checkSites(
+  siteIds: string[],
+): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
+  const unique = [...new Set(siteIds)];
+  if (unique.length === 0) return { ok: true, ids: [] };
+  const found = await prisma.site.findMany({
+    where: { id: { in: unique }, active: true },
+    select: { id: true },
+  });
+  if (found.length !== unique.length) return { ok: false, error: "One of those sites no longer exists." };
+  return { ok: true, ids: unique };
+}
 
 const NOT_ALLOWED = "Only managers, centre managers, operations managers and the CEO can do this.";
 
@@ -43,6 +58,7 @@ const pollSchema = z.object({
     .int()
     .refine((h) => POLL_DURATIONS.some((d) => d.hours === h), "Pick how long the poll runs."),
   showResults: z.boolean(),
+  siteIds: z.array(z.string().min(1)).max(50),
 });
 
 /**
@@ -61,11 +77,14 @@ export async function createPoll(
     options: formData.getAll("options").map(String),
     hours: formData.get("hours") ?? "",
     showResults: formData.get("showResults") === "on",
+    siteIds: formData.getAll("siteIds").map(String),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid poll." };
   }
   const { question, options, hours, showResults } = parsed.data;
+  const sites = await checkSites(parsed.data.siteIds);
+  if (!sites.ok) return sites;
 
   const poll = await prisma.recognition.create({
     data: {
@@ -76,6 +95,7 @@ export async function createPoll(
       visibility: "public",
       pollClosesAt: hours > 0 ? new Date(Date.now() + hours * 3_600_000) : null,
       pollShowResults: showResults,
+      audienceSiteIds: sites.ids,
       pollOptions: { create: options.map((label, i) => ({ label, sortOrder: i })) },
     },
   });
@@ -85,7 +105,7 @@ export async function createPoll(
     entityType: "recognition",
     entityId: poll.id,
     summary: `Asked a poll with ${options.length} choices`,
-    metadata: { question, options, hours, showResults },
+    metadata: { question, options, hours, showResults, siteIds: sites.ids },
     siteId: me.siteId,
   });
   revalidatePath("/");
@@ -99,6 +119,7 @@ const questionSchema = z.object({
     .trim()
     .min(3, "Write the question.")
     .max(QUESTION_MAX_LENGTH, `Keep the question under ${QUESTION_MAX_LENGTH} characters.`),
+  siteIds: z.array(z.string().min(1)).max(50),
 });
 
 /**
@@ -112,10 +133,15 @@ export async function createQuestion(
   const me = await requireUser();
   if (!canCreatePollsAndQuestions(me)) return { ok: false, error: NOT_ALLOWED };
 
-  const parsed = questionSchema.safeParse({ question: formData.get("message") ?? "" });
+  const parsed = questionSchema.safeParse({
+    question: formData.get("message") ?? "",
+    siteIds: formData.getAll("siteIds").map(String),
+  });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid question." };
   }
+  const sites = await checkSites(parsed.data.siteIds);
+  if (!sites.ok) return sites;
   const q = await prisma.recognition.create({
     data: {
       kind: "question",
@@ -123,6 +149,7 @@ export async function createQuestion(
       message: parsed.data.question,
       imageUrls: [],
       visibility: "public",
+      audienceSiteIds: sites.ids,
     },
   });
   await writeAudit({
@@ -131,7 +158,7 @@ export async function createQuestion(
     entityType: "recognition",
     entityId: q.id,
     summary: "Asked a question",
-    metadata: { question: parsed.data.question },
+    metadata: { question: parsed.data.question, siteIds: sites.ids },
     siteId: me.siteId,
   });
   revalidatePath("/");
@@ -149,7 +176,9 @@ export async function votePoll(pollId: string, optionId: string): Promise<PostAc
     where: { id: optionId, recognitionId: pollId, recognition: { kind: "poll" } },
     select: { id: true, recognition: { select: { pollClosesAt: true } } },
   });
-  if (!option) return { ok: false, error: "That poll no longer exists." };
+  if (!option || !(await canViewerSee(pollId, me.id))) {
+    return { ok: false, error: "That poll no longer exists." };
+  }
   const closesAt = option.recognition.pollClosesAt;
   if (closesAt && closesAt <= new Date()) return { ok: false, error: "This poll has closed." };
 
@@ -194,7 +223,9 @@ export async function answerQuestion(questionId: string, body: string): Promise<
     where: { id: questionId },
     select: { kind: true, senderId: true },
   });
-  if (!q || q.kind !== "question") return { ok: false, error: "That question no longer exists." };
+  if (!q || q.kind !== "question" || !(await canViewerSee(questionId, me.id))) {
+    return { ok: false, error: "That question no longer exists." };
+  }
   if (q.senderId === me.id) return { ok: false, error: "You can't answer your own question." };
 
   await prisma.questionAnswer.upsert({
