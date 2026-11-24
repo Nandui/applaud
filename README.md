@@ -41,6 +41,19 @@ npm run dev                   # http://localhost:3000
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob store — recognition photo/GIF uploads    |
 | `GIPHY_API_KEY`         | GIPHY GIF-library search in the composer (optional)  |
 
+### Connect the recognition mailbox
+
+In production, open **Admin → Settings → Recognition emails**, choose **Connect Gmail**,
+and authorise the sending Workspace mailbox. The app uses the existing Google sign-in
+client and registered callback. Enable the Gmail API in that client's Google Cloud
+project. Google requests send access during mailbox setup only. Once Gmail accepts the
+self-addressed test message, the app stores the encrypted refresh token and sends new
+shout-out notifications to each recipient with the organisation's configured display name.
+
+The encryption key is derived from `AUTH_SECRET`. Reconnect the mailbox after rotating
+that secret or revoking consent. Failed notification deliveries are logged without
+changing the recognition or points balance.
+
 ## Scripts
 
 | Script               | Description                       |
