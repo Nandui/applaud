@@ -10,6 +10,7 @@ import { getActiveClaims } from "@/lib/claims";
 import { ClaimsStrip } from "@/components/rewards/active-claims";
 import { loadRewardsShop } from "@/lib/rewards/shop";
 import { RewardsShop } from "@/components/rewards/rewards-shop";
+import { IdeasEntry } from "@/components/ideas/ideas-entry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
@@ -57,6 +58,7 @@ export default async function RewardsPage({
         activeCategory={activeCategory}
         claimsStrip={<ClaimsStrip claims={myClaims} />}
       />
+      {!filtered ? <IdeasEntry kind="reward" /> : null}
     </div>
   );
 }

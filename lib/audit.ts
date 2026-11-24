@@ -49,6 +49,9 @@ export const AUDIT_ACTIONS = [
   "award.updated",
   "milestone.updated",
   "settings.updated",
+  "suggestion.created",
+  "suggestion.updated",
+  "suggestion.deleted",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -140,4 +143,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   "award.updated": "Award program updated",
   "milestone.updated": "Milestone updated",
   "settings.updated": "Settings updated",
+  "suggestion.created": "Idea suggested",
+  "suggestion.updated": "Idea status changed",
+  "suggestion.deleted": "Idea removed",
 };
