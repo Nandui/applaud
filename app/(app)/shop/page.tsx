@@ -13,6 +13,7 @@ import { MarkSeen } from "@/components/app-shell/new-items";
 import { isNewSince, visitStamp } from "@/lib/seen";
 import { RANK_LABELS, isPointsRank, shopIsFreeFor } from "@/lib/ranks";
 import { Crown } from "lucide-react";
+import { IdeasEntry } from "@/components/ideas/ideas-entry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Profile shop" };
@@ -151,6 +152,7 @@ export default async function ShopPage() {
           </section>
         ))}
       </div>
+      <IdeasEntry kind="shop" />
     </div>
   );
 }

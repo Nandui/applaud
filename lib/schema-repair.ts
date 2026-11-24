@@ -91,6 +91,25 @@ const REPAIRS: Repair[] = [
       ),
     ],
   },
+  {
+    name: "20261124160000_suggestions",
+    checksum: "a58994d204b35e1fa1712cb45a1d3ccfe721ecd4585da93ed91cf877dc0d2635",
+    check: `SELECT to_regclass('"Suggestion"') IS NOT NULL AND to_regclass('"SuggestionVote"') IS NOT NULL AS ok`,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS "Suggestion" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL, "title" TEXT NOT NULL, "details" TEXT, "userId" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'new', "adminNote" TEXT, "voteCount" INTEGER NOT NULL DEFAULT 0, "statusChangedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "Suggestion_pkey" PRIMARY KEY ("id"))`,
+      `CREATE TABLE IF NOT EXISTS "SuggestionVote" ("suggestionId" TEXT NOT NULL, "userId" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "SuggestionVote_pkey" PRIMARY KEY ("suggestionId","userId"))`,
+      `CREATE INDEX IF NOT EXISTS "Suggestion_kind_status_idx" ON "Suggestion"("kind", "status")`,
+      `CREATE INDEX IF NOT EXISTS "SuggestionVote_userId_idx" ON "SuggestionVote"("userId")`,
+      ...[
+        ["Suggestion", "Suggestion_userId_fkey", `FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE`],
+        ["SuggestionVote", "SuggestionVote_suggestionId_fkey", `FOREIGN KEY ("suggestionId") REFERENCES "Suggestion"("id") ON DELETE CASCADE ON UPDATE CASCADE`],
+        ["SuggestionVote", "SuggestionVote_userId_fkey", `FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE`],
+      ].map(
+        ([table, name, def]) =>
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${name}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${name}" ${def}; END IF; END $$`,
+      ),
+    ],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {
