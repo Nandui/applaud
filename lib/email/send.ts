@@ -1,7 +1,10 @@
 import nodemailer from "nodemailer";
+import { gmailApiCredentials, sendViaGmailApi } from "./gmail-api";
 
 /**
- * Sends email through whichever service is configured:
+ * Sends email through whichever service is configured, in this order:
+ *  - Google Workspace through the Gmail API with a service account
+ *    (lib/email/gmail-api.ts lists the env vars);
  *  - SMTP (any mail server; for Google Workspace: SMTP_HOST=smtp.gmail.com,
  *    SMTP_PORT=465, SMTP_USER=the account, SMTP_PASS=an app password):
  *    SMTP_HOST, SMTP_PORT (default 587; 465 = TLS), SMTP_USER, SMTP_PASS
@@ -29,12 +32,14 @@ function smtpConfigured(): boolean {
 }
 
 export function emailConfigured(): boolean {
-  return smtpConfigured() || Boolean(process.env.RESEND_API_KEY);
+  return Boolean(gmailApiCredentials()) || smtpConfigured() || Boolean(process.env.RESEND_API_KEY);
 }
 
 function fromAddress(): string {
   const explicit = process.env.EMAIL_FROM || process.env.SMTP_FROM;
   if (explicit) return explicit;
+  const gmail = gmailApiCredentials();
+  if (gmail) return `Yayup <${gmail.sender}>`;
   // Gmail / Google Workspace only sends as the signed-in account (or its
   // aliases), so by default send as that account under the app's name.
   if (smtpConfigured() && process.env.SMTP_USER?.includes("@")) return `Yayup <${process.env.SMTP_USER}>`;
@@ -70,11 +75,13 @@ async function sendViaSmtp(emails: OutgoingEmail[], from: string): Promise<{ sen
 export async function sendEmails(emails: OutgoingEmail[]): Promise<{ sent: number; error?: string }> {
   if (emails.length === 0) return { sent: 0 };
   const from = fromAddress();
+  const gmail = gmailApiCredentials();
+  if (gmail) return sendViaGmailApi(emails, from, gmail);
   if (smtpConfigured()) return sendViaSmtp(emails, from);
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.info(`[email] No email service configured; skipped ${emails.length} email(s): ${emails[0].subject}`);
-    return { sent: 0, error: "Email isn't set up yet (no SMTP_HOST or RESEND_API_KEY)." };
+    return { sent: 0, error: "Email isn't set up yet (no Google service account, SMTP_HOST or RESEND_API_KEY)." };
   }
   let sent = 0;
   for (let i = 0; i < emails.length; i += BATCH_SIZE) {
