@@ -3,7 +3,7 @@ import { getGmailSender } from "./sender";
 
 type Recipient = { id: string; email: string };
 
-export async function notifyRecognition(recipients: Recipient[], appName: string, body: string) {
+export async function notifyRecognition(recipients: Recipient[], appName: string, recognisedBy: string, points: number) {
   const deliverable = recipients.filter(({ email }) => mailbox.safeParse(email).success && !email.toLowerCase().endsWith(".test"));
   if (!deliverable.length || process.env.VERCEL_ENV !== "production") return;
   try {
@@ -11,7 +11,7 @@ export async function notifyRecognition(recipients: Recipient[], appName: string
     if (!sender) return;
     await Promise.all(deliverable.map(async ({ id, email }) => {
       try {
-        await sendGmail(sender.accessToken, sender.email, appName, email, "You received a recognition", body);
+        await sendGmail(sender.accessToken, sender.email, appName, email, { kind: "recognition", recognisedBy, points });
       } catch {
         console.error("Recognition email delivery failed for user", id);
       }

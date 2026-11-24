@@ -161,12 +161,7 @@ export async function createRecognition(
   }
 
   after(async () => {
-    const body = [
-      `${me.name} recognised you on ${settings.appName}.`,
-      points > 0 && `You received ${points} ${points === 1 ? "point" : "points"}.`,
-      `Open your feed: ${process.env.AUTH_URL || "https://yayup.app"}`,
-    ].filter(Boolean).join("\n\n");
-    await notifyRecognition(recipients.filter(({ id }) => id !== me.id), settings.appName, body);
+    await notifyRecognition(recipients.filter(({ id }) => id !== me.id), settings.appName, me.name, points);
   });
 
   await writeAudit({

@@ -12,8 +12,7 @@ export async function sendAdminTestEmail(): Promise<string> {
     const sender = await getGmailSender();
     if (!sender) return "Connect a Gmail mailbox before sending a test.";
     const { appName } = await getOrgSettings();
-    await sendGmail(sender.accessToken, sender.email, appName, admin.email, "Notification email test",
-      `Hi ${admin.name},\n\nThis is the test email you requested from ${appName} admin settings.`);
+    await sendGmail(sender.accessToken, sender.email, appName, admin.email, { kind: "test", recipientName: admin.name });
     return `Gmail accepted the test email for ${admin.email}. Look for “Notification email test” in your inbox.`;
   } catch {
     return "Couldn’t confirm the send. Check your inbox and the Gmail connection before trying again.";

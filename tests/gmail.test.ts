@@ -27,18 +27,30 @@ test("recognition email uses the connected mailbox, brand and one recipient", as
     message = Buffer.from(JSON.parse(String(init.body)).raw, "base64url").toString();
     return Response.json({ id: "sent" });
   });
-  const id = await sendGmail("test", "sender@example.org", "Yayup", "recipient@example.org", "You received a recognition", "Róisín recognised you.");
+  const id = await sendGmail("test", "sender@example.org", "Yayup", "recipient@example.org", {
+    kind: "recognition", recognisedBy: "Róisín <Lee>", points: 12,
+  });
   assert.equal(id, "sent");
-  const [headers, body] = message.split("\r\n\r\n");
+  const [headers] = message.split("\r\n\r\n");
   assert.ok(headers.includes("From: =?UTF-8?B?WWF5dXA=?= <sender@example.org>"));
   assert.deepEqual(headers.split("\r\n").filter(h => /^(To|Cc|Bcc):/i.test(h)), ["To: recipient@example.org"]);
-  assert.equal(Buffer.from(body, "base64").toString(), "Róisín recognised you.");
+  const boundary = headers.match(/multipart\/alternative; boundary="([^"]+)"/)?.[1];
+  assert.ok(boundary);
+  const [, plain, html, end] = message.split(`--${boundary}`);
+  assert.match(plain, /Content-Type: text\/plain/);
+  assert.match(html, /Content-Type: text\/html/);
+  assert.equal(end.trim(), "--");
+  const decode = (part: string) => Buffer.from(part.split("\r\n\r\n")[1], "base64").toString();
+  assert.match(decode(plain), /Róisín <Lee> recognised you/);
+  assert.match(decode(html), /Róisín &lt;Lee&gt; recognised you/);
+  assert.match(decode(html), /\+12 points/);
+  assert.match(decode(html), /View your feed/);
 });
 
 test("handles disabled Gmail API and expired Google authorisation", async t => {
   t.mock.method(globalThis, "fetch", async () => Response.json({ error: {
     details: [{ reason: "SERVICE_DISABLED" }],
   } }, { status: 403 }));
-  await assert.rejects(sendGmail("test", "from@example.org", "Yayup", "to@example.org", "You received a recognition", "test"), /gmail-api-disabled/);
+  await assert.rejects(sendGmail("test", "from@example.org", "Yayup", "to@example.org", { kind: "connected" }), /gmail-api-disabled/);
   await assert.rejects(exchangeGoogleToken({ refresh_token: "test", grant_type: "refresh_token" }), /403/);
 });
