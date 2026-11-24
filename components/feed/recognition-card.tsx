@@ -384,7 +384,8 @@ export function RecognitionCard({
 
   return (
     <article
-      className="card-in pt-3 pb-6"
+      id={`r-${card.id}`}
+      className="card-in scroll-mt-20 pt-3 pb-6"
       style={{ "--card": Math.min(index, 6) } as React.CSSProperties}
     >
       {/* Header: who it's for, big; who sent it underneath. */}

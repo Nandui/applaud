@@ -10,6 +10,7 @@ import { MAX_RECOGNITION_IMAGES } from "@/lib/config";
 import { isGiphyMediaUrl } from "@/lib/recognition/gif";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
+import { emailAboutRecognition } from "@/lib/email/recognition";
 import {
   COVER_TYPES,
   COVER_WHAT_MAX,
@@ -155,6 +156,7 @@ export async function createCover(
     metadata: { recipientIds, points, coverType, coverWhat },
     siteId: me.siteId,
   });
+  await emailAboutRecognition(createdId);
   revalidatePath("/");
   revalidatePath("/me");
   revalidatePath("/leaderboard");

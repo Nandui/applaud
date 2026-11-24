@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { getOrgSettings } from "@/lib/org-settings";
+import { emailConfigured } from "@/lib/email/send";
 import { PageHeader } from "@/components/page-header";
 import { SettingsForm } from "./settings-form";
 
@@ -21,7 +22,12 @@ export default async function AdminSettingsPage() {
           appName: settings.appName,
           allowSelfRecognition: settings.allowSelfRecognition,
           autoCreateGoogleUsers: settings.autoCreateGoogleUsers,
+          emailRecipients: settings.emailRecipients,
+          emailEveryone: settings.emailEveryone,
+          emailTestMode: settings.emailTestMode,
+          emailTestAddress: settings.emailTestAddress,
         }}
+        emailReady={emailConfigured()}
       />
     </div>
   );
