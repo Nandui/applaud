@@ -50,7 +50,7 @@ export function renderNotification(appName: string, notification: Notification) 
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f5f4f8"><tr><td class="outer" align="center" style="padding:36px 12px">
 <!--[if mso]><table role="presentation" width="576"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="max-width:576px;border:1px solid #e3dfea;border-radius:20px">
-<tr><td class="inset" style="padding:24px 32px"><a href="${escapeHtml(origin)}" style="font-size:25px;line-height:28px;letter-spacing:-1.3px;font-weight:bold;color:#23172f;text-decoration:none">${brand}</a></td></tr>
+<tr><td class="inset" style="padding:24px 32px"><a href="${escapeHtml(origin)}" style="font-size:25px;font-weight:bold;color:#23172f;text-decoration:none"><img src="${escapeHtml(origin)}/brand/yayup-logo.png" width="119" height="26" alt="${brand}" style="display:block;width:119px;height:26px;border:0"></a></td></tr>
 <tr><td class="inset" bgcolor="#281d40" style="padding:33px 32px 37px;background-color:#281d40;border-left:5px solid #977dff">
 <p style="margin:0 0 13px;color:#dccbff;font-size:12px;line-height:16px;font-weight:bold;text-transform:uppercase;letter-spacing:1.4px">${copy.label}</p>
 <h1 class="headline" style="margin:0;font-size:41px;line-height:45px;letter-spacing:-1.4px;font-weight:bold;color:#ffffff">${copy.title}</h1>

@@ -45,7 +45,9 @@ test("recognition email uses the connected mailbox, brand and one recipient", as
   assert.match(decode(html), /Róisín &lt;Lee&gt; recognised you/);
   assert.match(decode(html), /\+12 points/);
   assert.match(decode(html), /View your feed/);
-  assert.doesNotMatch(decode(html), /<img\b|background-image/i);
+  const images = [...decode(html).matchAll(/<img\b[^>]*src="([^"]+)"/gi)];
+  assert.equal(images.length, 1);
+  assert.ok(images[0][1].endsWith("/brand/yayup-logo.png"));
 });
 
 test("handles disabled Gmail API and expired Google authorisation", async t => {
