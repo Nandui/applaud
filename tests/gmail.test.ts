@@ -2,6 +2,47 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sendGmail, exchangeGoogleToken } from "../lib/email/gmail";
 import { openToken, sealToken } from "../lib/email/connection";
+import { teamEmailBatches } from "../lib/email/recognition";
+import { renderNotification } from "../lib/email/template";
+
+test("team batches exclude the author, every honouree, duplicate mailboxes and test accounts", () => {
+  const people = [
+    { id: "author", name: "A", email: "a@example.org" },
+    { id: "one", name: "B", email: "b@example.org" },
+    { id: "two", name: "C", email: "c@example.org" },
+  ];
+  const staff = Array.from({ length: 51 }, (_, i) => ({ id: String(i), email: `staff${i}@example.org` }));
+  const batches = teamEmailBatches([...people, ...staff,
+    { id: "dup", email: "STAFF0@example.org" }, { id: "alias", email: "B@example.org" },
+    { id: "one", email: "new@example.org" }, { id: "demo", email: "demo@yayup.test" },
+  ], people);
+  assert.deepEqual(batches.map(batch => batch.length), [50, 1]);
+  assert.deepEqual(batches.flat(), staff.map(person => person.email));
+  assert.deepEqual(teamEmailBatches(people, people), []);
+});
+
+test("team announcements name the honourees, link to the post and hide the other addresses", async t => {
+  let raw = "";
+  t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+    raw = Buffer.from(JSON.parse(String(init.body)).raw, "base64url").toString();
+    return Response.json({ id: "sent" });
+  });
+  const team = { kind: "team" as const, recognisedBy: "Róisín Murphy",
+    recipientNames: ["Alex <Kelly>"], recognitionId: "post-123" };
+  const single = renderNotification("Yayup", team);
+  assert.equal(single.subject, "Róisín gave Alex a shout-out");
+  assert.match(single.html, /Alex &lt;Kelly&gt;/);
+  assert.match(single.html, /href="[^"]+\/recognition\/post-123"/);
+  assert.doesNotMatch(single.html, /in your wallet/);
+  const multi = renderNotification("Yayup", { ...team, recipientNames: ["Alex Kelly", "Jo Lee"] });
+  assert.match(multi.text, /Alex Kelly and Jo Lee/);
+  await sendGmail("token", "from@example.org", "Yayup", { bcc: ["first@example.org", "second@example.org"] }, team);
+  const [headers] = raw.split("\r\n\r\n");
+  assert.match(headers, /\r\nTo: undisclosed-recipients:;\r\n/);
+  assert.match(headers, /\r\nBcc: first@example.org,\r\n second@example.org\r\n/);
+  assert.doesNotMatch(headers, /\r\nCc:/i);
+  assert.match(headers, /Subject: =\?UTF-8\?B\?/);
+});
 
 test("a stored mailbox token is encrypted and tampering is detected", () => {
   const original = process.env.AUTH_SECRET;

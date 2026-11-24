@@ -89,7 +89,7 @@ export async function createRecognition(
 
   const recipients = await prisma.user.findMany({
     where: { id: { in: recipientIds }, active: true },
-    select: { id: true, email: true },
+    select: { id: true, email: true, name: true },
   });
   if (recipients.length !== recipientIds.length) {
     return { ok: false, error: "One or more recipients are invalid." };
@@ -107,10 +107,10 @@ export async function createRecognition(
   }
 
   const totalPoints = points * recipientIds.length;
-  let createdId: string | undefined;
+  let createdId: string;
 
   try {
-    await prisma.$transaction(async (tx) => {
+    createdId = await prisma.$transaction(async (tx) => {
       if (totalPoints > 0) {
         const used = await getMonthlyAllowanceUsage(me.id, new Date(), tx);
         const allowance = allowanceForRank(me.pointsRank, settings);
@@ -134,7 +134,6 @@ export async function createRecognition(
           },
         },
       });
-      createdId = recognition.id;
 
       if (points > 0) {
         for (const userId of recipientIds) {
@@ -154,6 +153,7 @@ export async function createRecognition(
           });
         }
       }
+      return recognition.id;
     });
   } catch (error) {
     if (error instanceof AllowanceError) return { ok: false, error: error.message };
@@ -161,7 +161,7 @@ export async function createRecognition(
   }
 
   after(async () => {
-    await notifyRecognition(recipients.filter(({ id }) => id !== me.id), settings.appName, me.name, points);
+    await notifyRecognition(createdId, recipients, settings.appName, me, points);
   });
 
   await writeAudit({
