@@ -12,6 +12,7 @@ export const LEDGER_TYPE_META: Record<
   BOOST: { label: "Boost", tone: "earn" },
   SHOP: { label: "Profile shop", tone: "spend" },
   WELCOME: { label: "Welcome bonus", tone: "earn" },
+  COVER: { label: "Covered last minute", tone: "earn" },
 };
 
 export function ledgerTypeMeta(type: string) {

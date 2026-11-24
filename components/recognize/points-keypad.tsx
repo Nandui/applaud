@@ -30,6 +30,8 @@ export function PointsKeypad({
   remaining,
   total,
   resetsIn,
+  presets = POINT_PRESETS,
+  source = "From your monthly giving allowance.",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,6 +44,10 @@ export function PointsKeypad({
   total: number;
   /** "resets in 9 days" */
   resetsIn: string;
+  /** Quick amounts; the giving presets unless another pot has its own. */
+  presets?: readonly number[];
+  /** Where the points come from, for a single recipient. */
+  source?: string;
 }) {
   function press(k: (typeof KEYS)[number]) {
     if (k === "C") return onChange(0);
@@ -58,7 +64,7 @@ export function PointsKeypad({
         <SheetHeader className="px-0 pt-2 pb-0">
           <SheetTitle className="font-display text-xl">Add points</SheetTitle>
           <SheetDescription>
-            {people > 1 ? `Each of the ${people} people gets this.` : "From your monthly giving allowance."}
+            {people > 1 ? `Each of the ${people} people gets this.` : source}
           </SheetDescription>
         </SheetHeader>
 
@@ -84,7 +90,7 @@ export function PointsKeypad({
         </div>
 
         <div className="mb-4 grid grid-cols-4 gap-2">
-          {POINT_PRESETS.map((n) => (
+          {presets.map((n) => (
             <button
               key={n}
               type="button"

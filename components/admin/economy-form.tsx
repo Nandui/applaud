@@ -13,6 +13,7 @@ import {
   type RankHeadcount,
 } from "@/lib/economy";
 import { GIVING_RANKS, POINTS_RANKS, RANK_ALLOWANCE_FIELD, RANK_LABELS } from "@/lib/ranks";
+import { COVER_ALLOWANCE_FIELD, COVER_RANKS } from "@/lib/covers";
 import { formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import { cn } from "@/lib/utils";
 export type EconomyFormData = EconomyInputs & {
   maxPointsPerShoutoutStaff: number;
   maxPointsPerShoutoutManager: number;
+  coverPointsSuggested: number;
+  maxPointsPerCover: number;
   walletPointsExpireYearEnd: boolean;
 };
 
@@ -78,6 +81,12 @@ export function EconomyForm({
     monthlyBonusPool: String(settings.monthlyBonusPool),
     maxPointsPerShoutoutStaff: String(settings.maxPointsPerShoutoutStaff),
     maxPointsPerShoutoutManager: String(settings.maxPointsPerShoutoutManager),
+    coverAllowanceManager: String(settings.coverAllowanceManager),
+    coverAllowanceCentreManager: String(settings.coverAllowanceCentreManager),
+    coverAllowanceOperations: String(settings.coverAllowanceOperations),
+    coverAllowanceCeo: String(settings.coverAllowanceCeo),
+    coverPointsSuggested: String(settings.coverPointsSuggested),
+    maxPointsPerCover: String(settings.maxPointsPerCover),
   });
   const num = (f: Field) => Math.max(0, Math.floor(Number(raw[f])) || 0);
   const rate = Math.max(1, num("pointsPerEuro"));
@@ -90,6 +99,10 @@ export function EconomyForm({
     monthlyAllowanceOperations: num("monthlyAllowanceOperations"),
     monthlyAllowanceCeo: num("monthlyAllowanceCeo"),
     monthlyBonusPool: num("monthlyBonusPool"),
+    coverAllowanceManager: num("coverAllowanceManager"),
+    coverAllowanceCentreManager: num("coverAllowanceCentreManager"),
+    coverAllowanceOperations: num("coverAllowanceOperations"),
+    coverAllowanceCeo: num("coverAllowanceCeo"),
   };
   const f = economyForecast(inputs, headcount);
   const euros = (points: number) => centsToEuros(pointsToCents(points, rate));
@@ -191,6 +204,50 @@ export function EconomyForm({
 
         <Card>
           <CardHeader>
+            <CardTitle>Thanks for covering</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <p className="text-muted text-sm sm:col-span-2">
+              A separate monthly pot for thanking people who covered a lesson, activity or shift at
+              short notice. Only Managers and above have one; it never touches their normal points
+              to give. Covers rank people on the &ldquo;Most helpful&rdquo; leaderboard.
+            </p>
+            {COVER_RANKS.map((rank) => {
+              const key = COVER_ALLOWANCE_FIELD[rank];
+              const people = headcount[rank];
+              const each = euros(inputs[key]);
+              const covers =
+                num("coverPointsSuggested") > 0
+                  ? ` · about ${formatNumber(Math.floor(inputs[key] / num("coverPointsSuggested")))} covers`
+                  : "";
+              return (
+                <div key={rank}>
+                  {field(
+                    key,
+                    `${RANK_LABELS[rank]}, for covers`,
+                    people === 0
+                      ? `${each} each${covers} · nobody has this rank yet`
+                      : `${each} each${covers} · ${formatNumber(people)} ${people === 1 ? "person" : "people"} = ${formatNumber(f.coverByRank[rank])} pts (${euros(f.coverByRank[rank])})`,
+                  )}
+                </div>
+              );
+            })}
+            <div className="border-border border-t sm:col-span-2" />
+            {field(
+              "coverPointsSuggested",
+              "Suggested points per cover",
+              `${euros(num("coverPointsSuggested"))}. What the thank-you starts on; the manager can change it.`,
+            )}
+            {field(
+              "maxPointsPerCover",
+              "Most per cover",
+              `Per person, ${euros(num("maxPointsPerCover"))}. 0 = no limit.`,
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Bonus pool</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -268,7 +325,8 @@ export function EconomyForm({
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <p className="text-muted">
-            If everyone gave every point and every point were spent on rewards with a cash cost.
+            If everyone gave every point (including every cover allowance) and every point were spent
+            on rewards with a cash cost.
           </p>
           <dl className="space-y-1.5">
             {POINTS_RANKS.map((rank) => (
@@ -279,6 +337,7 @@ export function EconomyForm({
                 sub={euros(f.byRank[rank])}
               />
             ))}
+            <Line label="Thanks for covering" value={`${formatNumber(f.coverPoints)} pts`} sub={euros(f.coverPoints)} />
             <Line label="Bonus pool" value={`${formatNumber(f.bonusPoints)} pts`} sub={euros(f.bonusPoints)} />
             <div className="border-border border-t pt-1.5">
               <Line label="Most points a month" value={`${formatNumber(f.maxPoints)} pts`} sub={centsToEuros(f.maxCents)} strong />

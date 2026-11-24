@@ -43,7 +43,7 @@ export default async function RecognizePage({
     getAllowanceStatus(me, settings),
     // People I've recognised lately, listed first.
     prisma.recognitionRecipient.findMany({
-      where: { recognition: { senderId: me.id, system: false } },
+      where: { recognition: { senderId: me.id, system: false, kind: "recognition" } },
       orderBy: { recognition: { createdAt: "desc" } },
       take: 30,
       select: { userId: true },

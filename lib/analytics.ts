@@ -65,7 +65,7 @@ export async function getAnalytics({
     // median time-to-first-recognition.
     prisma.recognitionRecipient.findMany({
       where: {
-        recognition: { system: false },
+        recognition: { system: false, kind: "recognition" },
         user: {
           active: true,
           hireDate: { gte: subMonths(new Date(), 18) },

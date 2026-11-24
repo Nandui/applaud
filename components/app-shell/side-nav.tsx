@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, Trophy, Gift, Wallet, Award, Shield, Plus, Sparkles, SquarePen, PackageOpen, type LucideIcon } from "lucide-react";
+import { House, Trophy, Gift, Wallet, Award, Shield, Plus, Sparkles, SquarePen, PackageOpen, LifeBuoy, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAdmin } from "@/lib/auth/types";
 import { UserAvatar } from "@/components/user-avatar";
@@ -11,6 +11,7 @@ import { FULL_SCREEN } from "./bottom-nav";
 import type { SessionUser } from "@/lib/auth/types";
 import type { SeenArea } from "@/lib/seen";
 import { NewDot } from "./new-items";
+import { canThankForCovers } from "@/lib/covers";
 
 /**
  * Desktop navigation: a left rail like Threads / Instagram on the web. Same
@@ -70,6 +71,14 @@ export function SideNav({ user }: { user: SessionUser }) {
       >
         <SquarePen className="size-4.5" strokeWidth={2.2} /> New post
       </Link>
+      {canThankForCovers(user) && (
+        <Link
+          href="/cover"
+          className="bg-surface-2 mt-2 flex h-11 items-center justify-center gap-2 rounded-xl font-semibold transition-opacity active:opacity-80"
+        >
+          <LifeBuoy className="size-4.5 text-[#0d9488]" strokeWidth={2.2} /> Thank for covering
+        </Link>
+      )}
       <Link
         href={`/profile/${user.id}`}
         data-tour="nav-profile"

@@ -92,9 +92,12 @@ export type FeedCard = {
   id: string;
   /**
    * "recognition" (a shout-out), "post" (an ordinary post by the sender),
-   * "poll" or "question" (asked by the sender; message is the question).
+   * "poll" or "question" (asked by the sender; message is the question), or
+   * "cover" (a manager thanking the recipients for covering at short notice).
    */
-  kind: "recognition" | "post" | "poll" | "question";
+  kind: "recognition" | "post" | "poll" | "question" | "cover";
+  /** Covers only: what was covered (lesson, activity or shift) and which one. */
+  cover: { type: string | null; what: string } | null;
   message: string;
   imageUrls: string[];
   boostType: string | null;
@@ -162,7 +165,7 @@ type RawRecognition = Prisma.RecognitionGetPayload<{
   include: ReturnType<typeof feedInclude>;
 }>;
 
-const KINDS = ["recognition", "post", "poll", "question"] as const;
+const KINDS = ["recognition", "post", "poll", "question", "cover"] as const;
 
 function toFeedPoll(r: RawRecognition, viewerId: string, now: Date): FeedPoll {
   const myOptionId = r.pollVotes[0]?.optionId ?? null;
@@ -215,6 +218,7 @@ export function toFeedCard(
   return {
     id: r.id,
     kind,
+    cover: kind === "cover" ? { type: r.coverType, what: r.coverWhat ?? "" } : null,
     message: r.message,
     imageUrls: r.imageUrls,
     boostType: r.boostType,

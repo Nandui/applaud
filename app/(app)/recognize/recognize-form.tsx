@@ -12,8 +12,11 @@ import {
   ImagePlus,
   Loader2,
   ChevronRight,
+  LifeBuoy,
 } from "lucide-react";
 import { createRecognition, type ActionResult } from "@/lib/recognition/actions";
+import { createCover } from "@/lib/covers-actions";
+import { COVER_TYPES, COVER_TYPE_LABELS, COVER_WHAT_MAX, type CoverType } from "@/lib/covers";
 import type { AllowanceStatus } from "@/lib/points";
 import { ALLOWED_IMAGE_TYPES } from "@/lib/config";
 import { GifPicker } from "@/components/recognize/gif-picker";
@@ -53,6 +56,11 @@ type RecipientOption = {
  *    of badges, then settings rows (photo, GIF, points). Every recognition is public.
  * Points use the keypad sheet. Every step stays mounted inside one <form> so
  * all fields still post to `createRecognition` exactly as before.
+ *
+ * With `cover`, the same flow thanks people for covering at short notice
+ * (managers and above): instead of a value it asks what they covered, the
+ * note is optional, and points come from the separate cover allowance via
+ * `createCover`.
  */
 export function RecognizeForm({
   values,
@@ -62,6 +70,7 @@ export function RecognizeForm({
   recentIds = [],
   mySiteCodes = [],
   me,
+  cover,
 }: {
   values: ValueOption[];
   recipients: RecipientOption[];
@@ -72,8 +81,12 @@ export function RecognizeForm({
   /** The sender's sites, main first. */
   mySiteCodes?: string[];
   me: { name: string; avatarUrl: string | null };
+  /** Thank-for-covering mode: the suggested points and keypad presets. */
+  cover?: { suggested: number; presets: number[] };
 }) {
   const router = useRouter();
+  const isCover = Boolean(cover);
+  const title = isCover ? "Thank for covering" : "New recognition";
   const [sent, setSent] = useState<{
     names: string;
     points: number;
@@ -82,7 +95,7 @@ export function RecognizeForm({
   // Celebrate (or toast the error) from inside the action, not an effect.
   const [, formAction, pending] = useActionState<ActionResult | undefined, FormData>(
     async (prev, fd) => {
-      const res = await createRecognition(prev, fd);
+      const res = isCover ? await createCover(prev, fd) : await createRecognition(prev, fd);
       if (res.ok) {
         const names = fd
           .getAll("recipientIds")
@@ -111,7 +124,9 @@ export function RecognizeForm({
   }
   const [message, setMessage] = useState("");
   const [valueId, setValueId] = useState<string>("");
-  const [rawPoints, setPoints] = useState<number>(0);
+  const [rawPoints, setPoints] = useState<number>(cover?.suggested ?? 0);
+  const [coverType, setCoverType] = useState<CoverType | "">("");
+  const [coverWhat, setCoverWhat] = useState("");
   const [search, setSearch] = useState("");
   const [keypadOpen, setKeypadOpen] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -179,19 +194,20 @@ export function RecognizeForm({
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
 
-  const canSubmit =
-    selected.length > 0 &&
-    valueId !== "" &&
-    message.trim().length >= 3 &&
-    !pending &&
-    uploadingCount === 0;
-  const blocker = !message.trim()
-    ? "Write what they did"
-    : message.trim().length < 3
-      ? "A few more words"
-      : !valueId
-        ? "Pick a value"
-        : null;
+  const blocker = isCover
+    ? !coverType
+      ? "Pick what they covered"
+      : coverWhat.trim().length < 2
+        ? "Say which one"
+        : null
+    : !message.trim()
+      ? "Write what they did"
+      : message.trim().length < 3
+        ? "A few more words"
+        : !valueId
+          ? "Pick a value"
+          : null;
+  const canSubmit = selected.length > 0 && blocker === null && !pending && uploadingCount === 0;
 
   if (sent) {
     return (
@@ -199,13 +215,16 @@ export function RecognizeForm({
         names={sent.names}
         points={sent.points}
         value={sent.value}
+        cover={isCover}
         onDone={() => router.push("/")}
         onAgain={() => {
           setSent(null);
           setSelected([]);
           setMessage("");
           setValueId("");
-          setPoints(0);
+          setCoverType("");
+          setCoverWhat("");
+          setPoints(cover?.suggested ?? 0);
           clear();
           setStep("to");
           router.refresh();
@@ -220,7 +239,11 @@ export function RecognizeForm({
       {selected.map((id) => (
         <input key={id} type="hidden" name="recipientIds" value={id} />
       ))}
-      <input type="hidden" name="valueId" value={valueId} />
+      {isCover ? (
+        <input type="hidden" name="coverType" value={coverType} />
+      ) : (
+        <input type="hidden" name="valueId" value={valueId} />
+      )}
       <input type="hidden" name="points" value={points} />
       {images.map((img) => (
         <input key={img.url} type="hidden" name="imageUrls" value={img.url} />
@@ -234,14 +257,14 @@ export function RecognizeForm({
               <X className="size-6.5" />
             </Link>
             <h1 className="pointer-events-none absolute inset-x-0 text-center text-[1rem] font-bold">
-              New recognition
+              {title}
             </h1>
             <button
               type="button"
               disabled={selected.length === 0}
               onClick={() => {
                 setStep("write");
-                setTimeout(() => textRef.current?.focus(), 250);
+                if (!isCover) setTimeout(() => textRef.current?.focus(), 250);
               }}
               className="text-primary relative text-[0.95rem] font-bold disabled:opacity-40"
             >
@@ -346,7 +369,7 @@ export function RecognizeForm({
                 type="button"
                 onClick={() => {
                   setStep("write");
-                  setTimeout(() => textRef.current?.focus(), 250);
+                  if (!isCover) setTimeout(() => textRef.current?.focus(), 250);
                 }}
                 className="bg-primary text-primary-fg mb-3 flex h-12 w-full items-center justify-center rounded-xl text-[0.95rem] font-bold active:opacity-80"
               >
@@ -365,7 +388,7 @@ export function RecognizeForm({
               Back
             </button>
             <h1 className="pointer-events-none absolute inset-x-0 text-center text-[1rem] font-bold">
-              New recognition
+              {title}
             </h1>
             <button
               type="submit"
@@ -395,11 +418,51 @@ export function RecognizeForm({
               {selectedPeople.map((r) => r.name).join(", ")}
             </span>
             <span className="text-muted mt-0.5 block text-[0.82rem]">
-              from <span className="text-foreground font-semibold">{me.name}</span>
+              {isCover ? "thanked by" : "from"} <span className="text-foreground font-semibold">{me.name}</span>
             </span>
           </span>
           <ChevronRight className="text-muted size-5 shrink-0" />
         </button>
+
+        {isCover && (
+          <section className="mt-4 space-y-3">
+            <h2 className="text-[0.95rem] font-bold">
+              What did {firstNames.length > 1 ? "they" : (firstNames[0] ?? "they")} cover?{" "}
+              <span className="text-danger">*</span>
+            </h2>
+            <div className="bg-surface-2 grid grid-cols-3 gap-1 rounded-xl p-1" role="radiogroup" aria-label="What they covered">
+              {COVER_TYPES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={coverType === t}
+                  onClick={() => setCoverType(t)}
+                  className={cn(
+                    "h-9 rounded-lg text-sm font-semibold transition-colors",
+                    coverType === t ? "bg-background text-foreground shadow-sm" : "text-muted",
+                  )}
+                >
+                  {COVER_TYPE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+            <input
+              name="coverWhat"
+              value={coverWhat}
+              onChange={(e) => setCoverWhat(e.target.value)}
+              maxLength={COVER_WHAT_MAX}
+              placeholder={
+                coverType === "activity"
+                  ? "Which one? e.g. Tuesday 7pm spin class"
+                  : coverType === "shift"
+                    ? "Which one? e.g. Sunday early lifeguard shift"
+                    : "Which one? e.g. Sat 10am Level 3 swim"
+              }
+              className="bg-surface-2 placeholder:text-muted h-11 w-full rounded-xl px-4 outline-none focus:ring-2 focus:ring-[#0d9488]/50"
+            />
+          </section>
+        )}
 
         <textarea
           ref={textRef}
@@ -411,17 +474,21 @@ export function RecognizeForm({
             e.target.style.height = "auto";
             e.target.style.height = `${e.target.scrollHeight}px`;
           }}
-          placeholder={`What did ${firstNames[0] ?? "they"} do? Be specific, it hits harder.`}
-          rows={3}
+          placeholder={
+            isCover
+              ? "Add a thank-you (optional)"
+              : `What did ${firstNames[0] ?? "they"} do? Be specific, it hits harder.`
+          }
+          rows={isCover ? 2 : 3}
           maxLength={500}
-          required
+          required={!isCover}
           className="placeholder:text-muted mt-4 block w-full resize-none bg-transparent text-[1.05rem] leading-relaxed outline-none"
         />
 
         <AttachmentStrip images={images} uploadingCount={uploadingCount} onRemove={removeImage} />
 
         {/* Value: a grid of badges, the same ones shown on the post. */}
-        <section className="border-border mt-4 border-t pt-4">
+        <section className={cn("border-border mt-4 border-t pt-4", isCover && "hidden")}>
           <h2 className="text-[0.95rem] font-bold">
             Recognised for <span className="text-danger">*</span>
           </h2>
@@ -499,7 +566,9 @@ export function RecognizeForm({
               {points > 0
                 ? `+${pts(points)} each`
                 : allowance.total === 0
-                  ? "None to give on your rank"
+                  ? isCover
+                    ? "No cover points on your rank"
+                    : "None to give on your rank"
                   : `${pts(allowance.remaining)} left to give`}
             </span>
             <ChevronRight className="text-muted size-4.5" />
@@ -527,7 +596,8 @@ export function RecognizeForm({
             {pending && <Loader2 className="size-5 animate-spin" />}
             {pending
               ? "Sharing…"
-              : blocker ?? `Share with ${namesLabel}${points > 0 ? ` · +${pts(points)}` : ""}`}
+              : blocker ??
+                `${isCover ? "Thank" : "Share with"} ${namesLabel}${points > 0 ? ` · +${pts(points)}` : ""}`}
           </button>
         </div>
       </div>
@@ -542,6 +612,8 @@ export function RecognizeForm({
         remaining={allowance.remaining}
         total={allowance.total}
         resetsIn={allowance.resetsIn}
+        presets={cover?.presets}
+        source={isCover ? "From your monthly cover allowance." : undefined}
       />
     </form>
   );
@@ -559,12 +631,14 @@ function Celebration({
   names,
   points,
   value,
+  cover = false,
   onDone,
   onAgain,
 }: {
   names: string;
   points: number;
   value: ValueOption | null;
+  cover?: boolean;
   onDone: () => void;
   onAgain: () => void;
 }) {
@@ -576,7 +650,11 @@ function Celebration({
         animate={{ scale: 1, rotate: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 14 }}
       >
-        {value ? (
+        {cover ? (
+          <span className="flex size-28 items-center justify-center rounded-full bg-[#0d9488] text-white">
+            <LifeBuoy className="size-14" strokeWidth={2} />
+          </span>
+        ) : value ? (
           <ValueSeal value={value} size="lg" />
         ) : (
           <span className="bg-primary flex size-28 items-center justify-center rounded-full text-6xl">👏</span>
@@ -588,7 +666,7 @@ function Celebration({
         transition={{ delay: 0.15 }}
         className="mt-8 text-3xl font-extrabold tracking-tight"
       >
-        Shared
+        {cover ? "Thanks sent" : "Shared"}
       </motion.h1>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
@@ -596,7 +674,9 @@ function Celebration({
         transition={{ delay: 0.25 }}
         className="text-muted mt-2 max-w-xs text-[1.05rem]"
       >
-        {names} {names.includes("&") || names.includes("+") ? "are" : "is"} going to love this.
+        {cover
+          ? `It's on the feed, and it counts for ${names} on Most helpful.`
+          : `${names} ${names.includes("&") || names.includes("+") ? "are" : "is"} going to love this.`}
       </motion.p>
       {points > 0 && (
         <motion.span

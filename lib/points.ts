@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { economyMonth, resetsInLabel } from "@/lib/economy";
 import { allowanceForRank, maxPointsForRank, type RankAllowances } from "@/lib/ranks";
+import { coverAllowanceForRank, type CoverAllowances } from "@/lib/covers";
 
 type AllowanceSettings = RankAllowances & {
   maxPointsPerShoutoutStaff: number;
@@ -35,7 +36,8 @@ export async function getMonthlyAllowanceUsage(
       _sum: { points: true },
       where: {
         points: { gt: 0 },
-        recognition: { senderId: userId, createdAt: month },
+        // Covers are paid from the separate cover allowance.
+        recognition: { senderId: userId, createdAt: month, kind: { not: "cover" } },
       },
     }),
     client.nomination.aggregate({
@@ -97,6 +99,42 @@ export async function getAllowanceStatus(
     used,
     remaining: Math.max(0, total - used),
     perShoutoutMax: maxPointsForRank(user.pointsRank, settings),
+    resetsIn: resetsInLabel(ref),
+  };
+}
+
+/**
+ * Points this person has given this month (Irish time) as thanks for
+ * covering at short notice. Comes out of their cover allowance only.
+ */
+export async function getMonthlyCoverUsage(
+  userId: string,
+  ref: Date = new Date(),
+  client: Pick<typeof prisma, "recognitionRecipient"> = prisma,
+): Promise<number> {
+  const agg = await client.recognitionRecipient.aggregate({
+    _sum: { points: true },
+    where: {
+      points: { gt: 0 },
+      recognition: { senderId: userId, kind: "cover", createdAt: economyMonth(ref) },
+    },
+  });
+  return agg._sum.points ?? 0;
+}
+
+/** The cover allowance, in the same shape as the giving allowance. */
+export async function getCoverAllowanceStatus(
+  user: { id: string; pointsRank: string },
+  settings: CoverAllowances & { maxPointsPerCover: number },
+  ref: Date = new Date(),
+): Promise<AllowanceStatus> {
+  const total = coverAllowanceForRank(user.pointsRank, settings);
+  const used = total > 0 ? await getMonthlyCoverUsage(user.id, ref) : 0;
+  return {
+    total,
+    used,
+    remaining: Math.max(0, total - used),
+    perShoutoutMax: settings.maxPointsPerCover,
     resetsIn: resetsInLabel(ref),
   };
 }

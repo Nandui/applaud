@@ -96,7 +96,7 @@ export default async function AdminPointsPage({
           sub={`${pct(d.givers, d.people.length)}% have sent points`}
           meter={pct(d.givers, d.people.length)}
         />
-        <Stat label="Received into wallets" value={formatNumber(d.received)} sub={`Recognitions, awards and boosts · ${euros(d.received)}`} />
+        <Stat label="Received into wallets" value={formatNumber(d.received)} sub={`Recognitions, covers, awards and boosts · ${euros(d.received)}`} />
         <Stat label="Spent in the Store" value={formatNumber(d.spentStore)} sub="Profile items, €0 to you" />
         <Stat label="Spent on rewards" value={formatNumber(d.spentRewards)} sub={(() => { const n = d.claims.reduce((s, c) => s + c.count, 0); return `${formatNumber(n)} ${n === 1 ? "claim" : "claims"}`; })()} />
         <Stat
@@ -110,6 +110,12 @@ export default async function AdminPointsPage({
           value={`${formatNumber(d.bonusUsed)} / ${formatNumber(d.bonusPool)}`}
           sub="Boosts, approved awards and milestones"
           meter={pct(d.bonusUsed, d.bonusPool)}
+        />
+        <Stat
+          label="Thanks for covering"
+          value={`${formatNumber(d.coverGiven)} / ${formatNumber(d.coverAllowance)}`}
+          sub={`Separate cover allowance · ${euros(d.coverGiven)}`}
+          meter={pct(d.coverGiven, d.coverAllowance)}
         />
         <Stat
           label="Points in wallets now"

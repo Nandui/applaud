@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ImagePlus, Plus } from "lucide-react";
+import { ImagePlus, Plus, LifeBuoy, ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { getFeedCards } from "@/lib/recognition/queries";
@@ -19,6 +19,8 @@ import { BirthdayHomeCard } from "@/components/birthday/birthday-prompt";
 import { getBirthdayPoints } from "@/lib/birthday-points";
 import { getOrgSettings } from "@/lib/org-settings";
 import { WalletExpiryHomeRow } from "@/components/rewards/wallet-expiry";
+import { canThankForCovers } from "@/lib/covers";
+import { getCoverAllowanceStatus } from "@/lib/points";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,8 @@ export default async function FeedPage() {
       select: { name: true, discountText: true, listedAt: true },
     }),
   ]);
+  // Managers and above: a way in to thank someone who covered at short notice.
+  const coverAllowance = canThankForCovers(me) ? await getCoverAllowanceStatus(me, settings) : null;
   const myFrame = lookOf(wallet?.profile, catalogue).frame;
   const viewer = {
     id: me.id,
@@ -97,6 +101,24 @@ export default async function FeedPage() {
           <span aria-hidden>👏</span> Recognize
         </Link>
       </div>
+
+      {coverAllowance && coverAllowance.total > 0 && (
+        <Link
+          href="/cover"
+          className="border-border active:bg-surface-2 -mx-4 flex items-center gap-3 border-b px-4 py-2.5 transition-colors md:mx-0"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0d9488]/12 text-[#0d9488]">
+            <LifeBuoy className="size-5" strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block text-[0.95rem] font-semibold">Someone covered last minute?</span>
+            <span className="text-muted block truncate text-[0.82rem]">
+              {formatNumber(coverAllowance.remaining)} cover points left to thank them
+            </span>
+          </span>
+          <ChevronRight className="text-muted size-4.5 shrink-0" />
+        </Link>
+      )}
 
       {/* New people are asked in the app tour; this is for everyone else. */}
       {askBirthday ? <BirthdayHomeCard points={birthdayPoints} /> : null}

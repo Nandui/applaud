@@ -7,7 +7,7 @@ import { PERIODS, PERIOD_LABELS, type Period } from "@/lib/periods";
 import { cn } from "@/lib/utils";
 
 type SiteOption = { id: string; name: string };
-export type Board = "received" | "given";
+export type Board = "received" | "given" | "helpful";
 
 /** Build a leaderboard URL from the current params with one key changed. */
 function useHref() {
@@ -28,9 +28,10 @@ export function BoardSwitch({ board }: { board: Board }) {
   const tabs: { key: Board; label: string }[] = [
     { key: "received", label: "Most recognised" },
     { key: "given", label: "Top givers" },
+    { key: "helpful", label: "Most helpful" },
   ];
   return (
-    <div className="bg-surface-2 grid grid-cols-2 gap-1 rounded-xl p-1">
+    <div className="bg-surface-2 grid grid-cols-3 gap-1 rounded-xl p-1">
       {tabs.map((t) => (
         <Link
           key={t.key}
@@ -38,7 +39,7 @@ export function BoardSwitch({ board }: { board: Board }) {
           replace
           scroll={false}
           className={cn(
-            "flex h-9 items-center justify-center rounded-lg text-sm font-semibold whitespace-nowrap transition-colors",
+            "flex h-9 items-center justify-center rounded-lg px-1 text-[0.8rem] font-semibold whitespace-nowrap transition-colors sm:text-sm",
             board === t.key ? "bg-background text-foreground shadow-sm" : "text-muted",
           )}
         >
