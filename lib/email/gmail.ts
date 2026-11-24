@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { renderNotification, type Notification } from "./template";
 
 export const gmailScope = "https://www.googleapis.com/auth/gmail.send";
 export const googleTokenEndpoint = "https://oauth2.googleapis.com/token";
@@ -25,18 +26,24 @@ export async function exchangeGoogleToken(params: Record<string, string>) {
 
 export async function sendGmail(
   accessToken: string, sender: string, name: string, to: string,
-  subject: "You received a recognition" | "Your notification mailbox is connected" | "Notification email test", body: string,
+  notification: Notification,
 ) {
   mailbox.parse(sender);
   mailbox.parse(to);
   const words = [...name.trim()].slice(0, 60).join("").match(/.{1,10}/gu) ?? [];
   const display = words.map(word => `=?UTF-8?B?${Buffer.from(word).toString("base64")}?=`).join(" ");
-  const encodedBody = Buffer.from(body.replace(/\r?\n/g, "\r\n")).toString("base64");
+  const { subject, text, html } = renderNotification(name, notification);
+  const boundary = `yayup_${randomUUID()}`;
+  const parts = [["plain", text], ["html", html]].flatMap(([subtype, content]) => [
+    `--${boundary}`, `Content-Type: text/${subtype}; charset="UTF-8"`,
+    "Content-Transfer-Encoding: base64", "",
+    ...(Buffer.from(content.replace(/\r?\n/g, "\r\n")).toString("base64").match(/.{1,76}/g) ?? []),
+  ]);
   const message = [
     `From: ${display} <${sender}>`, `To: ${to}`, `Subject: ${subject}`,
     `Date: ${new Date().toUTCString()}`, `Message-ID: <${randomUUID()}@${sender.split("@")[1]}>`,
-    "MIME-Version: 1.0", 'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64", "", ...(encodedBody.match(/.{1,76}/g) ?? []),
+    "MIME-Version: 1.0", `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "", ...parts, `--${boundary}--`, "",
   ].join("\r\n");
   const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(10000),

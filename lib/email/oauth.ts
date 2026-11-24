@@ -75,9 +75,7 @@ export async function completeConsent(request: NextRequest) {
     }
     const settings = await getOrgSettings();
     const data = { email: profile.email as string, encryptedToken: sealToken(token.refresh_token), connectedAt: new Date() };
-    await sendGmail(token.access_token, data.email, settings.appName, data.email,
-      "Your notification mailbox is connected",
-      `This is the connection test for ${settings.appName}. Recognition emails will come from this mailbox.`);
+    await sendGmail(token.access_token, data.email, settings.appName, data.email, { kind: "connected" });
     await prisma.gmailConnection.upsert({ where: { id: "singleton" }, create: { id: "singleton", ...data }, update: data });
     return finish(request, "connected");
   } catch (error) {
