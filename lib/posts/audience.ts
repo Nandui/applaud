@@ -1,23 +1,25 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { siteIdsOf, userSitesSelect } from "@/lib/sites";
 
 /**
  * Polls and questions can be limited to certain sites
  * (Recognition.audienceSiteIds; empty = everyone). Someone sees a post when
- * it is for everyone, for their site, or they wrote it. Admins see all of
+ * it is for everyone, for one of their sites, or they wrote it. Admins see all of
  * them (moderation). Everything else in the feed is for everyone.
  */
 export async function audienceWhere(viewerId: string): Promise<Prisma.RecognitionWhereInput> {
   const viewer = await prisma.user.findUnique({
     where: { id: viewerId },
-    select: { siteId: true, role: true },
+    select: { ...userSitesSelect, role: true },
   });
   if (viewer?.role === "admin") return {};
+  const siteIds = viewer ? siteIdsOf(viewer) : [];
   return {
     OR: [
       { audienceSiteIds: { isEmpty: true } },
       { senderId: viewerId },
-      ...(viewer?.siteId ? [{ audienceSiteIds: { has: viewer.siteId } }] : []),
+      ...(siteIds.length > 0 ? [{ audienceSiteIds: { hasSome: siteIds } }] : []),
     ],
   };
 }

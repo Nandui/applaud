@@ -44,7 +44,7 @@ export async function redeemReward(
       if (!reward || !reward.active) {
         throw new RedeemError("This reward isn't available.");
       }
-      if (reward.siteId && reward.siteId !== me.siteId) {
+      if (reward.siteId && !me.siteIds.includes(reward.siteId)) {
         throw new RedeemError("This reward isn't available at your site.");
       }
       if (reward.kind === "discount") {

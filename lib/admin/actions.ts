@@ -175,6 +175,7 @@ export async function setSiteActive(formData: FormData): Promise<ActionResult> {
 /**
  * Hard-deletes a site. People are never cascaded: a site with users assigned is
  * refused, so the only way to remove one is to move its people off it first.
+ * People who only list it as one of their other sites just lose that link.
  */
 export async function deleteSite(formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
@@ -239,6 +240,15 @@ export async function saveUser(
   // Older forms don't post a rank: fall back to the one that matches the role.
   const pointsRank = String(formData.get("pointsRank") ?? "") || rankForRole(role);
   const siteId = String(formData.get("siteId") ?? "").trim();
+  // Further sites they also work at; the main site is never one of them.
+  const otherSiteIds = [
+    ...new Set(
+      formData
+        .getAll("otherSiteIds")
+        .map((v) => String(v).trim())
+        .filter((v) => v && v !== siteId),
+    ),
+  ];
   // Zero or more managers, each a real user; the select posts one entry per pick.
   const managerIds = [
     ...new Set(
@@ -260,6 +270,12 @@ export async function saveUser(
   if (!ROLES.includes(role)) return { ok: false, error: "Invalid role." };
   if (!isPointsRank(pointsRank)) return { ok: false, error: "Invalid points rank." };
   if (!siteId) return { ok: false, error: "Pick a site." };
+  if (otherSiteIds.length > 0) {
+    const found = await prisma.site.count({ where: { id: { in: otherSiteIds } } });
+    if (found !== otherSiteIds.length) {
+      return { ok: false, error: "One of those sites no longer exists." };
+    }
+  }
   if (id && managerIds.includes(id)) {
     return { ok: false, error: "A user can't be their own manager." };
   }
@@ -288,6 +304,7 @@ export async function saveUser(
   };
   // The picked set replaces whatever was there — no partial merge.
   const managers = managerIds.map((managerId) => ({ managerId }));
+  const otherSites = otherSiteIds.map((s) => ({ siteId: s }));
   let entityId = id;
   try {
     if (id) {
@@ -298,11 +315,12 @@ export async function saveUser(
           ...data,
           needsReview: false,
           managers: { deleteMany: {}, create: managers },
+          otherSites: { deleteMany: {}, create: otherSites },
         },
       });
     } else {
       const created = await prisma.user.create({
-        data: { ...data, managers: { create: managers } },
+        data: { ...data, managers: { create: managers }, otherSites: { create: otherSites } },
       });
       entityId = created.id;
     }
@@ -334,6 +352,7 @@ export async function saveUser(
       role,
       pointsRank,
       siteId,
+      otherSiteIds,
       active,
       jobTitle: jobTitle || null,
       managerIds,
@@ -413,7 +432,7 @@ async function removeUserRecord(id: string): Promise<boolean> {
     archived = true;
     await prisma.user.update({
       where: { id },
-      data: { active: false, siteId: null },
+      data: { active: false, siteId: null, otherSites: { deleteMany: {} } },
     });
   }
 

@@ -37,6 +37,10 @@ export default async function AdminUsersPage() {
         needsReview: true,
         onboardedAt: true,
         site: { select: { name: true } },
+        otherSites: {
+          orderBy: { site: { name: "asc" } },
+          select: { site: { select: { id: true, name: true } } },
+        },
         managers: {
           orderBy: { manager: { name: "asc" } },
           select: { manager: { select: { id: true, name: true } } },
@@ -60,6 +64,8 @@ export default async function AdminUsersPage() {
     pointsRank: u.pointsRank,
     siteId: u.siteId ?? "",
     siteName: u.site?.name ?? "—",
+    otherSiteIds: u.otherSites.map((s) => s.site.id),
+    otherSiteNames: u.otherSites.map((s) => s.site.name),
     managerIds: u.managers.map((m) => m.manager.id),
     managerNames: u.managers.map((m) => m.manager.name),
     hireDate: isoDate(u.hireDate),
@@ -76,7 +82,7 @@ export default async function AdminUsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Manage people, sites, managers, company roles, app roles and points ranks."
+        description="Manage people, their sites, managers, company roles, app roles and points ranks."
         action={googleSignInEnabled ? <GooglePhotosButton /> : undefined}
       />
       <UsersManager

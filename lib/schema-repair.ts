@@ -75,6 +75,22 @@ const REPAIRS: Repair[] = [
     check: `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'Reward' AND column_name = 'featuredOrder') AS ok`,
     statements: [`ALTER TABLE "Reward" ADD COLUMN IF NOT EXISTS "featuredOrder" INTEGER`],
   },
+  {
+    name: "20261124140000_user_other_sites",
+    checksum: "c51e048203e762b9e862bace392d3085ee59e0e421e830058af23c9c5c777930",
+    check: `SELECT to_regclass('"UserSite"') IS NOT NULL AS ok`,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS "UserSite" ("userId" TEXT NOT NULL, "siteId" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "UserSite_pkey" PRIMARY KEY ("userId","siteId"))`,
+      `CREATE INDEX IF NOT EXISTS "UserSite_siteId_idx" ON "UserSite"("siteId")`,
+      ...[
+        ["UserSite_userId_fkey", `FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE`],
+        ["UserSite_siteId_fkey", `FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE`],
+      ].map(
+        ([name, def]) =>
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${name}') THEN ALTER TABLE "UserSite" ADD CONSTRAINT "${name}" ${def}; END IF; END $$`,
+      ),
+    ],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {

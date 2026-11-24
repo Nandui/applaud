@@ -52,11 +52,21 @@ export async function defaultSiteId(): Promise<string | null> {
   const sites = await prisma.site.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
-    select: { id: true, _count: { select: { users: { where: { active: true } } } } },
+    // Everyone who works there: main site or one of their other sites.
+    select: {
+      id: true,
+      _count: {
+        select: {
+          users: { where: { active: true } },
+          otherUsers: { where: { user: { active: true, siteId: { not: null } } } },
+        },
+      },
+    },
   });
+  const people = (s: (typeof sites)[number]) => s._count.users + s._count.otherUsers;
   let best: (typeof sites)[number] | null = null;
   for (const site of sites) {
-    if (!best || site._count.users > best._count.users) best = site;
+    if (!best || people(site) > people(best)) best = site;
   }
   return best?.id ?? null;
 }

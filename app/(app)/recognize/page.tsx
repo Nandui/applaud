@@ -37,6 +37,7 @@ export default async function RecognizePage({
         avatarUrl: true,
         profile: true,
         site: { select: { code: true } },
+        otherSites: { select: { site: { select: { code: true } } } },
       },
     }),
     getAllowanceStatus(me, settings),
@@ -47,9 +48,9 @@ export default async function RecognizePage({
       take: 30,
       select: { userId: true },
     }),
-    prisma.site.findFirst({
-      where: { id: me.siteId ?? "" },
-      select: { code: true },
+    prisma.site.findMany({
+      where: { id: { in: me.siteIds } },
+      select: { id: true, code: true },
     }),
     getCatalogue(),
   ]);
@@ -61,6 +62,7 @@ export default async function RecognizePage({
     avatarUrl: u.avatarUrl,
     frame: lookOf(u.profile, catalogue).frame,
     siteCode: u.site?.code ?? "",
+    siteCodes: [u.site?.code, ...u.otherSites.map((s) => s.site.code)].filter((c): c is string => Boolean(c)),
   }));
 
   const pickable = new Set(recipients.map((r) => r.id));
@@ -78,7 +80,9 @@ export default async function RecognizePage({
       allowance={allowance}
       initialSelected={initialSelected}
       recentIds={recentIds}
-      mySiteCode={mine?.code ?? ""}
+      mySiteCodes={me.siteIds
+        .map((id) => mine.find((s) => s.id === id)?.code)
+        .filter((c): c is string => Boolean(c))}
       me={{ name: me.name, avatarUrl: me.avatarUrl ?? null }}
     />
   );

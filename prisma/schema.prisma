@@ -23,7 +23,24 @@ model Site {
   timezone  String   @default("Europe/Dublin")
   active    Boolean  @default(true)
   users     User[]
+  // People who also work here besides their main site (UserSite).
+  otherUsers UserSite[]
   createdAt DateTime @default(now())
+}
+
+// Extra sites a person works at besides their main one (User.siteId). The main
+// site stays on User for display ("Lifeguard · Bishopstown"); everything that
+// is limited to a site (site-only polls and questions, site rewards, the
+// leaderboard and analytics site filters) counts every site a person has.
+model UserSite {
+  userId    String
+  siteId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, siteId])
+  @@index([siteId])
 }
 
 model User {
@@ -43,6 +60,8 @@ model User {
   // be deleted. Detached users are treated as removed everywhere.
   siteId      String?
   site        Site?         @relation(fields: [siteId], references: [id])
+  // Further sites they also work at (never includes the main site).
+  otherSites  UserSite[]
   // A person can have several managers, and every one of them is a real user.
   // The UserManager join below is the only source of truth: `managers` are the
   // people who manage this user, `reports` the people this user manages.
