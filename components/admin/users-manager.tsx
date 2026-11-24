@@ -12,7 +12,7 @@ import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { Pencil, Plus, Trash2, Upload, Loader2, RotateCcw, FlaskConical } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, Upload, Loader2, RotateCcw, FlaskConical } from "lucide-react";
 import {
   deleteUser,
   removeTestAccounts,
@@ -56,6 +56,9 @@ export type UserRow = {
   pointsRank: string;
   siteId: string;
   siteName: string;
+  /** Further sites they also work at (never the main one), name-sorted. */
+  otherSiteIds: string[];
+  otherSiteNames: string[];
   managerIds: string[]; // zero or more people, name-sorted
   managerNames: string[];
   hireDate: string | null; // yyyy-MM-dd
@@ -118,7 +121,16 @@ function UserFormDialog({
     if (pointsRank === rankForRole(role)) setPointsRank(rankForRole(next));
     setRole(next);
   }
-  const [siteId, setSiteId] = useState(editing?.siteId ?? sites[0]?.id ?? "");
+  const [siteId, setSiteIdState] = useState(editing?.siteId ?? sites[0]?.id ?? "");
+  const [otherSiteIds, setOtherSiteIds] = useState<string[]>(editing?.otherSiteIds ?? []);
+  // The main site is never also an "other" site.
+  function setSiteId(next: string) {
+    setSiteIdState(next);
+    setOtherSiteIds((ids) => ids.filter((id) => id !== next));
+  }
+  function toggleOtherSite(id: string) {
+    setOtherSiteIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
   const [managerIds, setManagerIds] = useState<string[]>(
     editing?.managerIds ?? [],
   );
@@ -180,6 +192,9 @@ function UserFormDialog({
           <input type="hidden" name="role" value={role} />
           <input type="hidden" name="pointsRank" value={pointsRank} />
           <input type="hidden" name="siteId" value={siteId} />
+          {otherSiteIds.map((s) => (
+            <input key={s} type="hidden" name="otherSiteIds" value={s} />
+          ))}
           {managerIds.map((m) => (
             <input key={m} type="hidden" name="managerIds" value={m} />
           ))}
@@ -310,7 +325,7 @@ function UserFormDialog({
               they can give each month (set in Economy). Backoffice gets none to give.
             </p>
             <div className="col-span-2 space-y-1.5">
-              <Label>Site</Label>
+              <Label>Main site</Label>
               <Select value={siteId} onValueChange={setSiteId} items={siteItems}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a site" />
@@ -323,7 +338,44 @@ function UserFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-muted text-xs">Shown next to their name.</p>
             </div>
+            {sites.length > 1 && (
+              <div className="col-span-2 space-y-1.5">
+                <Label id="other-sites-label">Also works at</Label>
+                <div
+                  role="group"
+                  aria-labelledby="other-sites-label"
+                  className="flex flex-wrap gap-1.5"
+                >
+                  {sites
+                    .filter((s) => s.id !== siteId)
+                    .map((s) => {
+                      const on = otherSiteIds.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggleOtherSite(s.id)}
+                          className={
+                            on
+                              ? "border-primary bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium"
+                              : "border-border text-foreground hover:bg-surface-2 inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm"
+                          }
+                        >
+                          {on ? <Check className="size-3.5" /> : <Plus className="size-3.5 opacity-60" />}
+                          {s.name}
+                        </button>
+                      );
+                    })}
+                </div>
+                <p className="text-muted text-xs">
+                  They see polls, questions and rewards meant for any of their sites, and show up
+                  under each one in the leaderboard and analytics.
+                </p>
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Managers</Label>
@@ -628,7 +680,25 @@ export function UsersManager({
         </span>
       ),
     },
-    { accessorKey: "siteName", header: "Site" },
+    {
+      id: "sites",
+      // Accessor so search and sort see every site, not just the main one.
+      accessorFn: (row) => [row.siteName, ...row.otherSiteNames].join(", "),
+      header: "Sites",
+      cell: ({ row }) => {
+        const others = row.original.otherSiteNames;
+        return (
+          <span title={others.length ? [row.original.siteName, ...others].join(", ") : undefined}>
+            {row.original.siteName}
+            {others.length > 0 && (
+              <span className="bg-surface-2 text-muted ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-xs font-medium">
+                +{others.length}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
     {
       id: "managers",
       // Accessor (not just a cell) so search and sort still see every name

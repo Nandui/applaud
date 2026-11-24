@@ -14,12 +14,12 @@ import { shopLayout } from "@/lib/rewards/layout";
  * the preview is the real page, not a lookalike.
  */
 export async function loadRewardsShop({
-  siteId,
+  siteIds,
   seenAt,
   now,
 }: {
-  /** The viewer's site; null sees only offerings for all sites. */
-  siteId: string | null;
+  /** The viewer's sites; empty sees only offerings for all sites. */
+  siteIds: string[];
   /** When they last opened Rewards, for New tags (null = never). */
   seenAt: Date | null;
   now: Date;
@@ -27,7 +27,7 @@ export async function loadRewardsShop({
   const settings = await getOrgSettings();
   const [catalogue, claims, economy] = await Promise.all([
     prisma.reward.findMany({
-      where: visibleRewardsWhere({ siteId }, now),
+      where: visibleRewardsWhere({ siteIds }, now),
       orderBy: [{ sortOrder: "asc" }, { pointsCost: "asc" }, { name: "asc" }],
       select: {
         id: true,

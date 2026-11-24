@@ -32,7 +32,7 @@ export default async function RewardsPreviewPage({
     ? Math.max(0, Math.floor(balanceRaw))
     : (await prisma.user.findUniqueOrThrow({ where: { id: me.id }, select: { walletBalance: true } })).walletBalance;
 
-  const data = await loadRewardsShop({ siteId, seenAt: now, now });
+  const data = await loadRewardsShop({ siteIds: siteId ? [siteId] : [], seenAt: now, now });
   const base = new URLSearchParams();
   if (site) base.set("site", site);
   if (at) base.set("at", at);

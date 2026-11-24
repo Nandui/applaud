@@ -1,6 +1,7 @@
 import { format, eachDayOfInterval, subMonths } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { periodRange, type Period } from "@/lib/periods";
+import { siteIdsOf, userSitesSelect, worksAtSite } from "@/lib/sites";
 
 export type Analytics = {
   participationRate: number; // 0-100
@@ -37,11 +38,13 @@ export async function getAnalytics({
 }): Promise<Analytics> {
   const range = periodRange(period);
   const createdAt = range ? { gte: range.gte, lte: range.lte } : undefined;
-  const inSite = (s: string | null | undefined) => !siteId || s === siteId;
+  // Someone is "in" the filtered site when it is their main site or one of their others.
+  const inSite = (u: { siteId: string | null; otherSites: { siteId: string }[] }) =>
+    !siteId || siteIdsOf(u).includes(siteId);
 
   const [activeUsers, sites, recognitions, hireRows] = await Promise.all([
     prisma.user.findMany({
-      where: { active: true, ...(siteId ? { siteId } : {}) },
+      where: { active: true, ...(siteId ? worksAtSite(siteId) : {}) },
       select: { id: true },
     }),
     prisma.site.findMany({ select: { id: true, name: true } }),
@@ -51,10 +54,10 @@ export async function getAnalytics({
         id: true,
         createdAt: true,
         senderId: true,
-        sender: { select: { siteId: true } },
+        sender: { select: userSitesSelect },
         value: { select: { id: true, name: true, color: true } },
         recipients: {
-          select: { userId: true, points: true, user: { select: { siteId: true } } },
+          select: { userId: true, points: true, user: { select: userSitesSelect } },
         },
       },
     }),
@@ -66,7 +69,7 @@ export async function getAnalytics({
         user: {
           active: true,
           hireDate: { gte: subMonths(new Date(), 18) },
-          ...(siteId ? { siteId } : {}),
+          ...(siteId ? worksAtSite(siteId) : {}),
         },
       },
       select: {
@@ -90,8 +93,8 @@ export async function getAnalytics({
   let totalPoints = 0;
 
   for (const r of recognitions) {
-    const senderInSite = inSite(r.sender.siteId);
-    const recipientsInSite = r.recipients.filter((rr) => inSite(rr.user.siteId));
+    const senderInSite = inSite(r.sender);
+    const recipientsInSite = r.recipients.filter((rr) => inSite(rr.user));
     const inScope = senderInSite || recipientsInSite.length > 0;
     if (!inScope) continue;
 

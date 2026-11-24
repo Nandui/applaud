@@ -40,7 +40,10 @@ type RecipientOption = {
   jobTitle: string | null;
   avatarUrl: string | null;
   frame: string | null;
+  /** Main site, shown under their name. */
   siteCode: string;
+  /** Every site they work at, main first. */
+  siteCodes: string[];
 };
 
 /**
@@ -57,7 +60,7 @@ export function RecognizeForm({
   allowance,
   initialSelected = [],
   recentIds = [],
-  mySiteCode = "",
+  mySiteCodes = [],
   me,
 }: {
   values: ValueOption[];
@@ -66,7 +69,8 @@ export function RecognizeForm({
   /** Recipients to preselect (from ?to=…); jumps straight to compose. */
   initialSelected?: string[];
   recentIds?: string[];
-  mySiteCode?: string;
+  /** The sender's sites, main first. */
+  mySiteCodes?: string[];
   me: { name: string; avatarUrl: string | null };
 }) {
   const router = useRouter();
@@ -142,7 +146,9 @@ export function RecognizeForm({
     !q ||
     r.name.toLowerCase().includes(q) ||
     (r.jobTitle ?? "").toLowerCase().includes(q) ||
-    r.siteCode.toLowerCase().includes(q);
+    r.siteCodes.some((c) => c.toLowerCase().includes(q));
+  // Shares at least one site with the sender.
+  const atMySite = (r: RecipientOption) => r.siteCodes.some((c) => mySiteCodes.includes(c));
 
   // Sections: Recents, your site, then everyone A–Z. While searching, one list.
   const sections: { title: string; people: RecipientOption[] }[] = q
@@ -153,13 +159,18 @@ export function RecognizeForm({
           people: recentIds.map((id) => byId.get(id)).filter((r): r is RecipientOption => Boolean(r)),
         },
         {
-          title: mySiteCode ? `Your site · ${mySiteCode}` : "Your site",
-          people: recipients.filter((r) => mySiteCode && r.siteCode === mySiteCode && !recentIds.includes(r.id)),
+          title:
+            mySiteCodes.length > 1
+              ? `Your sites · ${mySiteCodes.join(", ")}`
+              : mySiteCodes.length === 1
+                ? `Your site · ${mySiteCodes[0]}`
+                : "Your site",
+          people: recipients.filter((r) => atMySite(r) && !recentIds.includes(r.id)),
         },
         {
           title: "Everyone",
           people: recipients.filter(
-            (r) => !(mySiteCode && r.siteCode === mySiteCode) && !recentIds.includes(r.id),
+            (r) => !atMySite(r) && !recentIds.includes(r.id),
           ),
         },
       ];

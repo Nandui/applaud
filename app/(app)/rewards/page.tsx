@@ -33,7 +33,7 @@ export default async function RewardsPage({
     select: { walletBalance: true, rewardsSeenAt: true },
   });
   const [data, myClaims] = await Promise.all([
-    loadRewardsShop({ siteId: me.siteId, seenAt: user.rewardsSeenAt, now: new Date(renderedAt) }),
+    loadRewardsShop({ siteIds: me.siteIds, seenAt: user.rewardsSeenAt, now: new Date(renderedAt) }),
     getActiveClaims(me.id),
   ]);
   const filtered = Boolean(activeCategory && data.categories.some((c) => c.name === activeCategory));

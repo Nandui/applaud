@@ -8,7 +8,10 @@ export type SessionUser = {
   role: Role;
   /** Points rank (lib/ranks.ts): sets the monthly giving allowance. */
   pointsRank: string;
+  /** Main site, shown next to their name. */
   siteId: string | null;
+  /** Every site they work at, main site first (lib/sites.ts). */
+  siteIds: string[];
   avatarUrl?: string | null;
   /** Finished the first-sign-in app tour (lib/onboarding.ts). */
   onboarded?: boolean;

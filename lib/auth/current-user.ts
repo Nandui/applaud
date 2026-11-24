@@ -2,6 +2,7 @@ import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/lib/config";
+import { siteIdsOf, userSitesSelect } from "@/lib/sites";
 import type { SessionUser } from "./types";
 
 /**
@@ -29,7 +30,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
       email: true,
       role: true,
       pointsRank: true,
-      siteId: true,
+      ...userSitesSelect,
       avatarUrl: true,
       onboardedAt: true,
       birthday: true,
@@ -44,6 +45,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     role: (dbUser.role ?? "staff") as Role,
     pointsRank: dbUser.pointsRank,
     siteId: dbUser.siteId,
+    siteIds: siteIdsOf(dbUser),
     avatarUrl: dbUser.avatarUrl,
     onboarded: dbUser.onboardedAt !== null,
     hasBirthday: dbUser.birthday !== null,

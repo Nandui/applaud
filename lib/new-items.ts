@@ -6,11 +6,11 @@ import { isNewSince, type NewCounts } from "@/lib/seen";
 import { notGoneWhere } from "@/lib/reward-promo";
 import type { SessionUser } from "@/lib/auth/types";
 
-/** Rewards this person can see: shown, for every site or theirs, and not an offer that has ended. */
-export function visibleRewardsWhere(user: Pick<SessionUser, "siteId">, now: Date = new Date()) {
+/** Rewards this person can see: shown, for every site or one of theirs, and not an offer that has ended. */
+export function visibleRewardsWhere(user: Pick<SessionUser, "siteIds">, now: Date = new Date()) {
   return {
     active: true,
-    AND: [{ OR: [{ siteId: null }, { siteId: user.siteId }] }, notGoneWhere(now)],
+    AND: [{ OR: [{ siteId: null }, { siteId: { in: user.siteIds } }] }, notGoneWhere(now)],
   };
 }
 

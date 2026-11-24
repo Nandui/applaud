@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { periodRange, type Period } from "@/lib/periods";
+import { worksAtSite } from "@/lib/sites";
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import type { FrameArt } from "@/lib/cosmetics";
@@ -39,7 +40,7 @@ export async function getLeaderboard({
 }): Promise<Leaderboard> {
   const range = periodRange(period);
   const createdAt = range ? { gte: range.gte, lte: range.lte } : undefined;
-  const userFilter = siteId ? { siteId } : undefined;
+  const userFilter = siteId ? worksAtSite(siteId) : undefined;
 
   const [ledgerRows, recipientRows, sentRows] = await Promise.all([
     // Points received = earn rows in the ledger (reconciles with the wallet),
