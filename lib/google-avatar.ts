@@ -242,7 +242,7 @@ export async function savedGooglePicture(userId: string): Promise<string | null>
  */
 export async function backfillGoogleAvatars(
   limit = 500,
-): Promise<{ checked: number; updated: number; stale: number }> {
+): Promise<{ checked: number; updated: number; stale: number; noPicture: number }> {
   const users = await prisma.user.findMany({
     where: {
       active: true,
@@ -258,22 +258,27 @@ export async function backfillGoogleAvatars(
   let checked = 0;
   let updated = 0;
   let stale = 0;
+  let noPicture = 0;
   // A few at a time: each is a check, a download from Google and an upload to Blob.
   for (let i = 0; i < users.length; i += 5) {
     const results = await Promise.all(
-      users.slice(i, i + 5).map(async (u): Promise<GoogleAvatarOutcome | null> => {
+      users.slice(i, i + 5).map(async (u): Promise<GoogleAvatarOutcome | "no-picture" | null> => {
         if (u.avatarUrl && (await pictureLoads(u.avatarUrl))) return null;
         const picture = u.accounts.map((a) => pictureFromIdToken(a.id_token)).find(Boolean);
-        if (!picture) return null;
+        if (!picture) return "no-picture";
         return setGoogleAvatar(u, picture, { force: true });
       }),
     );
     for (const r of results) {
       if (r === null) continue;
+      if (r === "no-picture") {
+        noPicture++;
+        continue;
+      }
       checked++;
       if (r === "updated") updated++;
       if (r === "stale") stale++;
     }
   }
-  return { checked, updated, stale };
+  return { checked, updated, stale, noPicture };
 }

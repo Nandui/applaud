@@ -368,7 +368,7 @@ export async function setUserActive(formData: FormData): Promise<ActionResult> {
  */
 export async function applyGooglePhotos(): Promise<ActionResult> {
   const admin = await requireAdmin();
-  const { checked, updated, stale } = await backfillGoogleAvatars();
+  const { checked, updated, stale, noPicture } = await backfillGoogleAvatars();
   if (updated > 0) {
     await writeAudit({
       actor: admin,
@@ -376,21 +376,27 @@ export async function applyGooglePhotos(): Promise<ActionResult> {
       entityType: "user",
       entityId: admin.id,
       summary: `Set the Google picture as the avatar of ${updated} ${updated === 1 ? "person" : "people"}`,
-      metadata: { checked, updated, stale },
+      metadata: { checked, updated, stale, noPicture },
     });
     revalidatePath("/", "layout");
   }
-  if (checked === 0) {
-    return { ok: true, message: "Everyone who has signed in with Google already has a working picture." };
+  const people = (n: number) => `${n} ${n === 1 ? "person" : "people"}`;
+  const parts: string[] = [];
+  if (updated > 0) parts.push(`Added the Google picture for ${people(updated)}.`);
+  if (checked - updated > 0) {
+    parts.push(`${people(checked - updated)} will get it when they next sign in with Google.`);
   }
-  const rest = checked - updated;
-  return {
-    ok: true,
-    message:
-      updated === checked
-        ? `Added the Google picture for ${updated} ${updated === 1 ? "person" : "people"}.`
-        : `Added the Google picture for ${updated} of ${checked}. The other ${rest} get it when they next sign in with Google.`,
-  };
+  if (noPicture > 0) {
+    parts.push(
+      `${people(noPicture)} without a picture have no Google photo saved yet: they can sign out and back in, then use Edit profile > Use Google photo.`,
+    );
+  }
+  if (parts.length === 0) {
+    parts.push(
+      "Nobody was changed: everyone with a saved Google photo already has a picture that loads. To force your own, use Edit profile > Use Google photo.",
+    );
+  }
+  return { ok: true, message: parts.join(" ") };
 }
 
 /**
