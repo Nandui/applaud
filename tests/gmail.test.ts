@@ -45,6 +45,7 @@ test("recognition email uses the connected mailbox, brand and one recipient", as
   assert.match(decode(html), /Róisín &lt;Lee&gt; recognised you/);
   assert.match(decode(html), /\+12 points/);
   assert.match(decode(html), /View your feed/);
+  assert.doesNotMatch(decode(html), /<img\b|background-image/i);
 });
 
 test("handles disabled Gmail API and expired Google authorisation", async t => {

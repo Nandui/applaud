@@ -41,22 +41,19 @@ export function renderNotification(appName: string, notification: Notification) 
   const url = new URL(copy.path, origin).href;
   const text = [copy.title, ...copy.paragraphs, copy.points, `${copy.action}: ${url}`].filter(Boolean).join("\n\n");
   const brand = escapeHtml(appName);
-  const assetBase = escapeHtml(origin) + "/brand";
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${copy.subject}</title>
-<style>@media(max-width:480px){.outer{padding:16px 8px!important}.inset{padding-left:20px!important;padding-right:20px!important}.headline{font-size:31px!important;line-height:34px!important}.art{width:95px!important}}</style></head>
+<style>@media(max-width:480px){.outer{padding:16px 8px!important}.inset{padding-left:22px!important;padding-right:22px!important}.headline{font-size:34px!important;line-height:37px!important}}</style></head>
 <body style="margin:0;background-color:#f5f4f8;font-family:Arial,Helvetica,sans-serif;color:#20172c">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${escapeHtml(copy.preview)}</div>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f5f4f8"><tr><td class="outer" align="center" style="padding:36px 12px">
 <!--[if mso]><table role="presentation" width="576"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="max-width:576px;border:1px solid #e3dfea;border-radius:20px">
-<tr><td class="inset" style="padding:24px 32px"><a href="${escapeHtml(origin)}" style="color:#281a39;text-decoration:none"><img src="${assetBase}/yayup-logo.png" width="119" alt="${brand}" style="display:block;width:119px;height:auto;border:0"></a></td></tr>
-<tr><td class="inset" bgcolor="#2b1948" style="padding:33px 32px;background-color:#2b1948;background-image:linear-gradient(115deg,#251635,#42256a)">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td valign="middle">
-<p style="margin:0 0 12px;color:#dccbff;font-size:12px;line-height:16px;font-weight:bold;text-transform:uppercase;letter-spacing:1.4px">${copy.label}</p>
-<h1 class="headline" style="margin:0;font-size:42px;line-height:45px;letter-spacing:-1.6px;font-weight:800;color:#ffffff">${copy.title}</h1>
-</td><td align="right" valign="middle" style="padding-left:10px"><img class="art" src="${assetBase}/email-high-five.png" alt="" width="151" style="display:block;width:151px;height:auto;border:0"></td></tr></table>
+<tr><td class="inset" style="padding:24px 32px"><a href="${escapeHtml(origin)}" style="font-size:25px;line-height:28px;letter-spacing:-1.3px;font-weight:bold;color:#23172f;text-decoration:none">${brand}</a></td></tr>
+<tr><td class="inset" bgcolor="#281d40" style="padding:33px 32px 37px;background-color:#281d40;border-left:5px solid #977dff">
+<p style="margin:0 0 13px;color:#dccbff;font-size:12px;line-height:16px;font-weight:bold;text-transform:uppercase;letter-spacing:1.4px">${copy.label}</p>
+<h1 class="headline" style="margin:0;font-size:41px;line-height:45px;letter-spacing:-1.4px;font-weight:bold;color:#ffffff">${copy.title}</h1>
 </td></tr>
 <tr><td class="inset" style="padding:29px 32px 30px">
 ${copy.paragraphs.map(p => `<p style="margin:0 0 12px;color:#382e43;font-size:17px;line-height:26px">${escapeHtml(p)}</p>`).join("")}
