@@ -102,6 +102,8 @@ model User {
   commentReactions     CommentReaction[]
   pollVotes            PollVote[]
   questionAnswers      QuestionAnswer[]
+  suggestions          Suggestion[]
+  suggestionVotes      SuggestionVote[]
   nominationsMade      Nomination[]           @relation("Nominator")
   nominationsReceived  Nomination[]           @relation("Nominee")
   ledger               RewardLedger[]
@@ -607,4 +609,38 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+/// An idea from staff for a future reward (kind "reward") or profile shop
+/// item (kind "shop"). Others upvote it; admins set where it's up to in
+/// Admin > Suggestions. Statuses: "new" | "planned" | "added" | "declined".
+model Suggestion {
+  id              String           @id @default(cuid())
+  kind            String // "reward" | "shop"
+  title           String
+  details         String?
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status          String           @default("new")
+  /// The admin's reply, shown on the idea to everyone.
+  adminNote       String?
+  /// Cached number of upvotes, written in the same transaction as the vote.
+  voteCount       Int              @default(0)
+  statusChangedAt DateTime?
+  createdAt       DateTime         @default(now())
+  votes           SuggestionVote[]
+
+  @@index([kind, status])
+}
+
+/// One upvote per person per idea.
+model SuggestionVote {
+  suggestionId String
+  suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@id([suggestionId, userId])
+  @@index([userId])
 }
