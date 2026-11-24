@@ -107,6 +107,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         mayCreate: googleAllowedDomains.length > 0,
       });
       if (!result.ok) return `/sign-in?error=${result.error}`;
+      // Auth.js saves the Google ID token only when the account is first
+      // linked; keep it current, since its picture claim is what Admin >
+      // Users "Use Google photos" and Edit profile "Use Google photo" read.
+      if (account.id_token) {
+        await prisma.account
+          .updateMany({
+            where: { provider: "google", providerAccountId: account.providerAccountId },
+            data: { id_token: account.id_token },
+          })
+          .catch((error) => console.error("Saving the latest Google ID token failed:", error));
+      }
       // Every sign-in: their Google picture is their avatar unless they've
       // uploaded their own (lib/google-avatar.ts).
       await syncGoogleAvatar(result.user, profile?.picture ?? user?.image);
