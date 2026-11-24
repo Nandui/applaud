@@ -10,6 +10,12 @@ const allowances = {
   monthlyAllowanceOperations: 3000,
   monthlyAllowanceCeo: 5000,
 };
+const covers = {
+  coverAllowanceManager: 1000,
+  coverAllowanceCentreManager: 1000,
+  coverAllowanceOperations: 500,
+  coverAllowanceCeo: 0,
+};
 
 test("each rank gives from its own allowance", () => {
   assert.equal(allowanceForRank("staff", allowances), 400);
@@ -53,14 +59,17 @@ test("app roles map to the rank they had before ranks existed", () => {
 
 test("the worst-case month adds every rank's allowances", () => {
   const f = economyForecast(
-    { ...allowances, pointsPerEuro: 100, monthlyRewardBudgetCents: 50000, monthlyBonusPool: 4400 },
+    { ...allowances, ...covers, pointsPerEuro: 100, monthlyRewardBudgetCents: 50000, monthlyBonusPool: 4400 },
     { staff: 80, backoffice: 5, manager: 6, centre_manager: 3, operations: 1, ceo: 1 },
   );
+  assert.equal(f.coverByRank.staff, 0);
+  assert.equal(f.coverByRank.manager, 6000);
+  assert.equal(f.coverPoints, 6000 + 3000 + 500);
   assert.equal(f.byRank.staff, 32000);
   assert.equal(f.byRank.backoffice, 0);
   assert.equal(f.byRank.centre_manager, 6000);
   assert.equal(f.byRank.ceo, 5000);
-  assert.equal(f.maxPoints, 32000 + 7200 + 6000 + 3000 + 5000 + 4400);
+  assert.equal(f.maxPoints, 32000 + 7200 + 6000 + 3000 + 5000 + 9500 + 4400);
   assert.equal(f.maxCents, f.maxPoints);
 });
 

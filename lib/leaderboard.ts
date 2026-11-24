@@ -19,10 +19,13 @@ type LeaderUser = {
 
 export type ReceiverRow = LeaderUser & { points: number; count: number };
 export type GiverRow = LeaderUser & { count: number; pointsGiven: number };
+/** People thanked for covering at short notice: how many covers, and the points. */
+export type HelperRow = LeaderUser & { covers: number; points: number };
 
 export type Leaderboard = {
   receivers: ReceiverRow[];
   givers: GiverRow[];
+  helpers: HelperRow[];
 };
 
 /**
@@ -42,7 +45,7 @@ export async function getLeaderboard({
   const createdAt = range ? { gte: range.gte, lte: range.lte } : undefined;
   const userFilter = siteId ? worksAtSite(siteId) : undefined;
 
-  const [ledgerRows, recipientRows, sentRows] = await Promise.all([
+  const [ledgerRows, recipientRows, sentRows, coverRows] = await Promise.all([
     // Points received = earn rows in the ledger (reconciles with the wallet),
     // summed per person in the database rather than sent over row by row.
     prisma.rewardLedger.groupBy({
@@ -59,7 +62,7 @@ export async function getLeaderboard({
       by: ["userId"],
       _count: { _all: true },
       where: {
-        recognition: { system: false, ...(createdAt ? { createdAt } : {}) },
+        recognition: { system: false, kind: "recognition", ...(createdAt ? { createdAt } : {}) },
         ...(userFilter ? { user: userFilter } : {}),
       },
     }),
@@ -72,6 +75,16 @@ export async function getLeaderboard({
         ...(userFilter ? { sender: userFilter } : {}),
       },
       select: { senderId: true, recipients: { select: { points: true } } },
+    }),
+    // Covers: each time someone was thanked for stepping in at short notice.
+    prisma.recognitionRecipient.groupBy({
+      by: ["userId"],
+      _count: { _all: true },
+      _sum: { points: true },
+      where: {
+        recognition: { kind: "cover", ...(createdAt ? { createdAt } : {}) },
+        ...(userFilter ? { user: userFilter } : {}),
+      },
     }),
   ]);
 
@@ -95,6 +108,7 @@ export async function getLeaderboard({
     ...pointsByUser.keys(),
     ...countByReceiver.keys(),
     ...giverStats.keys(),
+    ...coverRows.map((r) => r.userId),
   ]);
   const [catalogue, users] = await Promise.all([
     getCatalogue(),
@@ -141,5 +155,11 @@ export async function getLeaderboard({
     .sort((a, b) => b.count - a.count || b.pointsGiven - a.pointsGiven)
     .slice(0, take);
 
-  return { receivers, givers };
+  const helpers: HelperRow[] = coverRows
+    .map((r) => ({ ...userMap.get(r.userId)!, covers: r._count._all, points: r._sum.points ?? 0 }))
+    .filter((r) => r.id)
+    .sort((a, b) => b.covers - a.covers || b.points - a.points)
+    .slice(0, take);
+
+  return { receivers, givers, helpers };
 }

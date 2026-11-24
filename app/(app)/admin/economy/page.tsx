@@ -109,6 +109,12 @@ export default async function AdminEconomyPage() {
           monthlyBonusPool: settings.monthlyBonusPool,
           maxPointsPerShoutoutStaff: settings.maxPointsPerShoutoutStaff,
           maxPointsPerShoutoutManager: settings.maxPointsPerShoutoutManager,
+          coverAllowanceManager: settings.coverAllowanceManager,
+          coverAllowanceCentreManager: settings.coverAllowanceCentreManager,
+          coverAllowanceOperations: settings.coverAllowanceOperations,
+          coverAllowanceCeo: settings.coverAllowanceCeo,
+          coverPointsSuggested: settings.coverPointsSuggested,
+          maxPointsPerCover: settings.maxPointsPerCover,
           walletPointsExpireYearEnd: settings.walletPointsExpireYearEnd,
         }}
         headcount={headcount}

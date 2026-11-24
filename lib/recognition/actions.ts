@@ -490,11 +490,14 @@ export async function toggleBoost(formData: FormData): Promise<ActionResult> {
         where: { id: recognitionId },
         select: {
           id: true,
+          kind: true,
           boostType: true,
           recipients: { select: { userId: true, points: true } },
         },
       });
       if (!rec) throw new BoostError("That recognition no longer exists.");
+      // Cover thanks have their own allowance and aren't boosted.
+      if (rec.kind !== "recognition") throw new BoostError("Only recognitions can be boosted.");
 
       const current = (rec.boostType as BoostType | null) ?? null;
 

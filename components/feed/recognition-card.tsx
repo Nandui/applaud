@@ -19,6 +19,7 @@ import {
   BarChart3,
   MessageCircleQuestion,
   MapPin,
+  LifeBuoy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { toggleReaction, toggleBoost, deletePost } from "@/lib/recognition/actions";
@@ -56,6 +57,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatNumber, pts } from "@/lib/format";
+import { coveredPhrase } from "@/lib/covers";
 import { cn } from "@/lib/utils";
 
 type Viewer = {
@@ -340,7 +342,7 @@ export function RecognitionCard({
   // What the viewer can do: remove their own boost, apply onto an unboosted or
   // lower-boosted post, or nothing (a higher boost is already applied).
   let boostMode: "apply" | "remove" | null = null;
-  if (myBoostType && card.pointsEach > 0) {
+  if (myBoostType && card.pointsEach > 0 && card.kind === "recognition") {
     if (activeType === myBoostType) boostMode = "remove";
     else if (
       activeType === null ||
@@ -359,7 +361,9 @@ export function RecognitionCard({
     allReactors.find((u) => u.id !== viewer.id) ?? allReactors[0] ?? null;
 
   // Posts, polls and questions are written by one person (no recipients).
-  const isPost = card.kind !== "recognition";
+  const isPost = card.kind === "post" || card.kind === "poll" || card.kind === "question";
+  // Thanks for covering at short notice: recipients like a shout-out, no value.
+  const isCover = card.kind === "cover" && card.cover !== null;
   const isPoll = card.kind === "poll" && card.poll !== null;
   const isQuestion = card.kind === "question" && card.question !== null;
   const isMine = card.sender.id === viewer.id;
@@ -441,7 +445,7 @@ export function RecognitionCard({
               <span>{card.sender.name}</span>
             ) : (
               <>
-                recognised by
+                {isCover ? "thanked by" : "recognised by"}
                 <Link href={`/profile/${card.sender.id}`} className="text-foreground font-semibold">
                   {card.sender.name}
                 </Link>
@@ -565,8 +569,36 @@ export function RecognitionCard({
         />
       )}
 
+      {/* Covers: what they stepped in for, with the points. */}
+      {isCover && card.cover && (
+        <div
+          className="-mx-4 flex items-center gap-3 px-4 py-2.5 md:mx-0 md:rounded-b-2xl"
+          style={{ backgroundColor: tint("#0d9488", 0.14) ?? "var(--surface)" }}
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0d9488] text-white shadow-sm">
+            <LifeBuoy className="size-5.5" strokeWidth={2.2} />
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="text-muted text-[0.7rem] font-semibold tracking-wider uppercase">
+              {coveredPhrase(card.cover.type)} · last minute
+            </p>
+            <p className="truncate text-[1.05rem] font-extrabold text-[#0f766e] dark:text-[#5eead4]">
+              {card.cover.what}
+            </p>
+          </div>
+          {card.pointsEach > 0 && (
+            <span
+              data-numeric
+              className="flex shrink-0 items-center gap-1 rounded-full bg-[#0d9488] px-3 py-1.5 text-sm font-bold text-white"
+            >
+              +{pts(card.pointsEach)}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* What it's for: the value's medal and name, with the points earned. */}
-      {(card.value || card.pointsEach > 0) && (
+      {!isCover && (card.value || card.pointsEach > 0) && (
         <div
           className="-mx-4 flex items-center gap-3 px-4 py-2.5 md:mx-0 md:rounded-b-2xl"
           style={{ backgroundColor: tint(card.value?.color ?? accent, 0.14) ?? "var(--surface)" }}

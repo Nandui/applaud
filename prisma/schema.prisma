@@ -154,7 +154,10 @@ model Recognition {
   /// (an ordinary feed post by senderId: text and/or pictures, no recipients,
   /// no value, no points) | "poll" (message is the question, pollOptions the
   /// choices) | "question" (message is the question; answers are private to
-  /// the sender). Shout-out counts and analytics only count recognitions.
+  /// the sender) | "cover" (thanks for covering a lesson, activity or shift
+  /// at short notice: recipients and points from the sender's separate cover
+  /// allowance, no value; see lib/covers.ts). Shout-out counts and analytics
+  /// only count recognitions.
   kind       String    @default("recognition")
   senderId   String
   sender     User      @relation("Sender", fields: [senderId], references: [id])
@@ -178,6 +181,10 @@ model Recognition {
   /// Polls and questions: the sites whose people can see it (Site ids).
   /// Empty = everyone. The author and admins always see it.
   audienceSiteIds String[]  @default([])
+  /// Covers only: what was covered, "lesson" | "activity" | "shift", and which
+  /// one in the manager's words (e.g. "Sat 10am Level 3 swim").
+  coverType  String?
+  coverWhat  String?
   createdAt  DateTime  @default(now())
 
   recipients RecognitionRecipient[]
@@ -537,6 +544,15 @@ model OrgSettings {
   monthlyAllowanceCentreManager Int     @default(1200)
   monthlyAllowanceOperations    Int     @default(1200)
   monthlyAllowanceCeo           Int     @default(1200)
+  /// Separate monthly pot per rank for thanking people who covered at short
+  /// notice (Recognition kind "cover"). Staff and Backoffice have none.
+  coverAllowanceManager         Int     @default(1000)
+  coverAllowanceCentreManager   Int     @default(1000)
+  coverAllowanceOperations      Int     @default(1000)
+  coverAllowanceCeo             Int     @default(1000)
+  /// Points the cover composer starts on, and the most per person per cover (0 = no limit).
+  coverPointsSuggested          Int     @default(200)
+  maxPointsPerCover             Int     @default(500)
   /// How many points make one euro (the internal conversion; staff never see euros).
   pointsPerEuro                 Int     @default(100)
   /// Legacy: profile Store price overrides from before the Cosmetic table.

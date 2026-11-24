@@ -110,6 +110,16 @@ const REPAIRS: Repair[] = [
       ),
     ],
   },
+  {
+    name: "20261124170000_cover_recognitions",
+    checksum: "c29cd87af49806d81c7bd1972e13f3bcefeb4f442e6e417fa1272e78d4bb81fc",
+    check: `SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'Recognition' AND column_name IN ('coverType', 'coverWhat')) = 2
+      AND (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'OrgSettings' AND column_name IN ('coverAllowanceManager', 'coverAllowanceCentreManager', 'coverAllowanceOperations', 'coverAllowanceCeo', 'coverPointsSuggested', 'maxPointsPerCover')) = 6 AS ok`,
+    statements: [
+      `ALTER TABLE "Recognition" ADD COLUMN IF NOT EXISTS "coverType" TEXT, ADD COLUMN IF NOT EXISTS "coverWhat" TEXT`,
+      `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "coverAllowanceManager" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceCentreManager" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceOperations" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceCeo" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverPointsSuggested" INTEGER NOT NULL DEFAULT 200, ADD COLUMN IF NOT EXISTS "maxPointsPerCover" INTEGER NOT NULL DEFAULT 500`,
+    ],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {

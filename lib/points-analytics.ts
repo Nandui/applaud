@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { allowanceForRank } from "@/lib/ranks";
+import { coverAllowanceForRank } from "@/lib/covers";
 import { ECONOMY_TIMEZONE, economyMonth } from "@/lib/economy";
 import type { OrgSettings } from "@/lib/org-settings";
 
@@ -92,7 +93,11 @@ export async function getPointsMonth(settings: OrgSettings, ref: Date) {
 
   const sumType = (t: string) => ledger.find((l) => l.type === t)?._sum.amount ?? 0;
   const instantTotal = instantAwards.reduce((s, n) => s + n.pointsAwarded, 0);
-  const received = sumType("RECOGNITION") + sumType("AWARD") + Math.max(0, sumType("BOOST"));
+  // Thanks for covering: a separate allowance, counted on its own.
+  const coverGiven = sumType("COVER");
+  const coverAllowance = people.reduce((s, p) => s + coverAllowanceForRank(p.pointsRank, settings), 0);
+  const received =
+    sumType("RECOGNITION") + sumType("AWARD") + Math.max(0, sumType("BOOST")) + coverGiven;
   const bonusUsed = Math.max(0, sumType("AWARD") + sumType("BOOST") - instantTotal);
   const spentStore = Math.abs(sumType("SHOP"));
   // Year-end expiry rows are dated 31 Dec, so they land in December.
@@ -123,6 +128,8 @@ export async function getPointsMonth(settings: OrgSettings, ref: Date) {
     given,
     left,
     givers,
+    coverGiven,
+    coverAllowance,
     received,
     bonusUsed,
     bonusPool: settings.monthlyBonusPool,

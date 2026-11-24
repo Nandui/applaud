@@ -27,7 +27,7 @@ export default async function LeaderboardPage({
     ? (sp.period as Period)
     : "month";
   const siteId = sp.site && sp.site !== "all" ? sp.site : undefined;
-  const board: Board = sp.board === "given" ? "given" : "received";
+  const board: Board = sp.board === "given" || sp.board === "helpful" ? sp.board : "received";
 
   const [sites, data] = await Promise.all([
     prisma.site.findMany({
@@ -40,7 +40,17 @@ export default async function LeaderboardPage({
   ]);
 
   const rows =
-    board === "received"
+    board === "helpful"
+      ? data.helpers.map((h) => ({
+          id: h.id,
+          name: h.name,
+          avatarUrl: h.avatarUrl,
+          frame: h.frame,
+          subtitle: [h.jobTitle, h.siteCode].filter(Boolean).join(" · "),
+          primary: `${formatNumber(h.covers)} ${h.covers === 1 ? "cover" : "covers"}`,
+          secondary: `${pts(h.points)} earned`,
+        }))
+      : board === "received"
       ? data.receivers.map((r) => ({
           id: r.id,
           name: r.name,
@@ -71,8 +81,21 @@ export default async function LeaderboardPage({
         <p className="text-muted pt-1 text-[0.82rem]">
           {PERIOD_LABELS[period]}
           {left !== null && ` · ${left} ${left === 1 ? "day" : "days"} left`}
+          {board === "helpful" && " · covers at short notice"}
         </p>
-        <RankedList rows={rows} viewerId={me.id} />
+        <RankedList
+          rows={rows}
+          viewerId={me.id}
+          empty={
+            board === "helpful"
+              ? {
+                  emoji: "🛟",
+                  title: "No covers yet",
+                  text: "When a manager thanks someone for covering a lesson, activity or shift at short notice, they show up here.",
+                }
+              : undefined
+          }
+        />
       </div>
     </div>
   );

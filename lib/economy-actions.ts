@@ -13,7 +13,7 @@ export type ActionResult =
 
 function revalidateEconomy() {
   updateTag(ORG_SETTINGS_TAG);
-  for (const path of ["/admin", "/admin/economy", "/admin/points", "/admin/rewards", "/rewards", "/shop", "/recognize", "/me", "/"]) {
+  for (const path of ["/admin", "/admin/economy", "/admin/points", "/admin/rewards", "/rewards", "/shop", "/recognize", "/cover", "/me", "/"]) {
     revalidatePath(path);
   }
 }
@@ -40,6 +40,12 @@ export async function updateEconomySettings(
   const maxPointsPerShoutoutStaff = whole("maxPointsPerShoutoutStaff");
   const maxPointsPerShoutoutManager = whole("maxPointsPerShoutoutManager");
   const monthlyBonusPool = whole("monthlyBonusPool");
+  const coverAllowanceManager = whole("coverAllowanceManager");
+  const coverAllowanceCentreManager = whole("coverAllowanceCentreManager");
+  const coverAllowanceOperations = whole("coverAllowanceOperations");
+  const coverAllowanceCeo = whole("coverAllowanceCeo");
+  const coverPointsSuggested = whole("coverPointsSuggested");
+  const maxPointsPerCover = whole("maxPointsPerCover");
 
   if (pointsPerEuro === null || pointsPerEuro < 1) {
     return { ok: false, error: "Points per euro must be a whole number of at least 1." };
@@ -59,6 +65,16 @@ export async function updateEconomySettings(
   ) {
     return { ok: false, error: "Allowances, limits and the bonus pool must be whole numbers (0 or more)." };
   }
+  if (
+    coverAllowanceManager === null ||
+    coverAllowanceCentreManager === null ||
+    coverAllowanceOperations === null ||
+    coverAllowanceCeo === null ||
+    coverPointsSuggested === null ||
+    maxPointsPerCover === null
+  ) {
+    return { ok: false, error: "Cover allowances and amounts must be whole numbers (0 or more)." };
+  }
 
   const data = {
     pointsPerEuro,
@@ -71,6 +87,12 @@ export async function updateEconomySettings(
     maxPointsPerShoutoutStaff,
     maxPointsPerShoutoutManager,
     monthlyBonusPool,
+    coverAllowanceManager,
+    coverAllowanceCentreManager,
+    coverAllowanceOperations,
+    coverAllowanceCeo,
+    coverPointsSuggested,
+    maxPointsPerCover,
     walletPointsExpireYearEnd: String(formData.get("walletPointsExpireYearEnd") ?? "true") === "true",
   };
   await prisma.orgSettings.upsert({

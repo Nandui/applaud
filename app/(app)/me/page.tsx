@@ -29,7 +29,7 @@ export default async function MePage() {
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
-    prisma.recognitionRecipient.count({ where: { userId: me.id } }),
+    prisma.recognitionRecipient.count({ where: { userId: me.id, recognition: { kind: "recognition" } } }),
     prisma.recognition.count({ where: { senderId: me.id, system: false, kind: "recognition" } }),
   ]);
 

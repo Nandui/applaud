@@ -13,6 +13,7 @@
  */
 
 import { POINTS_RANKS, allowanceForRank, type PointsRank, type RankAllowances } from "@/lib/ranks";
+import { coverAllowanceByRank, type CoverAllowances } from "@/lib/covers";
 
 /**
  * Default conversion: 100 points = €1, so one point is one euro cent. Admins
@@ -197,7 +198,7 @@ export function yearEndExpiryAmount(atYearEnd: number, now: number): number {
   return Math.max(0, Math.min(atYearEnd, now));
 }
 
-export type EconomyInputs = RankAllowances & {
+export type EconomyInputs = RankAllowances & CoverAllowances & {
   pointsPerEuro: number;
   monthlyRewardBudgetCents: number;
   monthlyBonusPool: number;
@@ -208,7 +209,8 @@ export type RankHeadcount = Record<PointsRank, number>;
 
 /**
  * The budget maths for a month: the most points that could be created (every
- * allowance fully given plus the whole bonus pool), what that is worth in
+ * giving allowance and cover allowance fully given, plus the whole bonus
+ * pool), what that is worth in
  * cash, and how it compares with the rewards budget. The budget cap on claims
  * still protects the money when the worst case is higher.
  */
@@ -217,11 +219,18 @@ export function economyForecast(inputs: EconomyInputs, headcount: RankHeadcount)
     POINTS_RANKS.map((rank) => [rank, headcount[rank] * allowanceForRank(rank, inputs)]),
   ) as Record<PointsRank, number>;
   const allowancePoints = POINTS_RANKS.reduce((sum, rank) => sum + byRank[rank], 0);
-  const maxPoints = allowancePoints + inputs.monthlyBonusPool;
+  const coverEach = coverAllowanceByRank(inputs);
+  const coverByRank = Object.fromEntries(
+    POINTS_RANKS.map((rank) => [rank, headcount[rank] * coverEach[rank]]),
+  ) as Record<PointsRank, number>;
+  const coverPoints = POINTS_RANKS.reduce((sum, rank) => sum + coverByRank[rank], 0);
+  const maxPoints = allowancePoints + coverPoints + inputs.monthlyBonusPool;
   const maxCents = pointsToCents(maxPoints, inputs.pointsPerEuro);
   const people = POINTS_RANKS.reduce((sum, rank) => sum + headcount[rank], 0);
   return {
     byRank,
+    coverByRank,
+    coverPoints,
     bonusPoints: inputs.monthlyBonusPool,
     maxPoints,
     maxCents,

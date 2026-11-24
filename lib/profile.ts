@@ -49,12 +49,12 @@ export const getProfileData = cache(async (userId: string) => {
   const [receivedCount, givenCount, earn, valueRows, celebrations, awards, catalogue] =
     await Promise.all([
       prisma.recognitionRecipient.count({
-        where: { userId: id, recognition: { system: false } },
+        where: { userId: id, recognition: { system: false, kind: "recognition" } },
       }),
       prisma.recognition.count({ where: { senderId: id, system: false, kind: "recognition" } }),
       prisma.rewardLedger.aggregate({
         _sum: { amount: true },
-        where: { userId: id, type: { in: ["RECOGNITION", "AWARD"] } },
+        where: { userId: id, type: { in: ["RECOGNITION", "AWARD", "COVER"] } },
       }),
       prisma.recognitionRecipient.findMany({
         where: {

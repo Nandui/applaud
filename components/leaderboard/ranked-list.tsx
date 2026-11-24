@@ -29,18 +29,21 @@ export function RankedList({
   rows,
   viewerId,
   shown = 25,
+  empty,
 }: {
   rows: RankedRow[];
   viewerId?: string;
   /** How many rows to list; your row still pins below if you're further down. */
   shown?: number;
+  /** Empty state: emoji, title and line. */
+  empty?: { emoji: string; title: string; text: string };
 }) {
   if (rows.length === 0) {
     return (
       <div className="text-muted flex flex-col items-center gap-2 py-20 text-center">
-        <span className="text-4xl">🏁</span>
-        <p className="text-foreground font-bold">No one on the board yet</p>
-        <p className="text-sm">Recognitions in this period will show up here.</p>
+        <span className="text-4xl">{empty?.emoji ?? "🏁"}</span>
+        <p className="text-foreground font-bold">{empty?.title ?? "No one on the board yet"}</p>
+        <p className="max-w-xs text-sm">{empty?.text ?? "Recognitions in this period will show up here."}</p>
       </div>
     );
   }
