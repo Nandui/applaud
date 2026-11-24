@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { getOrgSettings } from "@/lib/org-settings";
 import { PageHeader } from "@/components/page-header";
 import { SettingsForm } from "./settings-form";
+import { TestEmailForm } from "./test-email-form";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { googleSignInEnabled } from "@/lib/auth/mode";
@@ -21,7 +22,7 @@ const mailStatus: Record<string, string> = {
 };
 
 export default async function AdminSettingsPage({ searchParams }: { searchParams: Promise<{ mail?: string }> }) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const settings = await getOrgSettings();
   const enabled = process.env.VERCEL_ENV === "production" && googleSignInEnabled;
   const sender = enabled ? await prisma.gmailConnection.findUnique({
@@ -40,11 +41,12 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           <h2 className="font-semibold">Recognition emails</h2>
           <p className="text-muted text-sm">
             {sender ? `Sending from ${settings.appName} <${sender.email}>.` : "Choose the Google Workspace mailbox that will send recognition notifications."}
-            {" "}Connecting sends a test email to the selected mailbox.
+            {!sender && " Connecting sends a test email to the selected mailbox."}
           </p>
           {mail && Object.hasOwn(mailStatus, mail) && <p role="status" className="text-sm">{mailStatus[mail]}</p>}
+          {sender && <TestEmailForm email={admin.email} />}
           <form action="/api/admin/gmail/connect" method="post">
-            <Button type="submit">{sender ? "Reconnect Gmail" : "Connect Gmail"}</Button>
+            <Button type="submit" variant={sender ? "outline" : "default"}>{sender ? "Reconnect Gmail" : "Connect Gmail"}</Button>
           </form>
         </section>
       )}
