@@ -573,6 +573,13 @@ model OrgSettings {
   allowSelfRecognition          Boolean @default(false)
   /// Create a staff account on the first Google sign-in from the company workspace.
   autoCreateGoogleUsers         Boolean @default(true)
+  /// Email each recipient a celebratory email when they're recognised or thanked.
+  emailRecipients               Boolean @default(true)
+  /// Email everyone else that someone was recognised (without saying who).
+  emailEveryone                 Boolean @default(true)
+  /// While on, every email goes ONLY to emailTestAddress (lib/email).
+  emailTestMode                 Boolean @default(true)
+  emailTestAddress              String  @default("fernandoserina@leisureworldcork.com")
 }
 
 // ---------- next-auth (Auth.js Prisma adapter) ----------

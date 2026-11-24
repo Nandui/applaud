@@ -24,6 +24,7 @@ import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
 import { lockPool } from "@/lib/locks";
 import { AUTHORED_KINDS } from "@/lib/posts/kinds";
+import { emailAboutRecognition } from "@/lib/email/recognition";
 
 export type ActionResult =
   | { ok: true; message?: string }
@@ -167,6 +168,7 @@ export async function createRecognition(
     metadata: { recipientIds, points, valueId },
     siteId: me.siteId,
   });
+  await emailAboutRecognition(createdId);
   revalidatePath("/");
   revalidatePath("/me");
   return { ok: true, message: "Recognition posted!" };

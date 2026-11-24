@@ -120,6 +120,14 @@ const REPAIRS: Repair[] = [
       `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "coverAllowanceManager" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceCentreManager" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceOperations" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceCeo" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverPointsSuggested" INTEGER NOT NULL DEFAULT 200, ADD COLUMN IF NOT EXISTS "maxPointsPerCover" INTEGER NOT NULL DEFAULT 500`,
     ],
   },
+  {
+    name: "20261124200000_email_notifications",
+    checksum: "beabd3b26c699a4474152aea7b5026c1b1a571b4602eb183bc0f31b63e07b6d6",
+    check: `SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'OrgSettings' AND column_name IN ('emailRecipients', 'emailEveryone', 'emailTestMode', 'emailTestAddress')) = 4 AS ok`,
+    statements: [
+      `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "emailRecipients" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailEveryone" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailTestMode" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailTestAddress" TEXT NOT NULL DEFAULT 'fernandoserina@leisureworldcork.com'`,
+    ],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {
