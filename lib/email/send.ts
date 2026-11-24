@@ -2,7 +2,8 @@ import nodemailer from "nodemailer";
 
 /**
  * Sends email through whichever service is configured:
- *  - SMTP (any mail server, e.g. the one another of our apps already uses):
+ *  - SMTP (any mail server; for Google Workspace: SMTP_HOST=smtp.gmail.com,
+ *    SMTP_PORT=465, SMTP_USER=the account, SMTP_PASS=an app password):
  *    SMTP_HOST, SMTP_PORT (default 587; 465 = TLS), SMTP_USER, SMTP_PASS
  *    (SMTP_PASSWORD also accepted), optional SMTP_SECURE=true;
  *  - otherwise Resend's HTTP API: RESEND_API_KEY.
@@ -32,7 +33,12 @@ export function emailConfigured(): boolean {
 }
 
 function fromAddress(): string {
-  return process.env.EMAIL_FROM || process.env.SMTP_FROM || DEFAULT_FROM;
+  const explicit = process.env.EMAIL_FROM || process.env.SMTP_FROM;
+  if (explicit) return explicit;
+  // Gmail / Google Workspace only sends as the signed-in account (or its
+  // aliases), so by default send as that account under the app's name.
+  if (smtpConfigured() && process.env.SMTP_USER?.includes("@")) return `Yayup <${process.env.SMTP_USER}>`;
+  return DEFAULT_FROM;
 }
 
 async function sendViaSmtp(emails: OutgoingEmail[], from: string): Promise<{ sent: number; error?: string }> {
