@@ -108,7 +108,7 @@ export function SettingsForm({
             <p className="text-muted text-xs">
               {emailReady
                 ? "Sent when someone is recognised or thanked for covering."
-                : "The email service isn't connected yet, so nothing is sent. Add RESEND_API_KEY in Vercel to switch it on."}
+                : "The email service isn't connected yet, so nothing is sent. Add the SMTP settings (or RESEND_API_KEY) in Vercel to switch it on."}
             </p>
           </div>
           <div className="border-border flex items-center justify-between gap-4 rounded-lg border p-3">
