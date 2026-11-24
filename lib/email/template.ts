@@ -1,10 +1,25 @@
 export type Notification =
   | { kind: "recognition"; recognisedBy: string; points: number }
+  | { kind: "team"; recognisedBy: string; recipientNames: string[]; recognitionId: string }
   | { kind: "test"; recipientName: string }
   | { kind: "connected" };
 
 function copyFor(appName: string, notification: Notification) {
   switch (notification.kind) {
+    case "team": {
+      const { recognisedBy, recipientNames, recognitionId } = notification;
+      const firstName = (name: string) => name.trim().split(/\s+/)[0];
+      const who = recipientNames.length === 1 ? firstName(recipientNames[0]) : `${recipientNames.length} teammates`;
+      const names = new Intl.ListFormat("en-IE", { type: "conjunction" }).format(recipientNames);
+      const summary = `${recognisedBy} recognised ${names} on ${appName}.`;
+      return {
+        subject: `${firstName(recognisedBy)} gave ${who} a shout-out`, label: "Team recognition",
+        title: recipientNames.length === 1 ? `A shout‑out for ${who}!` : "A team shout‑out!",
+        preview: summary,
+        paragraphs: [`${summary} Read the post and add your congratulations.`],
+        points: "", action: "See the shout‑out", path: `/recognition/${encodeURIComponent(recognitionId)}`,
+      };
+    }
     case "recognition":
       return {
         subject: "You received a recognition", label: "Team recognition", title: "You got a shout‑out!",
@@ -43,7 +58,7 @@ export function renderNotification(appName: string, notification: Notification) 
   const brand = escapeHtml(appName);
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${copy.subject}</title>
+<title>${escapeHtml(copy.subject)}</title>
 <style>@media(max-width:480px){.outer{padding:16px 8px!important}.inset{padding-left:22px!important;padding-right:22px!important}.headline{font-size:34px!important;line-height:37px!important}}</style></head>
 <body style="margin:0;background-color:#f5f4f8;font-family:Arial,Helvetica,sans-serif;color:#20172c">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${escapeHtml(copy.preview)}</div>
@@ -53,7 +68,7 @@ export function renderNotification(appName: string, notification: Notification) 
 <tr><td class="inset" style="padding:24px 32px"><a href="${escapeHtml(origin)}" style="font-size:25px;font-weight:bold;color:#23172f;text-decoration:none"><img src="${escapeHtml(origin)}/brand/yayup-logo.png" width="119" height="26" alt="${brand}" style="display:block;width:119px;height:26px;border:0"></a></td></tr>
 <tr><td class="inset" bgcolor="#281d40" style="padding:33px 32px 37px;background-color:#281d40;border-left:5px solid #977dff">
 <p style="margin:0 0 13px;color:#dccbff;font-size:12px;line-height:16px;font-weight:bold;text-transform:uppercase;letter-spacing:1.4px">${copy.label}</p>
-<h1 class="headline" style="margin:0;font-size:41px;line-height:45px;letter-spacing:-1.4px;font-weight:bold;color:#ffffff">${copy.title}</h1>
+<h1 class="headline" style="margin:0;font-size:41px;line-height:45px;letter-spacing:-1.4px;font-weight:bold;color:#ffffff">${escapeHtml(copy.title)}</h1>
 </td></tr>
 <tr><td class="inset" style="padding:29px 32px 30px">
 ${copy.paragraphs.map(p => `<p style="margin:0 0 12px;color:#382e43;font-size:17px;line-height:26px">${escapeHtml(p)}</p>`).join("")}

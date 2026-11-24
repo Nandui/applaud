@@ -324,11 +324,11 @@ export async function getPostCards(
  * Specific recognitions by id (a profile's pinned shout-outs), in the given
  * order, dropping any that no longer exist.
  */
-export async function getCardsByIds(ids: string[], viewerId: string): Promise<FeedCard[]> {
+export async function getCardsByIds(ids: string[], viewerId: string, filter: Prisma.RecognitionWhereInput = {}): Promise<FeedCard[]> {
   if (ids.length === 0) return [];
   const [catalogue, audience] = await Promise.all([getCatalogue(), audienceWhere(viewerId)]);
   const rows = await prisma.recognition.findMany({
-    where: { AND: [{ id: { in: ids } }, audience] },
+    where: { AND: [{ id: { in: ids } }, audience, filter] },
     include: feedInclude(viewerId),
   });
   const byId = new Map(rows.map((r) => [r.id, r]));

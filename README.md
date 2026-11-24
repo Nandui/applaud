@@ -48,7 +48,9 @@ and authorise the sending Workspace mailbox. The app uses the existing Google si
 client and registered callback. Enable the Gmail API in that client's Google Cloud
 project. Google requests send access during mailbox setup only. Once Gmail accepts the
 self-addressed test message, the app stores the encrypted refresh token and sends new
-shout-out notifications to each recipient with the organisation's configured display name.
+personal shout-out notifications to each recognised colleague. Other active staff receive
+a team announcement linking to the shout-out. The sender is excluded and Gmail blind
+copies the team in batches so colleagues' email addresses stay private.
 
 The encryption key is derived from `AUTH_SECRET`. Reconnect the mailbox after rotating
 that secret or revoking consent. Failed notification deliveries are logged without

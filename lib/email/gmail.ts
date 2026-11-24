@@ -24,14 +24,20 @@ export async function exchangeGoogleToken(params: Record<string, string>) {
   }).parse(await response.json());
 }
 
+function encodedWords(value: string) {
+  const chunks = value.replace(/[\r\n]+/g, " ").trim().match(/.{1,10}/gu) ?? [];
+  return chunks.map(chunk => `=?UTF-8?B?${Buffer.from(chunk).toString("base64")}?=`).join("\r\n ");
+}
+
 export async function sendGmail(
-  accessToken: string, sender: string, name: string, to: string,
+  accessToken: string, sender: string, name: string, to: string | { bcc: string[] },
   notification: Notification,
 ) {
   mailbox.parse(sender);
-  mailbox.parse(to);
-  const words = [...name.trim()].slice(0, 60).join("").match(/.{1,10}/gu) ?? [];
-  const display = words.map(word => `=?UTF-8?B?${Buffer.from(word).toString("base64")}?=`).join(" ");
+  const recipients = typeof to === "string"
+    ? [`To: ${mailbox.parse(to)}`]
+    : ["To: undisclosed-recipients:;", `Bcc: ${z.array(mailbox).min(1).max(50).parse(to.bcc).join(",\r\n ")}`];
+  const display = encodedWords([...name.trim()].slice(0, 60).join(""));
   const { subject, text, html } = renderNotification(name, notification);
   const boundary = `yayup_${randomUUID()}`;
   const parts = [["plain", text], ["html", html]].flatMap(([subtype, content]) => [
@@ -40,7 +46,8 @@ export async function sendGmail(
     ...(Buffer.from(content.replace(/\r?\n/g, "\r\n")).toString("base64").match(/.{1,76}/g) ?? []),
   ]);
   const message = [
-    `From: ${display} <${sender}>`, `To: ${to}`, `Subject: ${subject}`,
+    `From: ${display} <${sender}>`, ...recipients,
+    `Subject: ${notification.kind === "team" ? encodedWords(subject) : subject}`,
     `Date: ${new Date().toUTCString()}`, `Message-ID: <${randomUUID()}@${sender.split("@")[1]}>`,
     "MIME-Version: 1.0", `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "", ...parts, `--${boundary}--`, "",
