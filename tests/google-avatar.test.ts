@@ -6,7 +6,9 @@ import {
   isGooglePictureUrl,
   largerGooglePicture,
   pictureFromIdToken,
+  setGoogleAvatar,
 } from "../lib/google-avatar";
+import { prisma } from "../lib/prisma";
 
 const PIC = "https://lh3.googleusercontent.com/a/ACg8ocK123=s96-c";
 const STORE = "https://abc.public.blob.vercel-storage.com/";
@@ -51,4 +53,75 @@ test("reads the picture out of a stored Google ID token", () => {
   assert.equal(pictureFromIdToken(`${part({})}.${part({ email: "a@b.com" })}.sig`), null);
   assert.equal(pictureFromIdToken(null), null);
   assert.equal(pictureFromIdToken("garbage"), null);
+});
+
+// setGoogleAvatar with Google, Blob and the database stubbed out.
+function stub(responses: Record<string, number>) {
+  const writes: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    const host = new URL(url).hostname;
+    return new Response(null, { status: responses[host] ?? 200 });
+  }) as typeof fetch;
+  const user = prisma.user as unknown as { updateMany: unknown };
+  const realUpdate = user.updateMany;
+  user.updateMany = async ({ data }: { data: { avatarUrl: string } }) => {
+    writes.push(data.avatarUrl);
+    return { count: 1 };
+  };
+  return {
+    writes,
+    restore() {
+      globalThis.fetch = realFetch;
+      user.updateMany = realUpdate;
+    },
+  };
+}
+
+test("replaces a Google copy that no longer loads", async () => {
+  const s = stub({ "abc.public.blob.vercel-storage.com": 404 });
+  try {
+    const avatarUrl = `${STORE}avatars/google/u1-${googlePictureKey(PIC)}.jpg`;
+    // No Blob store in tests, so the fresh picture is linked straight to Google.
+    assert.equal(await setGoogleAvatar({ id: "u1", avatarUrl }, PIC), "updated");
+    assert.deepEqual(s.writes, ["https://lh3.googleusercontent.com/a/ACg8ocK123=s512-c"]);
+  } finally {
+    s.restore();
+  }
+});
+
+test("leaves a working Google copy and an own upload alone", async () => {
+  const s = stub({});
+  try {
+    const copy = `${STORE}avatars/google/u1-${googlePictureKey(PIC)}.jpg`;
+    assert.equal(await setGoogleAvatar({ id: "u1", avatarUrl: copy }, PIC), "unchanged");
+    assert.equal(await setGoogleAvatar({ id: "u1", avatarUrl: `${STORE}avatars/me.jpg` }, PIC), "unchanged");
+    assert.deepEqual(s.writes, []);
+  } finally {
+    s.restore();
+  }
+});
+
+test("force replaces an own upload with the Google picture", async () => {
+  const s = stub({});
+  try {
+    const res = await setGoogleAvatar({ id: "u1", avatarUrl: `${STORE}avatars/me.jpg` }, PIC, { force: true });
+    assert.equal(res, "updated");
+    assert.equal(s.writes.length, 1);
+  } finally {
+    s.restore();
+  }
+});
+
+test("reports a Google picture link that has expired instead of linking to it", async () => {
+  const s = stub({ "lh3.googleusercontent.com": 404 });
+  process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test_token";
+  try {
+    assert.equal(await setGoogleAvatar({ id: "u1", avatarUrl: null }, PIC), "stale");
+    assert.deepEqual(s.writes, []);
+  } finally {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    s.restore();
+  }
 });

@@ -14,7 +14,10 @@ export default async function EditProfilePage() {
   const me = await requireUser();
   const [data, mine, birthdayPoints] = await Promise.all([
     getProfileData(me.id),
-    prisma.user.findUnique({ where: { id: me.id }, select: { birthday: true } }),
+    prisma.user.findUnique({
+      where: { id: me.id },
+      select: { birthday: true, _count: { select: { accounts: { where: { provider: "google" } } } } },
+    }),
     getBirthdayPoints(),
   ]);
   if (!data) notFound();
@@ -29,6 +32,7 @@ export default async function EditProfilePage() {
         avatarUrl: data.user.avatarUrl,
         jobTitle: data.user.jobTitle,
       }}
+      hasGoogle={(mine?._count.accounts ?? 0) > 0}
       pronouns={custom.pronouns}
       bio={custom.bio}
       birthday={mine?.birthday ? mine.birthday.toISOString().slice(0, 10) : null}

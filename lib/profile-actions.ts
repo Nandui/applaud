@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 import { isProjectBlobUrl } from "@/lib/blob";
+import { savedGooglePicture, setGoogleAvatar } from "@/lib/google-avatar";
 import { KIND_LABELS, itemById, type CosmeticKind } from "@/lib/cosmetics";
 import { getCatalogue, getCategories } from "@/lib/catalogue";
 import { RANK_LABELS, isPointsRank, shopIsFreeFor } from "@/lib/ranks";
@@ -94,6 +95,38 @@ export async function setMyAvatar(url: string | null): Promise<ProfileActionResu
   });
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/**
+ * Edit profile "Use Google photo": make the picture of their Google account
+ * their avatar now, replacing whatever they have (their own upload too).
+ */
+export async function applyMyGooglePhoto(): Promise<
+  { ok: true; avatarUrl: string | null } | { ok: false; error: string }
+> {
+  const me = await requireUser();
+  const signInAgain = "Sign out, sign back in with Google, then press Use Google photo again.";
+  const picture = await savedGooglePicture(me.id);
+  if (!picture) return { ok: false, error: `We don't have your Google photo yet. ${signInAgain}` };
+  const current = await prisma.user.findUnique({ where: { id: me.id }, select: { avatarUrl: true } });
+  const outcome = await setGoogleAvatar({ id: me.id, avatarUrl: current?.avatarUrl ?? null }, picture, {
+    force: true,
+  });
+  if (outcome === "stale") return { ok: false, error: `Google's link to your photo has expired. ${signInAgain}` };
+  if (outcome === "failed") return { ok: false, error: "Couldn't get your Google photo. Try again in a minute." };
+  const after = await prisma.user.findUnique({ where: { id: me.id }, select: { avatarUrl: true } });
+  if (outcome === "updated") {
+    await writeAudit({
+      actor: me,
+      action: "profile.updated",
+      entityType: "user",
+      entityId: me.id,
+      summary: "Used their Google photo as their profile picture",
+      siteId: me.siteId,
+    });
+    revalidatePath("/", "layout");
+  }
+  return { ok: true, avatarUrl: after?.avatarUrl ?? null };
 }
 
 /** Pin or unpin one received recognition from the feed card menu. */

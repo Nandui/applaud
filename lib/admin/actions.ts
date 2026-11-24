@@ -362,10 +362,13 @@ export async function setUserActive(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Admin > Users: give everyone without a picture their Google picture now. */
+/**
+ * Admin > Users: give everyone whose picture is missing, or no longer loads,
+ * their Google picture now.
+ */
 export async function applyGooglePhotos(): Promise<ActionResult> {
   const admin = await requireAdmin();
-  const { checked, updated } = await backfillGoogleAvatars();
+  const { checked, updated, stale } = await backfillGoogleAvatars();
   if (updated > 0) {
     await writeAudit({
       actor: admin,
@@ -373,19 +376,20 @@ export async function applyGooglePhotos(): Promise<ActionResult> {
       entityType: "user",
       entityId: admin.id,
       summary: `Set the Google picture as the avatar of ${updated} ${updated === 1 ? "person" : "people"}`,
-      metadata: { checked, updated },
+      metadata: { checked, updated, stale },
     });
     revalidatePath("/", "layout");
   }
   if (checked === 0) {
-    return { ok: true, message: "Everyone who has signed in with Google already has a picture." };
+    return { ok: true, message: "Everyone who has signed in with Google already has a working picture." };
   }
+  const rest = checked - updated;
   return {
     ok: true,
     message:
       updated === checked
         ? `Added the Google picture for ${updated} ${updated === 1 ? "person" : "people"}.`
-        : `Added the Google picture for ${updated} of ${checked}. The rest get it at their next sign-in.`,
+        : `Added the Google picture for ${updated} of ${checked}. The other ${rest} get it when they next sign in with Google.`,
   };
 }
 

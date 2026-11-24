@@ -89,7 +89,7 @@ const EXTENSIONS: Record<string, string> = {
 async function copyToBlob(
   userId: string,
   picture: string,
-): Promise<{ url: string } | { reason: string }> {
+): Promise<{ url: string } | { reason: string; status?: number }> {
   if (!process.env.BLOB_STORE_ID && !process.env.BLOB_READ_WRITE_TOKEN) {
     return { reason: "no Blob store is connected (BLOB_STORE_ID / BLOB_READ_WRITE_TOKEN)" };
   }
@@ -99,7 +99,7 @@ async function copyToBlob(
       headers: { accept: "image/jpeg,image/png,image/webp,image/gif" },
     });
     const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-    if (!res.ok) return { reason: `Google answered ${res.status}` };
+    if (!res.ok) return { reason: `Google answered ${res.status}`, status: res.status };
     if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(type) || !EXTENSIONS[type]) {
       return { reason: `Google sent an unexpected file type "${type}"` };
     }
@@ -119,48 +119,97 @@ async function copyToBlob(
 }
 
 /**
+ * True if the picture at `url` still loads. A Blob copy can have been
+ * deleted and a Google link can go stale; either way the avatar falls back to
+ * initials although the person "has" a picture. Network trouble counts as
+ * loading, so a slow moment never replaces anyone's picture.
+ */
+export async function pictureLoads(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(4000), cache: "no-store" });
+    return res.ok || res.status === 405;
+  } catch {
+    return true;
+  }
+}
+
+export type GoogleAvatarOutcome =
+  /** The avatar is now the Google picture. */
+  | "updated"
+  /** Nothing to do: their own picture, or already the current Google copy. */
+  | "unchanged"
+  /** Google no longer serves this picture link: a fresh sign-in brings a new one. */
+  | "stale"
+  | "failed";
+
+/**
  * Bring the person's avatar in line with their Google picture (see above).
+ * `force` replaces whatever they have, their own upload too (they asked for
+ * it, or what they have doesn't load). Without it a current Google copy is
+ * still checked, and copied again if it has gone missing.
  * Never throws: a failure only means they keep what they had, so sign-in
  * must not depend on it.
  */
-export async function syncGoogleAvatar(
+export async function setGoogleAvatar(
   user: { id: string; avatarUrl: string | null },
   picture: unknown,
-): Promise<boolean> {
+  { force = false }: { force?: boolean } = {},
+): Promise<GoogleAvatarOutcome> {
   try {
     if (typeof picture !== "string" || !picture.startsWith("https://")) {
       console.warn(`No Google profile picture for user ${user.id}; avatar left as it was.`);
-      return false;
+      return "failed";
     }
-    if (googleAvatarAction(user.avatarUrl, user.id, picture) === "keep") return false;
+    const action = googleAvatarAction(user.avatarUrl, user.id, picture);
+    if (action === "keep" && user.avatarUrl) {
+      const isCurrentCopy = isGoogleAvatar(user.avatarUrl, user.id);
+      if (!isCurrentCopy && !force) return "unchanged";
+      if (await pictureLoads(user.avatarUrl)) {
+        if (isCurrentCopy) return "unchanged";
+      } else {
+        console.warn(`The avatar of user ${user.id} no longer loads; replacing it with the Google picture.`);
+      }
+    }
 
     const copy = await copyToBlob(user.id, picture);
     let next: string;
     if ("url" in copy) {
       next = copy.url;
+    } else if (copy.status === 404 || copy.status === 403 || copy.status === 410) {
+      // Linking to a picture Google no longer serves would only show initials.
+      console.warn(`Google no longer serves the saved profile picture of user ${user.id} (${copy.reason}).`);
+      return "stale";
     } else {
       console.warn(
         `Copying the Google profile picture of user ${user.id} failed (${copy.reason}); linking to Google's picture instead.`,
       );
       next = largerGooglePicture(picture);
     }
-    if (next === user.avatarUrl) return false;
+    if (next === user.avatarUrl) return "unchanged";
 
     // Only if the avatar is still what we read: an upload made meanwhile wins.
     const { count } = await prisma.user.updateMany({
       where: { id: user.id, avatarUrl: user.avatarUrl },
       data: { avatarUrl: next },
     });
-    if (count === 0) return false;
+    if (count === 0) return "unchanged";
     // Tidy up the older Google copy it replaced (never anything else).
-    if (user.avatarUrl && isGoogleAvatar(user.avatarUrl, user.id)) {
+    if (user.avatarUrl && isGoogleAvatar(user.avatarUrl, user.id) && user.avatarUrl !== next) {
       await del(user.avatarUrl).catch(() => {});
     }
-    return true;
+    return "updated";
   } catch (error) {
     console.error(`Setting the Google profile picture of user ${user.id} failed:`, error);
-    return false;
+    return "failed";
   }
+}
+
+/** Sign-in: true if the avatar changed. */
+export async function syncGoogleAvatar(
+  user: { id: string; avatarUrl: string | null },
+  picture: unknown,
+): Promise<boolean> {
+  return (await setGoogleAvatar(user, picture)) === "updated";
 }
 
 /** The `picture` claim of a Google ID token (no signature check: we stored it ourselves). */
@@ -175,18 +224,28 @@ export function pictureFromIdToken(idToken: string | null | undefined): string |
   }
 }
 
+/** The Google picture saved for this user (from their latest Google sign-in). */
+export async function savedGooglePicture(userId: string): Promise<string | null> {
+  const accounts = await prisma.account.findMany({
+    where: { userId, provider: "google", id_token: { not: null } },
+    select: { id_token: true },
+  });
+  return accounts.map((a) => pictureFromIdToken(a.id_token)).find(Boolean) ?? null;
+}
+
 /**
- * Give everyone who has signed in with Google before, and still has no
- * picture, their Google picture now rather than at their next sign-in. The
- * picture comes from the ID token Auth.js saved when their Google account was
- * first linked. Run by Admin > Users and by the daily cron; does nothing for
- * people who already have a picture, so re-runs are cheap.
+ * Give everyone who has signed in with Google before, and has no picture or
+ * one that no longer loads, their Google picture now rather than at their
+ * next sign-in. The picture comes from the ID token saved at their latest
+ * Google sign-in (auth.ts). Run by Admin > Users and by the daily cron;
+ * people whose picture loads are left alone, so re-runs are cheap.
  */
-export async function backfillGoogleAvatars(limit = 200): Promise<{ checked: number; updated: number }> {
+export async function backfillGoogleAvatars(
+  limit = 500,
+): Promise<{ checked: number; updated: number; stale: number }> {
   const users = await prisma.user.findMany({
     where: {
       active: true,
-      avatarUrl: null,
       accounts: { some: { provider: "google", id_token: { not: null } } },
     },
     select: {
@@ -196,16 +255,25 @@ export async function backfillGoogleAvatars(limit = 200): Promise<{ checked: num
     },
     take: limit,
   });
+  let checked = 0;
   let updated = 0;
-  // A few at a time: each is a download from Google and an upload to Blob.
+  let stale = 0;
+  // A few at a time: each is a check, a download from Google and an upload to Blob.
   for (let i = 0; i < users.length; i += 5) {
     const results = await Promise.all(
-      users.slice(i, i + 5).map((u) => {
+      users.slice(i, i + 5).map(async (u): Promise<GoogleAvatarOutcome | null> => {
+        if (u.avatarUrl && (await pictureLoads(u.avatarUrl))) return null;
         const picture = u.accounts.map((a) => pictureFromIdToken(a.id_token)).find(Boolean);
-        return picture ? syncGoogleAvatar(u, picture) : Promise.resolve(false);
+        if (!picture) return null;
+        return setGoogleAvatar(u, picture, { force: true });
       }),
     );
-    updated += results.filter(Boolean).length;
+    for (const r of results) {
+      if (r === null) continue;
+      checked++;
+      if (r === "updated") updated++;
+      if (r === "stale") stale++;
+    }
   }
-  return { checked: users.length, updated };
+  return { checked, updated, stale };
 }

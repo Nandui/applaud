@@ -7,7 +7,7 @@ import { uploadPresigned } from "@vercel/blob/client";
 import { uploadErrorMessage } from "@/lib/upload-error";
 import { toast } from "sonner";
 import { ChevronRight, Loader2 } from "lucide-react";
-import { updateMyProfile, setMyAvatar, type ProfileActionResult } from "@/lib/profile-actions";
+import { updateMyProfile, setMyAvatar, applyMyGooglePhoto, type ProfileActionResult } from "@/lib/profile-actions";
 import { BIO_MAX, PRONOUNS_MAX } from "@/lib/profile-limits";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/config";
 import { UserAvatar } from "@/components/user-avatar";
@@ -20,6 +20,7 @@ import { BirthdayProfileRow } from "@/components/birthday/birthday-prompt";
  */
 export function ProfileEditor({
   user,
+  hasGoogle = false,
   pronouns: initialPronouns,
   bio: initialBio,
   birthday,
@@ -27,6 +28,8 @@ export function ProfileEditor({
   look,
 }: {
   user: { id: string; name: string; avatarUrl: string | null; jobTitle: string | null };
+  /** Signed in with Google before, so "Use Google photo" can work. */
+  hasGoogle?: boolean;
   pronouns: string;
   bio: string;
   birthday: string | null;
@@ -89,6 +92,19 @@ export function ProfileEditor({
     });
   }
 
+  function pickGooglePhoto() {
+    startUpload(async () => {
+      const res = await applyMyGooglePhoto();
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setAvatarUrl(res.avatarUrl);
+      toast.success("Your Google photo is now your picture");
+      router.refresh();
+    });
+  }
+
   return (
     <form action={formAction} className="mx-auto max-w-xl pb-10">
       <header className="glass pt-safe border-border sticky top-0 z-30 -mx-4 border-b md:mx-0">
@@ -127,6 +143,16 @@ export function ProfileEditor({
           >
             {uploading ? "Uploading…" : "Edit picture"}
           </button>
+          {hasGoogle ? (
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={pickGooglePhoto}
+              className="text-primary text-sm font-semibold disabled:opacity-50"
+            >
+              Use Google photo
+            </button>
+          ) : null}
           {avatarUrl ? (
             <button type="button" disabled={uploading} onClick={removePhoto} className="text-danger text-sm font-semibold">
               Remove
