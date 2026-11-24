@@ -25,7 +25,7 @@ export async function exchangeGoogleToken(params: Record<string, string>) {
 
 export async function sendGmail(
   accessToken: string, sender: string, name: string, to: string,
-  subject: "You received a recognition" | "Your notification mailbox is connected", body: string,
+  subject: "You received a recognition" | "Your notification mailbox is connected" | "Notification email test", body: string,
 ) {
   mailbox.parse(sender);
   mailbox.parse(to);
