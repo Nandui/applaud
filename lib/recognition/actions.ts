@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { notifyRecognition } from "@/lib/email/recognition";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
@@ -87,7 +89,7 @@ export async function createRecognition(
 
   const recipients = await prisma.user.findMany({
     where: { id: { in: recipientIds }, active: true },
-    select: { id: true },
+    select: { id: true, email: true },
   });
   if (recipients.length !== recipientIds.length) {
     return { ok: false, error: "One or more recipients are invalid." };
@@ -157,6 +159,15 @@ export async function createRecognition(
     if (error instanceof AllowanceError) return { ok: false, error: error.message };
     throw error;
   }
+
+  after(async () => {
+    const body = [
+      `${me.name} recognised you on ${settings.appName}.`,
+      points > 0 && `You received ${points} ${points === 1 ? "point" : "points"}.`,
+      `Open your feed: ${process.env.AUTH_URL || "https://yayup.app"}`,
+    ].filter(Boolean).join("\n\n");
+    await notifyRecognition(recipients.filter(({ id }) => id !== me.id), settings.appName, body);
+  });
 
   await writeAudit({
     actor: me,
