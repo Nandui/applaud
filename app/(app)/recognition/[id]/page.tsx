@@ -5,6 +5,7 @@ import { getCardsByIds } from "@/lib/recognition/queries";
 import { prisma } from "@/lib/prisma";
 import { parseProfile } from "@/lib/profile-custom";
 import { RecognitionCard } from "@/components/feed/recognition-card";
+import { TestEmailForm } from "../../admin/settings/test-email-form";
 
 export const metadata = { title: "Team recognition" };
 
@@ -22,6 +23,9 @@ export default async function RecognitionPage({ params }: { params: Promise<{ id
       <Link href="/" className="text-primary mb-4 inline-block text-sm font-semibold">Back to feed</Link>
       <RecognitionCard card={card} viewer={{ id: me.id, name: me.name, avatarUrl: me.avatarUrl, role: me.role }}
         pinned={parseProfile(user?.profile).pinned.includes(id)} />
+      {me.role === "admin" && !card.system && process.env.VERCEL_ENV === "production" && (
+        <div className="mt-5"><TestEmailForm email={me.email} recognitionId={id} /></div>
+      )}
     </div>
   );
 }

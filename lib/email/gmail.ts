@@ -6,6 +6,18 @@ export const gmailScope = "https://www.googleapis.com/auth/gmail.send";
 export const googleTokenEndpoint = "https://oauth2.googleapis.com/token";
 export const mailbox = z.email().max(254).regex(/^[^\r\n]+$/);
 
+class GoogleRequestError extends Error {}
+
+// Log Google's status/reason codes, never a raw response, address, or credential.
+export function mailFailure(error: unknown) {
+  if (error instanceof GoogleRequestError) return error.message;
+  return error instanceof Error ? error.name : "UnknownError";
+}
+
+function googleCode(value: unknown) {
+  return typeof value === "string" && /^[a-zA-Z0-9_]{1,80}$/.test(value) ? value : "unknown";
+}
+
 export async function exchangeGoogleToken(params: Record<string, string>) {
   const response = await fetch(googleTokenEndpoint, {
     method: "POST",
@@ -16,7 +28,10 @@ export async function exchangeGoogleToken(params: Record<string, string>) {
     }),
     cache: "no-store", redirect: "error", signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Google token exchange failed (HTTP ${response.status})`);
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new GoogleRequestError(`Google token exchange failed (HTTP ${response.status}, ${googleCode(detail?.error)})`);
+  }
   return z.object({
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),
@@ -30,13 +45,11 @@ function encodedWords(value: string) {
 }
 
 export async function sendGmail(
-  accessToken: string, sender: string, name: string, to: string | { bcc: string[] },
+  accessToken: string, sender: string, name: string, to: string,
   notification: Notification,
 ) {
   mailbox.parse(sender);
-  const recipients = typeof to === "string"
-    ? [`To: ${mailbox.parse(to)}`]
-    : ["To: undisclosed-recipients:;", `Bcc: ${z.array(mailbox).min(1).max(50).parse(to.bcc).join(",\r\n ")}`];
+  mailbox.parse(to);
   const display = encodedWords([...name.trim()].slice(0, 60).join(""));
   const { subject, text, html } = renderNotification(name, notification);
   const boundary = `yayup_${randomUUID()}`;
@@ -46,7 +59,7 @@ export async function sendGmail(
     ...(Buffer.from(content.replace(/\r?\n/g, "\r\n")).toString("base64").match(/.{1,76}/g) ?? []),
   ]);
   const message = [
-    `From: ${display} <${sender}>`, ...recipients,
+    `From: ${display} <${sender}>`, `To: ${to}`,
     `Subject: ${notification.kind === "team" ? encodedWords(subject) : subject}`,
     `Date: ${new Date().toUTCString()}`, `Message-ID: <${randomUUID()}@${sender.split("@")[1]}>`,
     "MIME-Version: 1.0", `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -61,9 +74,10 @@ export async function sendGmail(
     // Google returns SERVICE_DISABLED when Gmail hasn't been enabled in the OAuth project.
     const detail = await response.json().catch(() => null);
     if (detail?.error?.details?.some((item: { reason?: string }) => item.reason === "SERVICE_DISABLED")) {
-      throw new Error("gmail-api-disabled");
+      throw new GoogleRequestError("gmail-api-disabled");
     }
-    throw new Error(`Gmail rejected the message (HTTP ${response.status})`);
+    const reason = googleCode(detail?.error?.errors?.[0]?.reason ?? detail?.error?.status);
+    throw new GoogleRequestError(`Gmail rejected the message (HTTP ${response.status}, ${reason})`);
   }
   return z.object({ id: z.string().min(1) }).parse(await response.json()).id;
 }
