@@ -1,4 +1,5 @@
-import { mailbox, sendGmail } from "./gmail";
+import { mailbox, mailFailure, sendGmail } from "./gmail";
+import type { Notification } from "./template";
 import { getGmailSender } from "./sender";
 import { prisma } from "@/lib/prisma";
 
@@ -8,19 +9,35 @@ function deliverable(email: string) {
   return mailbox.safeParse(email).success && !email.toLowerCase().endsWith(".test");
 }
 
-export function teamEmailBatches(activeUsers: Pick<Person, "id" | "email">[], excluded: Person[]) {
+export function emailRecipients(activeUsers: Pick<Person, "id" | "email">[], excluded: Person[]) {
   const excludedIds = new Set(excluded.map(person => person.id));
   const seen = new Set(excluded.map(person => person.email.toLowerCase()));
-  const addresses: string[] = [];
+  const recipients: Pick<Person, "id" | "email">[] = [];
   for (const { id, email } of activeUsers) {
     const key = email.toLowerCase();
     if (excludedIds.has(id) || seen.has(key) || !deliverable(email)) continue;
     seen.add(key);
-    addresses.push(email);
+    recipients.push({ id, email });
   }
-  const batches: string[][] = [];
-  for (let i = 0; i < addresses.length; i += 50) batches.push(addresses.slice(i, i + 50));
-  return batches;
+  return recipients;
+}
+
+export async function sendRecognitionCopies(
+  recognitionId: string, sender: { accessToken: string; email: string }, appName: string,
+  people: Pick<Person, "id" | "email">[], notification: Notification,
+) {
+  const concurrency = 3;
+  for (let i = 0; i < people.length; i += concurrency) {
+    await Promise.all(people.slice(i, i + concurrency).map(async ({ id, email }) => {
+      const context = { recognitionId, userId: id, kind: notification.kind };
+      try {
+        const gmailId = await sendGmail(sender.accessToken, sender.email, appName, email, notification);
+        console.info("Gmail accepted recognition email", { ...context, gmailId });
+      } catch (error) {
+        console.error("Recognition email send failed", { ...context, reason: mailFailure(error) });
+      }
+    }));
+  }
 }
 
 export async function notifyRecognition(
@@ -29,30 +46,18 @@ export async function notifyRecognition(
   if (process.env.VERCEL_ENV !== "production" || !recipients.length) return;
   try {
     const sender = await getGmailSender();
-    if (!sender) return;
-    const personal = recipients.filter(person => person.id !== author.id && deliverable(person.email));
-    await Promise.all(personal.map(async ({ id, email }) => {
-      try {
-        await sendGmail(sender.accessToken, sender.email, appName, email, {
-          kind: "recognition", recognisedBy: author.name, points,
-        });
-      } catch {
-        console.error("Recognition email delivery failed for user", id);
-      }
-    }));
+    if (!sender) {
+      console.warn("Recognition emails skipped: no connected mailbox", { recognitionId });
+      return;
+    }
+    const personal = emailRecipients(recipients, [author]);
+    await sendRecognitionCopies(recognitionId, sender, appName, personal, { kind: "recognition", recognisedBy: author.name, points });
     // New shout-outs are public to all active accounts, across sites.
     const staff = await prisma.user.findMany({ where: { active: true }, select: { id: true, email: true } });
-    const recipientNames = recipients.map(person => person.name);
-    for (const bcc of teamEmailBatches(staff, [author, ...recipients])) {
-      try {
-        await sendGmail(sender.accessToken, sender.email, appName, { bcc }, {
-          kind: "team", recognisedBy: author.name, recipientNames, recognitionId,
-        });
-      } catch {
-        console.error("Team recognition email batch failed", { recognitionId, recipientCount: bcc.length });
-      }
-    }
-  } catch {
-    console.error("Could not access the notification mailbox. Check the connection in admin settings.");
+    await sendRecognitionCopies(recognitionId, sender, appName, emailRecipients(staff, [author, ...recipients]), {
+      kind: "team", recognisedBy: author.name, recipientNames: recipients.map(person => person.name), recognitionId,
+    });
+  } catch (error) {
+    console.error("Could not complete recognition email delivery", { recognitionId, reason: mailFailure(error) });
   }
 }

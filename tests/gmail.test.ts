@@ -1,24 +1,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendGmail, exchangeGoogleToken } from "../lib/email/gmail";
+import { sendGmail, exchangeGoogleToken, mailFailure } from "../lib/email/gmail";
 import { openToken, sealToken } from "../lib/email/connection";
-import { teamEmailBatches } from "../lib/email/recognition";
+import { emailRecipients, sendRecognitionCopies } from "../lib/email/recognition";
 import { renderNotification } from "../lib/email/template";
 
-test("team batches exclude the author, every honouree, duplicate mailboxes and test accounts", () => {
+test("team recipients exclude the author, every honouree, duplicate mailboxes and test accounts", () => {
   const people = [
     { id: "author", name: "A", email: "a@example.org" },
     { id: "one", name: "B", email: "b@example.org" },
     { id: "two", name: "C", email: "c@example.org" },
   ];
   const staff = Array.from({ length: 51 }, (_, i) => ({ id: String(i), email: `staff${i}@example.org` }));
-  const batches = teamEmailBatches([...people, ...staff,
+  const selected = emailRecipients([...people, ...staff,
     { id: "dup", email: "STAFF0@example.org" }, { id: "alias", email: "B@example.org" },
     { id: "one", email: "new@example.org" }, { id: "demo", email: "demo@yayup.test" },
   ], people);
-  assert.deepEqual(batches.map(batch => batch.length), [50, 1]);
-  assert.deepEqual(batches.flat(), staff.map(person => person.email));
-  assert.deepEqual(teamEmailBatches(people, people), []);
+  assert.deepEqual(selected, staff);
+  assert.deepEqual(emailRecipients(people, people), []);
 });
 
 test("team announcements name the honourees, link to the post and hide the other addresses", async t => {
@@ -36,12 +35,42 @@ test("team announcements name the honourees, link to the post and hide the other
   assert.doesNotMatch(single.html, /in your wallet/);
   const multi = renderNotification("Yayup", { ...team, recipientNames: ["Alex Kelly", "Jo Lee"] });
   assert.match(multi.text, /Alex Kelly and Jo Lee/);
-  await sendGmail("token", "from@example.org", "Yayup", { bcc: ["first@example.org", "second@example.org"] }, team);
+  await sendGmail("token", "from@example.org", "Yayup", "first@example.org", team);
   const [headers] = raw.split("\r\n\r\n");
-  assert.match(headers, /\r\nTo: undisclosed-recipients:;\r\n/);
-  assert.match(headers, /\r\nBcc: first@example.org,\r\n second@example.org\r\n/);
-  assert.doesNotMatch(headers, /\r\nCc:/i);
+  assert.deepEqual(headers.split("\r\n").filter(line => /^(To|Bcc|Cc):/i.test(line)), ["To: first@example.org"]);
   assert.match(headers, /Subject: =\?UTF-8\?B\?/);
+});
+
+test("provider failures expose status and reason without exposing recipient or response text", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    error: { message: "failed for private@example.org", errors: [{ reason: "invalidArgument" }] },
+  }, { status: 400 }));
+  await assert.rejects(sendGmail("test", "from@example.org", "Yayup", "to@example.org", { kind: "connected" }),
+    error => mailFailure(error) === "Gmail rejected the message (HTTP 400, invalidArgument)");
+  assert.equal(mailFailure(new Error("secret details")), "Error");
+});
+
+test("one Gmail rejection in an 18-person announcement leaves the other 17 deliveries independent", async t => {
+  const audience = Array.from({ length: 18 }, (_, i) => ({ id: String(i), email: `person${i}@example.org` }));
+  const destinations: string[] = [];
+  t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+    const raw = Buffer.from(JSON.parse(String(init.body)).raw, "base64url").toString();
+    const to = raw.match(/^To: ([^\r\n]+)$/m)?.[1];
+    assert.ok(to);
+    destinations.push(to);
+    if (to === audience[1].email) return Response.json({ error: { status: "INVALID_ARGUMENT" } }, { status: 400 });
+    return Response.json({ id: `accepted-${to.split("@")[0]}` });
+  });
+  const accepted = t.mock.method(console, "info", () => {});
+  const failed = t.mock.method(console, "error", () => {});
+  await sendRecognitionCopies("r", { accessToken: "test", email: "from@example.org" }, "Yayup", audience,
+    { kind: "team", recognisedBy: "Pat", recipientNames: ["Alex"], recognitionId: "r" });
+  assert.deepEqual(destinations.sort(), audience.map(p => p.email).sort());
+  assert.equal(accepted.mock.callCount(), 17);
+  assert.equal(failed.mock.callCount(), 1);
+  assert.deepEqual(failed.mock.calls[0].arguments[1], {
+    kind: "team", recognitionId: "r", userId: "1", reason: "Gmail rejected the message (HTTP 400, INVALID_ARGUMENT)",
+  });
 });
 
 test("a stored mailbox token is encrypted and tampering is detected", () => {
