@@ -166,7 +166,7 @@ export async function createRecognition(
   });
   after(() => postToGoogleChat({
     kind: "recognition", id: createdId, from: me.name, to: recipients.map((r) => r.name),
-    value: value.name, message, points,
+    value: value.name, message, points, image: imageUrls[0] ?? null,
   }));
 
   await writeAudit({

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatText, chatWebhookUrl, postToGoogleChat } from "../lib/chat/google-chat";
+import { chatMessage, chatText, chatWebhookUrl, postToGoogleChat } from "../lib/chat/google-chat";
 
 const hook = "https://chat.googleapis.com/v1/spaces/AAAA123/messages?key=k&token=t";
 
@@ -59,4 +59,32 @@ test("nothing is posted outside production", async () => {
     globalThis.fetch = realFetch;
     process.env = env;
   }
+});
+
+test("messages are Yayup-branded cards with a violet button that opens Yayup", () => {
+  const message = chatMessage("Yayup", {
+    kind: "recognition", id: "rec1", from: "Ana", to: ["Bo"], value: "Teamwork",
+    message: "<script>hi</script>", points: 20, image: "https://media.giphy.com/media/x/giphy.gif",
+  });
+  assert.match(message.fallbackText, /Ana/);
+  const card = message.cardsV2[0].card;
+  assert.equal(card.header.title, "New recognition");
+  assert.equal(card.header.imageUrl, "https://yayup.app/brand/icon-192.png");
+  const [text, image, buttons] = card.sections[0].widgets;
+  assert.match(text.textParagraph!.text, /<b>Bo<\/b> was recognised by <b>Ana<\/b>/);
+  assert.match(text.textParagraph!.text, /Recognised for Teamwork/);
+  assert.match(text.textParagraph!.text, /&lt;script&gt;/);
+  assert.ok(!text.textParagraph!.text.includes("<script>"));
+  assert.equal(image.image!.imageUrl, "https://media.giphy.com/media/x/giphy.gif");
+  const button = buttons.buttonList!.buttons[0];
+  assert.equal(button.text, "Say congrats in Yayup");
+  assert.equal(button.onClick.openLink.url, "https://yayup.app/recognition/rec1");
+  assert.ok(button.color.blue === 1);
+});
+
+test("the test message opens Yayup's home page", () => {
+  const card = chatMessage("Yayup", { kind: "test", admin: "Fern" }).cardsV2[0].card;
+  const buttons = card.sections[0].widgets.at(-1)!;
+  assert.equal(buttons.buttonList!.buttons[0].text, "Open Yayup");
+  assert.equal(buttons.buttonList!.buttons[0].onClick.openLink.url, "https://yayup.app/");
 });
