@@ -152,6 +152,7 @@ export async function createCover(
     const id = createdId;
     after(() => postToGoogleChat({
       kind: "cover", id, from: me.name, to: recipients.map((r) => r.name), what: coverWhat, points,
+      image: imageUrls[0] ?? null,
     }));
   }
 

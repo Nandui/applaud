@@ -10,8 +10,8 @@ import { getOrgSettings, type OrgSettings } from "@/lib/org-settings";
  */
 
 export type ChatEvent =
-  | { kind: "recognition"; id: string; from: string; to: string[]; value: string | null; message: string; points: number }
-  | { kind: "cover"; id: string; from: string; to: string[]; what: string; points: number }
+  | { kind: "recognition"; id: string; from: string; to: string[]; value: string | null; message: string; points: number; image?: string | null }
+  | { kind: "cover"; id: string; from: string; to: string[]; what: string; points: number; image?: string | null }
   | { kind: "award"; id: string; winner: string; award: string; points: number }
   | { kind: "milestone"; id: string; message: string }
   | { kind: "claim"; person: string; reward: string; points: number }
@@ -103,11 +103,147 @@ export function chatText(appName: string, event: ChatEvent): string {
   }
 }
 
-async function send(url: string, text: string) {
+/** Yayup's violet accent (--primary), as Google Chat's RGB 0..1 colour. */
+const VIOLET = { red: 0x6a / 255, green: 0x4d / 255, blue: 0xff / 255, alpha: 1 };
+const VIOLET_HEX = "#6a4dff";
+
+/** Card text accepts a small HTML subset, so user text is HTML-escaped. */
+function html(text: string) {
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function htmlNames(list: string[]) {
+  return new Intl.ListFormat("en-IE", { type: "conjunction" }).format(list.map((n) => `<b>${html(n)}</b>`));
+}
+
+function htmlPoints(points: number, each: boolean) {
+  if (points <= 0) return "";
+  const n = points.toLocaleString("en-IE");
+  return `<font color="${VIOLET_HEX}"><b>+${n} ${points === 1 ? "point" : "points"}${each ? " each" : ""}</b></font>`;
+}
+
+function htmlQuote(message: string) {
+  const text = message.trim();
+  if (!text) return "";
+  const short = text.length > MAX_QUOTE ? `${text.slice(0, MAX_QUOTE - 1).trimEnd()}…` : text;
+  return `<i>“${html(short).replace(/\s*\n+\s*/g, " ")}”</i>`;
+}
+
+type CardParts = {
+  title: string;
+  subtitle: string;
+  lines: string[];
+  image?: string | null;
+  path: string;
+  button: string;
+};
+
+function cardParts(appName: string, event: ChatEvent): CardParts {
+  const app = appName.trim() || "Yayup";
+  switch (event.kind) {
+    case "recognition":
+      return {
+        title: "New recognition",
+        subtitle: `${app} · from ${event.from}`,
+        lines: [
+          `🎉 ${htmlNames(event.to)} ${event.to.length > 1 ? "were" : "was"} recognised by <b>${html(event.from)}</b>`,
+          event.value ? `<font color="${VIOLET_HEX}"><b>Recognised for ${html(event.value)}</b></font>` : "",
+          htmlQuote(event.message),
+          htmlPoints(event.points, event.to.length > 1),
+        ],
+        image: event.image,
+        path: post(event.id),
+        button: "Say congrats in Yayup",
+      };
+    case "cover":
+      return {
+        title: "Thanks for covering",
+        subtitle: `${app} · from ${event.from}`,
+        lines: [
+          `🙌 <b>${html(event.from)}</b> thanked ${htmlNames(event.to)} for covering ${html(event.what)}`,
+          htmlPoints(event.points, event.to.length > 1),
+        ],
+        image: event.image,
+        path: post(event.id),
+        button: "Open in Yayup",
+      };
+    case "award":
+      return {
+        title: "Award winner",
+        subtitle: app,
+        lines: [`🏆 <b>${html(event.winner)}</b> won <font color="${VIOLET_HEX}"><b>${html(event.award)}</b></font>!`, htmlPoints(event.points, false)],
+        path: post(event.id),
+        button: "Congratulate them in Yayup",
+      };
+    case "milestone":
+      return {
+        title: "Celebration",
+        subtitle: app,
+        lines: [html(event.message)],
+        path: post(event.id),
+        button: "Celebrate in Yayup",
+      };
+    case "claim":
+      return {
+        title: "Reward claimed",
+        subtitle: app,
+        lines: [`🎁 <b>${html(event.person)}</b> claimed <b>${html(event.reward)}</b> for ${event.points.toLocaleString("en-IE")} points`],
+        path: "/admin/redemptions",
+        button: "Open claims in Yayup",
+      };
+    case "test":
+      return {
+        title: "Notifications are connected",
+        subtitle: app,
+        lines: [`👋 This space will now get ${html(app)} news: recognitions, thanks for covering, award winners and celebrations.`, `<i>Test sent by ${html(event.admin)}</i>`],
+        path: "/",
+        button: "Open Yayup",
+      };
+  }
+}
+
+export type ChatWidget = {
+  textParagraph?: { text: string };
+  image?: { imageUrl: string; altText: string };
+  buttonList?: { buttons: { text: string; color: typeof VIOLET; onClick: { openLink: { url: string } } }[] };
+};
+
+/** The Google Chat message for one event: a branded card with a button, plus plain text for notifications. */
+export function chatMessage(appName: string, event: ChatEvent, id = "yayup") {
+  const parts = cardParts(appName, event);
+  const url = new URL(parts.path, origin()).href;
+  const widgets: ChatWidget[] = [
+    { textParagraph: { text: parts.lines.filter(Boolean).join("<br>") } },
+  ];
+  if (parts.image) widgets.push({ image: { imageUrl: parts.image, altText: "Photo from the post" } });
+  widgets.push({
+    buttonList: {
+      buttons: [{ text: parts.button, color: VIOLET, onClick: { openLink: { url } } }],
+    },
+  });
+  return {
+    fallbackText: chatText(appName, event),
+    cardsV2: [{
+      cardId: id,
+      card: {
+        header: {
+          title: parts.title,
+          subtitle: parts.subtitle,
+          imageUrl: new URL("/brand/icon-192.png", origin()).href,
+          imageType: "CIRCLE",
+          imageAltText: "Yayup",
+        },
+        sections: [{ widgets }],
+      },
+    }],
+  };
+}
+
+async function send(url: string, message: object) {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=UTF-8" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(message),
     signal: AbortSignal.timeout(8000),
   });
   if (!response.ok) {
@@ -124,7 +260,7 @@ export async function postToGoogleChat(event: ChatEvent): Promise<void> {
     if (!url) return;
     const settings = await getOrgSettings();
     if (event.kind !== "test" && !settings[settingFor[event.kind]]) return;
-    await send(url, chatText(settings.appName, event));
+    await send(url, chatMessage(settings.appName, event));
   } catch (error) {
     console.error("Google Chat post failed", { kind: event.kind, reason: error instanceof Error ? error.message : String(error) });
   }
@@ -137,7 +273,7 @@ export async function sendChatTest(admin: string): Promise<string> {
   if (!url) return "Add the GOOGLE_CHAT_WEBHOOK_URL environment variable in Vercel and redeploy first.";
   try {
     const { appName } = await getOrgSettings();
-    await send(url, chatText(appName, { kind: "test", admin }));
+    await send(url, chatMessage(appName, { kind: "test", admin }));
     return "Sent. Look for the test message in your Google Chat space.";
   } catch (error) {
     console.error("Google Chat test failed", { reason: error instanceof Error ? error.message : String(error) });
