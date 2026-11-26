@@ -68,6 +68,8 @@ export type UserRow = {
   needsReview: boolean;
   /** Finished the first-sign-in app tour. */
   onboarded: boolean;
+  /** Has signed in with Google at least once. */
+  joined: boolean;
   /** Throwaway account from "Try as a brand-new person" (lib/test-accounts.ts). */
   isTest: boolean;
 };
@@ -639,6 +641,14 @@ export function UsersManager({
                   title="Created on their first Google sign-in. Edit to check role and site."
                 >
                   New
+                </span>
+              )}
+              {!row.original.joined && !row.original.isTest && row.original.active && (
+                <span
+                  className="bg-surface-2 text-muted shrink-0 rounded-full px-1.5 py-px text-[10px] font-semibold uppercase"
+                  title="Has an account but has never signed in. Use “Nudge people to join” above."
+                >
+                  Not joined
                 </span>
               )}
               {row.original.isTest && (

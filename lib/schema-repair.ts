@@ -127,6 +127,12 @@ const REPAIRS: Repair[] = [
       `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "chatRecognitions" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatCovers" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatAwards" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatMilestones" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatRewardClaims" BOOLEAN NOT NULL DEFAULT false`,
     ],
   },
+  {
+    name: "20261126230000_join_nudge",
+    checksum: "76f9c51df1109e5a669525bcddcee2116eea5501d5ffc8fa4a184f4f61727def",
+    check: `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'User' AND column_name = 'lastNudgedAt') AS ok`,
+    statements: [`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastNudgedAt" TIMESTAMP(3)`],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {

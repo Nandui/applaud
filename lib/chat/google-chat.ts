@@ -15,6 +15,7 @@ export type ChatEvent =
   | { kind: "award"; id: string; winner: string; award: string; points: number }
   | { kind: "milestone"; id: string; message: string }
   | { kind: "claim"; person: string; reward: string; points: number }
+  | { kind: "invite"; welcomePoints: number }
   | { kind: "test"; admin: string };
 
 const settingFor = {
@@ -23,7 +24,7 @@ const settingFor = {
   award: "chatAwards",
   milestone: "chatMilestones",
   claim: "chatRewardClaims",
-} as const satisfies Record<Exclude<ChatEvent["kind"], "test">, keyof OrgSettings>;
+} as const satisfies Record<Exclude<ChatEvent["kind"], "test" | "invite">, keyof OrgSettings>;
 
 const MAX_QUOTE = 400;
 
@@ -98,6 +99,11 @@ export function chatText(appName: string, event: ChatEvent): string {
     case "claim":
       return `🎁 *${clean(event.person)}* claimed *${clean(event.reward)}* for ${event.points.toLocaleString("en-IE")} pts`
         + link("/admin/redemptions", "Open claims");
+    case "invite":
+      return `👋 *Not on ${clean(appName)} yet?* Your team is already recognising each other there. `
+        + "Get recognised, earn points and choose rewards."
+        + (event.welcomePoints > 0 ? ` Finish the quick tour for ${event.welcomePoints} welcome points.` : "")
+        + link("/sign-in", `Join ${clean(appName)} with your work Google account`);
     case "test":
       return `👋 Test from ${clean(appName)}, sent by ${clean(event.admin)}. Notifications will appear in this space.`;
   }
@@ -196,6 +202,23 @@ function cardParts(appName: string, event: ChatEvent): CardParts {
         path: "/admin/redemptions",
         button: "Open claims in Yayup",
       };
+    case "invite":
+      return {
+        title: `Not on ${app} yet?`,
+        subtitle: `${app} · your team's recognition app`,
+        lines: [
+          `👋 <b>Your team is already recognising each other on ${html(app)}.</b> Join in with your work Google account, it takes a minute.`,
+          "<br>🎉 Get recognised when you go the extra mile",
+          "⭐ Earn points from your teammates and managers",
+          "🎁 Spend them on real rewards and staff discounts",
+          "🎨 Make your profile yours with frames, banners and themes",
+          event.welcomePoints > 0
+            ? `<font color="${VIOLET_HEX}"><b>+${event.welcomePoints} welcome points</b></font> when you finish the quick tour`
+            : "",
+        ],
+        path: "/sign-in",
+        button: `Join ${app}`,
+      };
     case "test":
       return {
         title: "Notifications are connected",
@@ -264,10 +287,27 @@ export async function postToGoogleChat(event: ChatEvent): Promise<void> {
     const url = chatWebhookUrl();
     if (!url) return;
     const settings = await getOrgSettings();
-    if (event.kind !== "test" && !settings[settingFor[event.kind]]) return;
+    if (event.kind !== "test" && event.kind !== "invite" && !settings[settingFor[event.kind]]) return;
     await send(url, chatMessage(settings.appName, event));
   } catch (error) {
     console.error("Google Chat post failed", { kind: event.kind, reason: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/**
+ * For the "Nudge people who haven't joined" button in Admin > Users: posts the
+ * invite card regardless of the event switches. Resolves to whether Google
+ * Chat accepted it; never throws.
+ */
+export async function postJoinInvite(welcomePoints: number): Promise<boolean> {
+  if (!chatConfigured()) return false;
+  try {
+    const { appName } = await getOrgSettings();
+    await send(chatWebhookUrl()!, chatMessage(appName, { kind: "invite", welcomePoints }, "yayup-invite"));
+    return true;
+  } catch (error) {
+    console.error("Google Chat invite failed", { reason: error instanceof Error ? error.message : String(error) });
+    return false;
   }
 }
 
