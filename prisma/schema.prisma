@@ -102,6 +102,9 @@ model User {
   /// welcome points). Null: they haven't, so the tour opens for them. Replaying
   /// the tour from the menu never changes it, so the points are paid once.
   onboardedAt   DateTime?
+  /// When an admin's "Nudge people who haven't joined" last emailed them
+  /// (Admin > Users). Used so nobody gets the invite twice in a week.
+  lastNudgedAt  DateTime?
 
   sentRecognitions     Recognition[]          @relation("Sender")
   receivedRecognitions RecognitionRecipient[]

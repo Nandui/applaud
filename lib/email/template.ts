@@ -2,6 +2,7 @@ export type Notification =
   | { kind: "recognition"; recognisedBy: string; points: number }
   | { kind: "team"; recognisedBy: string; recipientNames: string[]; recognitionId: string }
   | { kind: "test"; recipientName: string }
+  | { kind: "invite"; recipientName: string; welcomePoints: number }
   | { kind: "connected" };
 
 function copyFor(appName: string, notification: Notification) {
@@ -28,6 +29,26 @@ function copyFor(appName: string, notification: Notification) {
         points: notification.points > 0 ? `+${notification.points.toLocaleString("en-IE")} ${notification.points === 1 ? "point" : "points"}` : "",
         action: "View your feed", path: "/",
       };
+    case "invite": {
+      const first = notification.recipientName.trim().split(/\s+/)[0] || "there";
+      return {
+        subject: `Your team is on ${appName}. Come and join in!`, label: "You're invited",
+        title: "Your team is cheering you on.",
+        preview: `Get recognised, earn points and choose rewards on ${appName}.`,
+        paragraphs: [
+          `Hi ${first},`,
+          `Your teammates are already recognising each other on ${appName}, and you have a spot waiting. Sign in with your work Google account, it takes a minute.`,
+          "🎉 Get recognised when you go the extra mile.",
+          "⭐ Earn points from your teammates and managers.",
+          "🎁 Spend them on real rewards and staff discounts.",
+          "🎨 Make your profile yours with frames, banners and themes.",
+          ...(notification.welcomePoints > 0
+            ? [`Finish the quick tour when you first sign in and we'll add ${notification.welcomePoints} welcome points to your wallet.`]
+            : []),
+        ],
+        points: "", action: `Join ${appName}`, path: "/sign-in",
+      };
+    }
     case "test":
       return {
         subject: "Notification email test", label: "Delivery test", title: "Your test email is here.",

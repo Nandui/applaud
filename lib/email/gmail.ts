@@ -60,7 +60,7 @@ export async function sendGmail(
   ]);
   const message = [
     `From: ${display} <${sender}>`, `To: ${to}`,
-    `Subject: ${notification.kind === "team" ? encodedWords(subject) : subject}`,
+    `Subject: ${notification.kind === "team" || /[^\x20-\x7e]/.test(subject) ? encodedWords(subject) : subject}`,
     `Date: ${new Date().toUTCString()}`, `Message-ID: <${randomUUID()}@${sender.split("@")[1]}>`,
     "MIME-Version: 1.0", `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "", ...parts, `--${boundary}--`, "",
