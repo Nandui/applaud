@@ -119,6 +119,13 @@ const REPAIRS: Repair[] = [
       `ALTER TABLE "Recognition" ADD COLUMN IF NOT EXISTS "coverType" TEXT, ADD COLUMN IF NOT EXISTS "coverWhat" TEXT`,
       `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "coverAllowanceManager" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceCentreManager" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceOperations" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverAllowanceCeo" INTEGER NOT NULL DEFAULT 1000, ADD COLUMN IF NOT EXISTS "coverPointsSuggested" INTEGER NOT NULL DEFAULT 200, ADD COLUMN IF NOT EXISTS "maxPointsPerCover" INTEGER NOT NULL DEFAULT 500`,
     ],
+  },  {
+    name: "20261126210000_google_chat",
+    checksum: "39f3250fd06750158aba1377c5558f9895f32ee31d06c5793a4ccc95676e11a7",
+    check: `SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'OrgSettings' AND column_name IN ('chatRecognitions', 'chatCovers', 'chatAwards', 'chatMilestones', 'chatRewardClaims')) = 5 AS ok`,
+    statements: [
+      `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "chatRecognitions" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatCovers" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatAwards" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatMilestones" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatRewardClaims" BOOLEAN NOT NULL DEFAULT false`,
+    ],
   },
 ];
 

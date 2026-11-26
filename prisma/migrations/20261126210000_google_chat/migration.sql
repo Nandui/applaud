@@ -1,0 +1,2 @@
+-- Google Chat notification switches (Admin > Settings).
+ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "chatRecognitions" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatCovers" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatAwards" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatMilestones" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatRewardClaims" BOOLEAN NOT NULL DEFAULT false;

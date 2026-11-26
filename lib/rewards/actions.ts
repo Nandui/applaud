@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { postToGoogleChat } from "@/lib/chat/google-chat";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireAdmin } from "@/lib/auth/guards";
 import { getFulfilmentAdapter } from "@/lib/rewards/adapter";
@@ -150,6 +152,7 @@ export async function redeemReward(
     metadata: { rewardId, pointsCost: redeemed.pointsCost },
     siteId: me.siteId,
   });
+  after(() => postToGoogleChat({ kind: "claim", person: me.name, reward: redeemed.name, points: redeemed.pointsCost }));
   revalidatePath("/rewards");
   revalidatePath("/rewards/claimed");
   revalidatePath("/me");

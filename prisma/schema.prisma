@@ -581,6 +581,12 @@ model OrgSettings {
   allowSelfRecognition          Boolean @default(false)
   /// Create a staff account on the first Google sign-in from the company workspace.
   autoCreateGoogleUsers         Boolean @default(true)
+  /// Which events post to the Google Chat space (webhook in GOOGLE_CHAT_WEBHOOK_URL).
+  chatRecognitions              Boolean @default(true)
+  chatCovers                    Boolean @default(true)
+  chatAwards                    Boolean @default(true)
+  chatMilestones                Boolean @default(true)
+  chatRewardClaims              Boolean @default(false)
 }
 
 // ---------- next-auth (Auth.js Prisma adapter) ----------
