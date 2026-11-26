@@ -104,7 +104,12 @@ export function chatText(appName: string, event: ChatEvent): string {
 }
 
 /** Yayup's violet accent (--primary), as Google Chat's RGB 0..1 colour. */
-const VIOLET = { red: 0x6a / 255, green: 0x4d / 255, blue: 0xff / 255, alpha: 1 };
+/**
+ * The button uses a deeper Yayup violet. Google Chat picks the button's text
+ * colour itself and drew dark text on the lighter #6a4dff, in both themes;
+ * this shade is dark enough that it always switches to white.
+ */
+const BUTTON_VIOLET = { red: 0x3d / 255, green: 0x22 / 255, blue: 0xb8 / 255, alpha: 1 };
 const VIOLET_HEX = "#6a4dff";
 
 /** Card text accepts a small HTML subset, so user text is HTML-escaped. */
@@ -205,7 +210,7 @@ function cardParts(appName: string, event: ChatEvent): CardParts {
 export type ChatWidget = {
   textParagraph?: { text: string };
   image?: { imageUrl: string; altText: string };
-  buttonList?: { buttons: { text: string; color: typeof VIOLET; onClick: { openLink: { url: string } } }[] };
+  buttonList?: { buttons: { text: string; color: typeof BUTTON_VIOLET; onClick: { openLink: { url: string } } }[] };
 };
 
 /** The Google Chat message for one event: a branded card with a button, plus plain text for notifications. */
@@ -218,7 +223,7 @@ export function chatMessage(appName: string, event: ChatEvent, id = "yayup") {
   if (parts.image) widgets.push({ image: { imageUrl: parts.image, altText: "Photo from the post" } });
   widgets.push({
     buttonList: {
-      buttons: [{ text: parts.button, color: VIOLET, onClick: { openLink: { url } } }],
+      buttons: [{ text: parts.button, color: BUTTON_VIOLET, onClick: { openLink: { url } } }],
     },
   });
   return {
