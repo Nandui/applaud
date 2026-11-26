@@ -3,6 +3,8 @@ import { getOrgSettings } from "@/lib/org-settings";
 import { PageHeader } from "@/components/page-header";
 import { SettingsForm } from "./settings-form";
 import { TestEmailForm } from "./test-email-form";
+import { TestChatForm } from "./test-chat-form";
+import { chatConfigured } from "@/lib/chat/google-chat";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { googleSignInEnabled } from "@/lib/auth/mode";
@@ -55,8 +57,19 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           appName: settings.appName,
           allowSelfRecognition: settings.allowSelfRecognition,
           autoCreateGoogleUsers: settings.autoCreateGoogleUsers,
+          chatRecognitions: settings.chatRecognitions,
+          chatCovers: settings.chatCovers,
+          chatAwards: settings.chatAwards,
+          chatMilestones: settings.chatMilestones,
+          chatRewardClaims: settings.chatRewardClaims,
         }}
+        chatConnected={chatConfigured()}
       />
+      {chatConfigured() && (
+        <section className="mt-4 max-w-xl">
+          <TestChatForm />
+        </section>
+      )}
     </div>
   );
 }

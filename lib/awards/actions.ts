@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { postToGoogleChat } from "@/lib/chat/google-chat";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { requireUser, requireManager, requireAdmin } from "@/lib/auth/guards";
@@ -66,6 +68,7 @@ async function applyAward(
       pointsAwarded: program.points,
     },
   });
+  return post.id;
 }
 
 const nominateSchema = z.object({
@@ -125,6 +128,7 @@ export async function nominate(
   // giving allowance (otherwise anyone could hand out unlimited points).
   const settings = await getOrgSettings();
   let nomId: string | undefined;
+  let postId: string | undefined;
   try {
     await prisma.$transaction(async (tx) => {
       if (program.points > 0) {
@@ -140,7 +144,7 @@ export async function nominate(
         data: { programId, nominatorId: me.id, nomineeId, justification, status: "pending" },
       });
       nomId = nom.id;
-      await applyAward(
+      postId = await applyAward(
         tx,
         { id: nom.id, nomineeId, nomineeName: nominee.name },
         { name: program.name, points: program.points },
@@ -160,6 +164,12 @@ export async function nominate(
     metadata: { programId, nomineeId, status: "approved", auto: true, points: program.points },
     siteId: me.siteId,
   });
+  if (postId) {
+    const id = postId;
+    after(() => postToGoogleChat({
+      kind: "award", id, winner: nominee.name, award: program.name, points: program.points,
+    }));
+  }
   revalidatePath("/awards");
   revalidatePath("/");
   return { ok: true, message: `Awarded! ${nominee.name} received ${program.points} pts.` };
@@ -205,8 +215,9 @@ export async function approveNomination(formData: FormData): Promise<ActionResul
 
   // Approved awards come out of the company's monthly bonus pool.
   const settings = await getOrgSettings();
+  let postId: string;
   try {
-    await prisma.$transaction(async (tx) => {
+    postId = await prisma.$transaction(async (tx) => {
       const points = nomination.program.points;
       if (points > 0) {
         await lockPool(tx, "bonusPool");
@@ -217,7 +228,7 @@ export async function approveNomination(formData: FormData): Promise<ActionResul
           );
         }
       }
-      await applyAward(
+      return applyAward(
         tx,
         {
           id: nomination.id,
@@ -241,6 +252,10 @@ export async function approveNomination(formData: FormData): Promise<ActionResul
     metadata: { status: "approved", points: nomination.program.points },
     siteId: reviewer.siteId,
   });
+  after(() => postToGoogleChat({
+    kind: "award", id: postId, winner: nomination.nominee.name,
+    award: nomination.program.name, points: nomination.program.points,
+  }));
   revalidatePath("/admin/nominations");
   revalidatePath("/awards");
   revalidatePath("/");

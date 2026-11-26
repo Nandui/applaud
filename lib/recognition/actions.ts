@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { notifyRecognition } from "@/lib/email/recognition";
+import { postToGoogleChat } from "@/lib/chat/google-chat";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
@@ -97,7 +98,7 @@ export async function createRecognition(
 
   const value = await prisma.value.findFirst({
     where: { id: valueId, active: true },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!value) return { ok: false, error: "That value is unavailable." };
 
@@ -163,6 +164,10 @@ export async function createRecognition(
   after(async () => {
     await notifyRecognition(createdId, recipients, settings.appName, me, points);
   });
+  after(() => postToGoogleChat({
+    kind: "recognition", id: createdId, from: me.name, to: recipients.map((r) => r.name),
+    value: value.name, message, points,
+  }));
 
   await writeAudit({
     actor: me,

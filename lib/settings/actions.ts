@@ -6,6 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 
+const CHAT_SWITCHES = [
+  "chatRecognitions",
+  "chatCovers",
+  "chatAwards",
+  "chatMilestones",
+  "chatRewardClaims",
+] as const;
+
 export type ActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
@@ -22,12 +30,17 @@ export async function updateOrgSettings(
   const autoCreateGoogleUsers =
     String(formData.get("autoCreateGoogleUsers") ?? "true") === "true";
 
+  const chat = Object.fromEntries(
+    CHAT_SWITCHES.map((key) => [key, String(formData.get(key) ?? "false") === "true"]),
+  ) as Record<(typeof CHAT_SWITCHES)[number], boolean>;
+
   if (appName.length < 1) return { ok: false, error: "App name is required." };
 
   const data = {
     appName,
     allowSelfRecognition,
     autoCreateGoogleUsers,
+    ...chat,
   };
   await prisma.orgSettings.upsert({
     where: { id: "singleton" },

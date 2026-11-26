@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { isBirthdayOn } from "@/lib/birthday";
+import { postToGoogleChat } from "@/lib/chat/google-chat";
 
 type RunResult = {
   date: string;
@@ -103,6 +104,7 @@ export async function runMilestones(referenceDate: Date = new Date()): Promise<R
       continue;
     }
 
+    let postId: string | undefined;
     try {
       await prisma.$transaction(async (tx) => {
         const celebration = await tx.celebration.create({
@@ -117,6 +119,7 @@ export async function runMilestones(referenceDate: Date = new Date()): Promise<R
             recipients: { create: [{ userId: e.userId, points: 0 }] },
           },
         });
+        postId = post.id;
         await tx.celebration.update({
           where: { id: celebration.id },
           data: { recognitionId: post.id },
@@ -139,6 +142,7 @@ export async function runMilestones(referenceDate: Date = new Date()): Promise<R
         }
       });
       result.created.push({ type: e.type, userName: e.userName, points });
+      if (postId) await postToGoogleChat({ kind: "milestone", id: postId, message: milestoneMessage(e.type, e.userName, e.years) });
     } catch (error) {
       // Unique violation = another run already created it; treat as skipped.
       if (

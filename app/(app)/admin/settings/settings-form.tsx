@@ -14,15 +14,33 @@ export type SettingsData = {
   appName: string;
   allowSelfRecognition: boolean;
   autoCreateGoogleUsers: boolean;
+  chatRecognitions: boolean;
+  chatCovers: boolean;
+  chatAwards: boolean;
+  chatMilestones: boolean;
+  chatRewardClaims: boolean;
 };
 
-export function SettingsForm({ settings }: { settings: SettingsData }) {
+type ChatKey = "chatRecognitions" | "chatCovers" | "chatAwards" | "chatMilestones" | "chatRewardClaims";
+
+const CHAT_EVENTS: { key: ChatKey; label: string; hint: string }[] = [
+  { key: "chatRecognitions", label: "New recognitions", hint: "Who recognised whom, the value and the message." },
+  { key: "chatCovers", label: "Thanks for covering", hint: "When a manager thanks someone for a last-minute cover." },
+  { key: "chatAwards", label: "Award winners", hint: "When someone wins an award." },
+  { key: "chatMilestones", label: "Birthdays and work anniversaries", hint: "The same celebrations posted in the feed." },
+  { key: "chatRewardClaims", label: "Reward claims", hint: "Who claimed which reward. Best for an admins-only space." },
+];
+
+export function SettingsForm({ settings, chatConnected }: { settings: SettingsData; chatConnected: boolean }) {
   const [state, formAction, pending] = useActionState<
     ActionResult | undefined,
     FormData
   >(updateOrgSettings, undefined);
   const [allowSelf, setAllowSelf] = useState(settings.allowSelfRecognition);
   const [autoCreate, setAutoCreate] = useState(settings.autoCreateGoogleUsers);
+  const [chat, setChat] = useState<Record<ChatKey, boolean>>(() =>
+    Object.fromEntries(CHAT_EVENTS.map(({ key }) => [key, settings[key]])) as Record<ChatKey, boolean>,
+  );
 
   useEffect(() => {
     if (state?.ok) toast.success(state.message ?? "Saved.");
@@ -33,6 +51,9 @@ export function SettingsForm({ settings }: { settings: SettingsData }) {
     <form action={formAction} className="max-w-xl space-y-4">
       <input type="hidden" name="allowSelfRecognition" value={String(allowSelf)} />
       <input type="hidden" name="autoCreateGoogleUsers" value={String(autoCreate)} />
+      {CHAT_EVENTS.map(({ key }) => (
+        <input key={key} type="hidden" name={key} value={String(chat[key])} />
+      ))}
 
       <Card>
         <CardContent className="space-y-4">
@@ -72,6 +93,32 @@ export function SettingsForm({ settings }: { settings: SettingsData }) {
             </div>
             <Switch checked={autoCreate} onCheckedChange={setAutoCreate} />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card id="google-chat">
+        <CardContent className="space-y-3">
+          <div>
+            <h2 className="font-semibold">Google Chat</h2>
+            <p className="text-muted text-sm">
+              {chatConnected
+                ? "Connected. The events switched on below are posted to your Google Chat space."
+                : "Not connected. Add the space's webhook as GOOGLE_CHAT_WEBHOOK_URL in Vercel (Production) and redeploy. Your choices below are kept until then."}
+            </p>
+          </div>
+          {CHAT_EVENTS.map(({ key, label, hint }) => (
+            <div key={key} className="border-border flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-muted text-xs">{hint}</p>
+              </div>
+              <Switch
+                checked={chat[key]}
+                onCheckedChange={(on) => setChat((prev) => ({ ...prev, [key]: on }))}
+                aria-label={label}
+              />
+            </div>
+          ))}
         </CardContent>
       </Card>
 

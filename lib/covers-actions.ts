@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { postToGoogleChat } from "@/lib/chat/google-chat";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
 import { getOrgSettings } from "@/lib/org-settings";
@@ -82,7 +84,7 @@ export async function createCover(
   }
   const recipients = await prisma.user.findMany({
     where: { id: { in: recipientIds }, active: true },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (recipients.length !== recipientIds.length) {
     return { ok: false, error: "One or more people are invalid." };
@@ -144,6 +146,13 @@ export async function createCover(
   } catch (error) {
     if (error instanceof CoverAllowanceError) return { ok: false, error: error.message };
     throw error;
+  }
+
+  if (createdId) {
+    const id = createdId;
+    after(() => postToGoogleChat({
+      kind: "cover", id, from: me.name, to: recipients.map((r) => r.name), what: coverWhat, points,
+    }));
   }
 
   await writeAudit({
