@@ -79,7 +79,10 @@ test("messages are Yayup-branded cards with a violet button that opens Yayup", (
   const button = buttons.buttonList!.buttons[0];
   assert.equal(button.text, "Say congrats in Yayup");
   assert.equal(button.onClick.openLink.url, "https://yayup.app/recognition/rec1");
-  assert.ok(button.color.blue === 1);
+  // Dark enough for Google Chat to draw white text on it.
+  const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * lin(button.color.red) + 0.7152 * lin(button.color.green) + 0.0722 * lin(button.color.blue);
+  assert.ok(luminance < 0.06, `button luminance ${luminance}`);
 });
 
 test("the test message opens Yayup's home page", () => {
