@@ -59,8 +59,9 @@ export default async function RewardsPage({
         balance={user.walletBalance}
         activeCategory={activeCategory}
         claimsStrip={<ClaimsStrip claims={myClaims} />}
+        ideas={<IdeasEntry kind="reward" />}
       />
-      {!filtered ? <IdeasEntry kind="reward" /> : null}
+      {!filtered ? <IdeasEntry kind="reward" variant="foot" /> : null}
     </div>
   );
 }

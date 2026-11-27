@@ -16,6 +16,7 @@ export function RewardsShop({
   balance,
   activeCategory,
   claimsStrip,
+  ideas,
   categoryHref = (cat) => (cat ? `/rewards?c=${encodeURIComponent(cat)}` : "/rewards"),
 }: {
   data: RewardsShopData;
@@ -23,6 +24,8 @@ export function RewardsShop({
   activeCategory?: string;
   /** Your open claims, between the balance and Featured (the live page only). */
   claimsStrip?: React.ReactNode;
+  /** The "Suggest an idea" card, under the balance (the live page only). */
+  ideas?: React.ReactNode;
   categoryHref?: (cat: string | undefined) => string;
 }) {
   const { discounts, featured, categories, settings } = data;
@@ -62,6 +65,8 @@ export function RewardsShop({
       </section>
 
       {!filtered ? claimsStrip : null}
+
+      {!filtered ? ideas : null}
 
       {!filtered && featured.length > 0 ? (
         <section className="mt-6" aria-labelledby="featured-heading">

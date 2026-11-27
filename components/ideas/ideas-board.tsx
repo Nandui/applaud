@@ -73,14 +73,23 @@ export function IdeaStatusBadge({
  * The Ideas list for one kind: a "Suggest" button, open ideas by upvotes,
  * then what's been added and what isn't planned.
  */
-export function IdeasBoard({ kind, ideas: initial }: { kind: SuggestionKind; ideas: IdeaData[] }) {
+export function IdeasBoard({
+  kind,
+  ideas: initial,
+  startSuggesting = false,
+}: {
+  kind: SuggestionKind;
+  ideas: IdeaData[];
+  /** Opened from a "Suggest an idea" button: show the form straight away. */
+  startSuggesting?: boolean;
+}) {
   // Votes are applied here straight away and kept in sync with the server's count.
   const [overrides, setOverrides] = useState<Record<string, { voted: boolean; votes: number }>>({});
   const ideas = useMemo(
     () => initial.map((i) => (overrides[i.id] ? { ...i, ...overrides[i.id] } : i)),
     [initial, overrides],
   );
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startSuggesting);
   const text = KIND_TEXT[kind];
 
   const openIdeas = ideas.filter((i) => i.status === "new" || i.status === "planned");

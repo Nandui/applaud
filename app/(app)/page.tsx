@@ -13,6 +13,7 @@ import { FramedAvatar } from "@/components/user-avatar";
 import { getActiveClaims } from "@/lib/claims";
 import { ClaimsHomeRow } from "@/components/rewards/active-claims";
 import { DiscountsHomeRow } from "@/components/rewards/discount-card";
+import { IdeasHomeRow } from "@/components/ideas/ideas-entry";
 import { visibleRewardsWhere } from "@/lib/new-items";
 import { isNewSince } from "@/lib/seen";
 import { BirthdayHomeCard } from "@/components/birthday/birthday-prompt";
@@ -125,6 +126,8 @@ export default async function FeedPage() {
       {askBirthday ? <BirthdayHomeCard points={birthdayPoints} /> : null}
 
       <ClaimsHomeRow claims={myClaims} />
+
+      <IdeasHomeRow />
 
       <DiscountsHomeRow
         discounts={discounts.map((d) => ({

@@ -15,8 +15,8 @@ export const metadata = { title: "Ideas" };
  * them (Coming soon), decline them (Not planned) or, once added, link them
  * to the reward or item (Available) in Admin > Suggestions.
  */
-export default async function IdeasPage({ searchParams }: { searchParams: Promise<{ k?: string }> }) {
-  const { k } = await searchParams;
+export default async function IdeasPage({ searchParams }: { searchParams: Promise<{ k?: string; suggest?: string }> }) {
+  const { k, suggest } = await searchParams;
   const kind: SuggestionKind = isSuggestionKind(k) ? k : "reward";
   const me = await requireUser();
 
@@ -79,7 +79,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
           />
         }
       />
-      <IdeasBoard key={kind} kind={kind} ideas={ideas} />
+      <IdeasBoard key={kind} kind={kind} ideas={ideas} startSuggesting={suggest === "1"} />
     </div>
   );
 }

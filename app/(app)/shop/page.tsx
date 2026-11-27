@@ -99,6 +99,8 @@ export default async function ShopPage() {
         </div>
       ) : null}
 
+      <IdeasEntry kind="shop" />
+
       <div className="mt-6 space-y-7">
         {categories.map((cat) => {
           // Frames first, then banners, then themes; admin order within each.
@@ -154,7 +156,7 @@ export default async function ShopPage() {
           </section>
         ))}
       </div>
-      <IdeasEntry kind="shop" />
+      <IdeasEntry kind="shop" variant="foot" />
     </div>
   );
 }
