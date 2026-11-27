@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search, Loader2, Film, Sticker } from "lucide-react";
-import type { GifResult } from "@/lib/recognition/gif";
+import { fallBackTo, giphyRendition, type GifResult } from "@/lib/recognition/gif";
 import {
   Dialog,
   DialogContent,
@@ -152,7 +152,8 @@ export function GifPicker({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={gif.previewUrl}
+                    src={giphyRendition(gif.url, "thumb")}
+                    onError={fallBackTo(gif.previewUrl)}
                     alt={gif.title}
                     loading="lazy"
                     className="w-full"

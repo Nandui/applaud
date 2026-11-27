@@ -42,6 +42,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatNumber } from "@/lib/format";
+import { optimizedImage } from "@/lib/image-url";
+import { fallBackTo } from "@/lib/recognition/gif";
 import { cn } from "@/lib/utils";
 
 type Viewer = {
@@ -415,7 +417,8 @@ function CommentRow({
         {c.gifUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={c.gifUrl}
+            src={optimizedImage(c.gifUrl, 192)}
+            onError={fallBackTo(c.gifUrl)}
             alt="GIF"
             loading="lazy"
             className="mt-1.5 max-h-48 max-w-[12rem] rounded-xl"

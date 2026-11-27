@@ -1,6 +1,8 @@
 "use client";
 
 import { Loader2, X } from "lucide-react";
+import { optimizedImage } from "@/lib/image-url";
+import { fallBackTo } from "@/lib/recognition/gif";
 import type { Attachment } from "./use-attachments";
 
 /** The picked photos and GIFs as a sideways strip, with uploads still in flight. */
@@ -19,7 +21,12 @@ export function AttachmentStrip({
       {images.map((img) => (
         <div key={img.url} className="relative h-40 w-32 shrink-0 overflow-hidden rounded-xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
+          <img
+            src={optimizedImage(img.url, 128)}
+            onError={fallBackTo(img.url)}
+            alt={img.name}
+            className="h-full w-full object-cover"
+          />
           <button
             type="button"
             onClick={() => onRemove(img.url)}
