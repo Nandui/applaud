@@ -16,6 +16,7 @@ import {
   Pin,
   PinOff,
   Trash2,
+  Clock,
   BarChart3,
   MessageCircleQuestion,
   MapPin,
@@ -24,6 +25,8 @@ import {
 import { toast } from "sonner";
 import { toggleReaction, toggleBoost, deletePost } from "@/lib/recognition/actions";
 import { togglePin } from "@/lib/profile-actions";
+import { unpinFromFeed } from "@/lib/recognition/feed-pin-actions";
+import { PinToFeedSheet } from "@/components/feed/pin-to-feed-sheet";
 import { TypingLine } from "@/components/feed/live-comments";
 import { CommentsSheet, useCardComments } from "@/components/feed/comments";
 import {
@@ -67,6 +70,8 @@ type Viewer = {
   role: string;
   /** The viewer's equipped frame, for their own optimistic comments. */
   frame?: string | null;
+  /** Manager rank and above, or an admin: may pin things to the top of the feed. */
+  canPinToFeed?: boolean;
 };
 
 /** Messages longer than this also appear in full as a caption under the quote card. */
@@ -246,10 +251,13 @@ export function RecognitionCard({
   viewer,
   index = 0,
   pinned,
+  showFeedPin = false,
 }: {
   card: FeedCard;
   viewer: Viewer;
   index?: number;
+  /** Show the "Pinned" marker above the card (the Home feed's pinned row). */
+  showFeedPin?: boolean;
   /**
    * Whether this shout-out is pinned to the viewer's profile. Only meaningful
    * (and the pin menu only shown) when the viewer is one of the recipients.
@@ -267,6 +275,8 @@ export function RecognitionCard({
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pinSheetOpen, setPinSheetOpen] = useState(false);
+  const [feedPinPending, startFeedPin] = useTransition();
   const [burst, setBurst] = useState(0);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -314,6 +324,15 @@ export function RecognitionCard({
     setMenuOpen(false);
     startPin(async () => {
       const res = await togglePin(card.id);
+      if (res.ok) toast.success(res.message);
+      else toast.error(res.error);
+    });
+  }
+
+  function onUnpinFromFeed() {
+    setMenuOpen(false);
+    startFeedPin(async () => {
+      const res = await unpinFromFeed(card.id);
       if (res.ok) toast.success(res.message);
       else toast.error(res.error);
     });
@@ -383,6 +402,13 @@ export function RecognitionCard({
     pinned !== undefined && !card.system && card.recipients.some((r) => r.id === viewer.id);
   // Posts can be deleted by whoever wrote them, and by admins (moderation).
   const canDelete = isPost && (card.sender.id === viewer.id || viewer.role === "admin");
+  // Pinning to the top of the Home feed: managers and above, and admins. Only
+  // whoever pinned it (or an admin) can unpin it or change the time.
+  const feedPin = card.feedPin;
+  const canFeedPin = Boolean(viewer.canPinToFeed);
+  const canChangeFeedPin =
+    feedPin !== null && (viewer.role === "admin" || (feedPin.byId !== null && feedPin.byId === viewer.id));
+  const showFeedPinMenu = canFeedPin;
 
   // A big group (a whole site, or everyone) reads "Aoife, Cian & 40 others",
   // with the viewer first when they're in it; the rest open in a sheet.
@@ -404,6 +430,15 @@ export function RecognitionCard({
       className="card-in pt-3 pb-6"
       style={{ "--card": Math.min(index, 6) } as React.CSSProperties}
     >
+      {showFeedPin && feedPin && (
+        <p className="text-primary mb-2 flex items-center gap-1.5 text-[0.8rem] font-semibold">
+          <Pin className="size-3.5 fill-current" aria-hidden />
+          <span className="truncate">
+            Pinned{feedPin.byName ? ` by ${feedPin.byName}` : ""}
+            <span className="text-muted font-normal"> · {feedPin.untilLabel}</span>
+          </span>
+        </p>
+      )}
       {/* Header: who it's for, big; who sent it underneath. */}
       <header className="flex items-center gap-3">
         {isPost ? (
@@ -499,7 +534,7 @@ export function RecognitionCard({
             )}
           </p>
         </div>
-        {(canPin || canDelete) && (
+        {(canPin || canDelete || showFeedPinMenu) && (
           <Popover
             open={menuOpen}
             onOpenChange={(open) => {
@@ -516,7 +551,52 @@ export function RecognitionCard({
                 {pinned ? <Pin className="text-primary size-4 fill-current" /> : <Ellipsis className="size-5" />}
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 rounded-2xl p-1.5">
+            <PopoverContent align="end" className="w-60 rounded-2xl p-1.5">
+              {showFeedPinMenu && !feedPin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setPinSheetOpen(true);
+                  }}
+                  className="hover:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold"
+                >
+                  <Pin className="size-4.5" />
+                  Pin to top of feed
+                </button>
+              )}
+              {showFeedPinMenu && feedPin && canChangeFeedPin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setPinSheetOpen(true);
+                    }}
+                    className="hover:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold"
+                  >
+                    <Clock className="size-4.5" />
+                    Change pin time
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onUnpinFromFeed}
+                    disabled={feedPinPending}
+                    className="hover:bg-surface-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold disabled:opacity-50"
+                  >
+                    <PinOff className="size-4.5" />
+                    Unpin from feed
+                  </button>
+                </>
+              )}
+              {showFeedPinMenu && feedPin && !canChangeFeedPin && (
+                <p className="text-muted flex items-start gap-3 px-3 py-2.5 text-[0.82rem] leading-snug">
+                  <Pin className="mt-0.5 size-4 shrink-0" />
+                  <span>
+                    Pinned by {feedPin.byName ?? "someone"}. Only they or an admin can unpin it.
+                  </span>
+                </p>
+              )}
               {canPin && (
                 <button
                   type="button"
@@ -808,6 +888,15 @@ export function RecognitionCard({
       ))}
       {!commentsOpen && <TypingLine users={typing} className="mt-1" />}
 
+      {canFeedPin && (
+        <PinToFeedSheet
+          open={pinSheetOpen}
+          onOpenChange={setPinSheetOpen}
+          recognitionId={card.id}
+          noun={noun}
+          changing={feedPin !== null}
+        />
+      )}
       <CommentsSheet
         state={commentState}
         open={commentsOpen}

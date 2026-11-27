@@ -9,10 +9,13 @@ import type { FeedCard } from "@/lib/recognition/queries";
 type Viewer = Parameters<typeof RecognitionCard>[0]["viewer"];
 
 /**
- * The home feed. Shows the first page from the server, then loads the next
- * page as the reader nears the bottom, until there is nothing older left.
+ * The home feed. Shows what's pinned first, then the first page from the
+ * server, then loads the next page as the reader nears the bottom, until there
+ * is nothing older left. A pinned card shows only in the pinned row, never a
+ * second time further down.
  */
 export function FeedList({
+  pinnedCards = [],
   initialCards,
   initialCursor,
   viewer,
@@ -22,6 +25,8 @@ export function FeedList({
   initialCursor: string | null;
   viewer: Viewer;
   pinnedIds: string[];
+  /** Pinned to the top of the feed right now, most recently pinned first. */
+  pinnedCards?: FeedCard[];
 }) {
   const [cards, setCards] = useState(initialCards);
   const [cursor, setCursor] = useState(initialCursor);
@@ -30,6 +35,8 @@ export function FeedList({
   const busy = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const pins = new Set(pinnedIds);
+  const feedPinned = new Set(pinnedCards.map((c) => c.id));
+  const rest = cards.filter((c) => !feedPinned.has(c.id));
 
   // When the server sends a fresh first page (after a reaction, comment or new
   // post), swap it in and keep the older cards already scrolled to, refreshed
@@ -95,7 +102,21 @@ export function FeedList({
 
   return (
     <div>
-      {cards.map((card, i) => (
+      {pinnedCards.length > 0 && (
+        <section aria-label="Pinned" className="border-border border-b">
+          {pinnedCards.map((card, i) => (
+            <RecognitionCard
+              key={card.id}
+              card={card}
+              index={i}
+              viewer={viewer}
+              pinned={pins.has(card.id)}
+              showFeedPin
+            />
+          ))}
+        </section>
+      )}
+      {rest.map((card, i) => (
         <RecognitionCard
           key={card.id}
           card={card}
