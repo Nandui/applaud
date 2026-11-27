@@ -42,6 +42,7 @@ import { FramedAvatar } from "@/components/user-avatar";
 import { DEFAULT_LOOK } from "@/lib/cosmetics";
 import { isLight } from "@/lib/contrast";
 import { optimizedImage } from "@/lib/image-url";
+import { fallBackTo } from "@/lib/recognition/gif";
 import { ValueSeal } from "@/components/value-seal";
 import { PostBanner } from "@/components/feed/post-banner";
 import { PollChoices } from "@/components/feed/poll";
@@ -209,6 +210,7 @@ function MediaHero({ urls }: { urls: string[] }) {
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={optimizedImage(urls[0], MEDIA_WIDTH)}
+        onError={fallBackTo(urls[0])}
         alt="Recognition photo"
         loading="lazy"
         decoding="async"
@@ -231,6 +233,7 @@ function MediaHero({ urls }: { urls: string[] }) {
           <img
             key={url}
             src={optimizedImage(url, MEDIA_WIDTH)}
+            onError={fallBackTo(url)}
             alt={`Photo ${i + 1} of ${urls.length}`}
             loading="lazy"
             decoding="async"
