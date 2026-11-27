@@ -246,7 +246,7 @@ export function PostForm({
               <PostBanner
                 banner={me.banner}
                 message={text}
-                className="aspect-[2/1] min-h-44 rounded-2xl py-6"
+                className="aspect-[2/1] rounded-2xl py-6"
                 label={
                   <>
                     <MessageCircleQuestion className="size-3.5" /> Question
