@@ -8,7 +8,7 @@ import { getCatalogue } from "@/lib/catalogue";
 import { formatNumber } from "@/lib/format";
 import { AppBar } from "@/components/app-shell/app-bar";
 import { Wordmark } from "@/components/app-shell/brand";
-import { RecognitionCard } from "@/components/feed/recognition-card";
+import { FeedList } from "@/components/feed/feed-list";
 import { FramedAvatar } from "@/components/user-avatar";
 import { getActiveClaims } from "@/lib/claims";
 import { ClaimsHomeRow } from "@/components/rewards/active-claims";
@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 export default async function FeedPage() {
   const me = await requireUser();
   const askBirthday = (me.onboarded ?? true) && !(me.hasBirthday ?? true);
-  const [cards, wallet, catalogue, myClaims, birthdayPoints, settings, discounts] = await Promise.all([
+  const [feed, wallet, catalogue, myClaims, birthdayPoints, settings, discounts] = await Promise.all([
     getFeedCards(me.id),
     prisma.user.findUnique({
       where: { id: me.id },
@@ -54,7 +54,8 @@ export default async function FeedPage() {
     role: me.role,
     frame: myFrame,
   };
-  const myPins = new Set(parseProfile(wallet?.profile).pinned);
+  const myPins = parseProfile(wallet?.profile).pinned;
+  const cards = feed.cards;
 
   return (
     <div className="mx-auto max-w-xl">
@@ -164,18 +165,12 @@ export default async function FeedPage() {
           </Link>
         </div>
       ) : (
-        <div>
-          {cards.map((card, i) => (
-            <RecognitionCard
-              key={card.id}
-              card={card}
-              index={i}
-              viewer={viewer}
-              pinned={myPins.has(card.id)}
-            />
-          ))}
-          <p className="text-muted py-10 text-center text-sm">You&apos;re all caught up ✨</p>
-        </div>
+        <FeedList
+          initialCards={cards}
+          initialCursor={feed.nextCursor}
+          viewer={viewer}
+          pinnedIds={myPins}
+        />
       )}
     </div>
   );

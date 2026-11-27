@@ -338,11 +338,20 @@ export async function getCardsByIds(ids: string[], viewerId: string, filter: Pri
     .map((r) => toFeedCard(r, viewerId, catalogue));
 }
 
+/** How many feed cards load at a time (first screen and each scroll). */
+export const FEED_PAGE_SIZE = 20;
+
+export type FeedPage = { cards: FeedCard[]; nextCursor: string | null };
+
 /**
  * The feed, newest first: every recognition and post, plus the polls and
- * questions meant for the viewer's site (or for everyone).
+ * questions meant for the viewer's site (or for everyone). Loads one page;
+ * pass the previous page's nextCursor to get the next one.
  */
-export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCard[]> {
+export async function getFeedCards(
+  viewerId: string,
+  { cursor = null, take = FEED_PAGE_SIZE }: { cursor?: string | null; take?: number } = {},
+): Promise<FeedPage> {
   const [catalogue, audience, siteNames] = await Promise.all([
     getCatalogue(),
     audienceWhere(viewerId),
@@ -350,9 +359,38 @@ export async function getFeedCards(viewerId: string, take = 40): Promise<FeedCar
   ]);
   const rows = await prisma.recognition.findMany({
     where: audience,
-    orderBy: { createdAt: "desc" },
-    take,
+    // id breaks ties so paging never skips or repeats cards made in the same instant.
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    take: take + 1,
     include: feedInclude(viewerId),
   });
-  return rows.map((r) => toFeedCard(r, viewerId, catalogue, siteNames));
+  const hasMore = rows.length > take;
+  const page = hasMore ? rows.slice(0, take) : rows;
+  return {
+    cards: page.map((r) => toFeedCard(r, viewerId, catalogue, siteNames)),
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  };
+}
+
+/**
+ * Fresh copies of feed cards the reader already scrolled to, in the given
+ * order. Cards that were deleted (or are no longer for this viewer) drop out.
+ */
+export async function refreshFeedCardsByIds(viewerId: string, ids: string[]): Promise<FeedCard[]> {
+  if (ids.length === 0) return [];
+  const [catalogue, audience, siteNames] = await Promise.all([
+    getCatalogue(),
+    audienceWhere(viewerId),
+    audienceLabels(),
+  ]);
+  const rows = await prisma.recognition.findMany({
+    where: { AND: [{ id: { in: ids } }, audience] },
+    include: feedInclude(viewerId),
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((r): r is RawRecognition => Boolean(r))
+    .map((r) => toFeedCard(r, viewerId, catalogue, siteNames));
 }
