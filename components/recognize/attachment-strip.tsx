@@ -2,7 +2,7 @@
 
 import { Loader2, X } from "lucide-react";
 import { optimizedImage } from "@/lib/image-url";
-import { fallBackTo } from "@/lib/recognition/gif";
+import { fallBackTo, isGiphyMediaUrl } from "@/lib/recognition/gif";
 import type { Attachment } from "./use-attachments";
 
 /** The picked photos and GIFs as a sideways strip, with uploads still in flight. */
@@ -25,7 +25,11 @@ export function AttachmentStrip({
             src={optimizedImage(img.url, 128)}
             onError={fallBackTo(img.url)}
             alt={img.name}
-            className="h-full w-full object-cover"
+            className={
+              isGiphyMediaUrl(img.url)
+                ? "bg-surface-2 h-full w-full object-contain"
+                : "h-full w-full object-cover"
+            }
           />
           <button
             type="button"

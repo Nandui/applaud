@@ -42,7 +42,7 @@ import { FramedAvatar } from "@/components/user-avatar";
 import { DEFAULT_LOOK } from "@/lib/cosmetics";
 import { isLight } from "@/lib/contrast";
 import { optimizedImage } from "@/lib/image-url";
-import { fallBackTo } from "@/lib/recognition/gif";
+import { fallBackTo, isGiphyMediaUrl } from "@/lib/recognition/gif";
 import { ValueSeal } from "@/components/value-seal";
 import { PostBanner } from "@/components/feed/post-banner";
 import { PollChoices } from "@/components/feed/poll";
@@ -202,7 +202,11 @@ function NameMedal({ months }: { months: number | null }) {
 /** The feed column is at most 576px wide; photos are resized to fit it. */
 const MEDIA_WIDTH = 600;
 
-/** Photos and GIFs full width, swipeable when there are several (Instagram carousel). */
+/**
+ * Photos and GIFs full width, swipeable when there are several (Instagram
+ * carousel). Photos are cropped to fill the frame; GIFs are never cut, so they
+ * are fitted whole inside it on a plain backdrop.
+ */
 function MediaHero({ urls }: { urls: string[] }) {
   const [at, setAt] = useState(0);
   if (urls.length === 1) {
@@ -215,7 +219,11 @@ function MediaHero({ urls }: { urls: string[] }) {
         loading="lazy"
         decoding="async"
         draggable={false}
-        className="max-h-[36rem] min-h-64 w-full object-cover"
+        className={
+          isGiphyMediaUrl(urls[0])
+            ? "bg-surface-2 max-h-[36rem] w-full object-contain"
+            : "max-h-[36rem] min-h-64 w-full object-cover"
+        }
       />
     );
   }
@@ -238,7 +246,10 @@ function MediaHero({ urls }: { urls: string[] }) {
             loading="lazy"
             decoding="async"
             draggable={false}
-            className="aspect-[4/5] w-full shrink-0 snap-center object-cover"
+            className={cn(
+              "aspect-[4/5] w-full shrink-0 snap-center",
+              isGiphyMediaUrl(url) ? "bg-surface-2 object-contain" : "object-cover",
+            )}
           />
         ))}
       </div>
