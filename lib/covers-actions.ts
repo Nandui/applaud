@@ -29,7 +29,7 @@ const attachmentUrl = z
   .refine((value) => isProjectBlobUrl(value) || isGiphyMediaUrl(value), "Unrecognised image URL.");
 
 const coverSchema = z.object({
-  recipientIds: z.array(z.string().min(1)).min(1, "Pick who covered.").max(10),
+  recipientIds: z.array(z.string().min(1)).min(1, "Pick who covered.").max(10, "Thank at most 10 people at once."),
   coverType: z.enum(COVER_TYPES, { message: "Say what they covered." }),
   coverWhat: z
     .string()

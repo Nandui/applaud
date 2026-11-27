@@ -1,4 +1,5 @@
 import { getOrgSettings, type OrgSettings } from "@/lib/org-settings";
+import { shortNameList } from "@/lib/format";
 
 /**
  * Posts Yayup events to a Google Chat space through an incoming webhook.
@@ -10,7 +11,12 @@ import { getOrgSettings, type OrgSettings } from "@/lib/org-settings";
  */
 
 export type ChatEvent =
-  | { kind: "recognition"; id: string; from: string; to: string[]; value: string | null; message: string; points: number; image?: string | null }
+  | {
+      kind: "recognition"; id: string; from: string; to: string[]; value: string | null; message: string; points: number;
+      image?: string | null;
+      /** "everyone" / "everyone at Mahon" when it went to a whole group. */
+      audience?: string | null;
+    }
   | { kind: "cover"; id: string; from: string; to: string[]; what: string; points: number; image?: string | null }
   | { kind: "award"; id: string; winner: string; award: string; points: number }
   | { kind: "milestone"; id: string; message: string }
@@ -55,8 +61,13 @@ function clean(text: string) {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
+// Long lists collapse to "Aoife, Cian, Dara and 39 others".
 function names(list: string[]) {
-  return new Intl.ListFormat("en-IE", { type: "conjunction" }).format(list.map(clean));
+  return new Intl.ListFormat("en-IE", { type: "conjunction" }).format(shortNameList(list).map(clean));
+}
+
+function groupOf(audience: string, count: number) {
+  return `${audience} (${count.toLocaleString("en-IE")} people)`;
 }
 
 function pts(points: number, each: boolean) {
@@ -85,7 +96,8 @@ export function chatText(appName: string, event: ChatEvent): string {
   switch (event.kind) {
     case "recognition": {
       const value = event.value ? ` for *${clean(event.value)}*` : "";
-      return `🎉 *${clean(event.from)}* recognised *${names(event.to)}*${value}${pts(event.points, event.to.length > 1)}`
+      const who = event.audience ? clean(groupOf(event.audience, event.to.length)) : names(event.to);
+      return `🎉 *${clean(event.from)}* recognised *${who}*${value}${pts(event.points, event.to.length > 1)}`
         + quote(event.message) + link(post(event.id), `See it in ${clean(appName)} and say congrats`);
     }
     case "cover":
@@ -124,7 +136,7 @@ function html(text: string) {
 }
 
 function htmlNames(list: string[]) {
-  return new Intl.ListFormat("en-IE", { type: "conjunction" }).format(list.map((n) => `<b>${html(n)}</b>`));
+  return new Intl.ListFormat("en-IE", { type: "conjunction" }).format(shortNameList(list).map((n) => `<b>${html(n)}</b>`));
 }
 
 function htmlPoints(points: number, each: boolean) {
@@ -157,7 +169,9 @@ function cardParts(appName: string, event: ChatEvent): CardParts {
         title: "New recognition",
         subtitle: `${app} · from ${event.from}`,
         lines: [
-          `🎉 ${htmlNames(event.to)} ${event.to.length > 1 ? "were" : "was"} recognised by <b>${html(event.from)}</b>`,
+          event.audience
+            ? `🎉 <b>${html(event.from)}</b> recognised <b>${html(groupOf(event.audience, event.to.length))}</b>`
+            : `🎉 ${htmlNames(event.to)} ${event.to.length > 1 ? "were" : "was"} recognised by <b>${html(event.from)}</b>`,
           event.value ? `<font color="${VIOLET_HEX}"><b>Recognised for ${html(event.value)}</b></font>` : "",
           htmlQuote(event.message),
           htmlPoints(event.points, event.to.length > 1),

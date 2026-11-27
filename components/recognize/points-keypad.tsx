@@ -64,7 +64,7 @@ export function PointsKeypad({
         <SheetHeader className="px-0 pt-2 pb-0">
           <SheetTitle className="font-display text-xl">Add points</SheetTitle>
           <SheetDescription>
-            {people > 1 ? `Each of the ${people} people gets this.` : source}
+            {people > 1 ? `Points per person. Each of the ${formatNumber(people)} people gets this.` : source}
           </SheetDescription>
         </SheetHeader>
 
@@ -81,12 +81,24 @@ export function PointsKeypad({
             )}
           >
             {formatNumber(value)}
-            <span className="text-muted ml-1 text-2xl font-bold">pts</span>
+            <span className="text-muted ml-1 text-2xl font-bold">{people > 1 ? "pts each" : "pts"}</span>
           </motion.p>
-          <p data-numeric className={cn("mt-3 text-sm", over ? "text-danger" : "text-muted")}>
-            {people > 1 && value > 0 && `${pts(value * people)} total · `}
+          {people > 1 && (
+            // Per person vs what it costs in total, so a big group can't surprise anyone.
+            <p data-numeric className={cn("mt-3 text-[0.95rem] font-semibold", over && "text-danger")}>
+              {formatNumber(value)} × {formatNumber(people)} people = {pts(value * people)} total
+            </p>
+          )}
+          <p data-numeric className={cn("text-sm", people > 1 ? "mt-1" : "mt-3", over ? "text-danger" : "text-muted")}>
             {formatNumber(left)} of {formatNumber(total)} left · {resetsIn}
           </p>
+          {people > 1 && remaining > 0 && (
+            <p data-numeric className="text-muted mt-1 text-center text-sm">
+              {max > 0
+                ? `Up to ${pts(max)} each for ${formatNumber(people)} people.`
+                : `Not enough left for 1 point each across ${formatNumber(people)} people. Pick fewer people to add points.`}
+            </p>
+          )}
         </div>
 
         <div className="mb-4 grid grid-cols-4 gap-2">
@@ -137,7 +149,7 @@ export function PointsKeypad({
           onClick={() => onOpenChange(false)}
           className="bg-foreground text-background mt-3 h-13 w-full rounded-full text-base font-bold transition-transform active:scale-[0.98]"
         >
-          {value > 0 ? `Add ${pts(value)}` : "No points"}
+          {value > 0 ? (people > 1 ? `Add ${pts(value)} each` : `Add ${pts(value)}`) : "No points"}
         </button>
       </SheetContent>
     </Sheet>

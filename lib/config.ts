@@ -81,6 +81,8 @@ export function boostMultiplier(type: BoostType): number {
  * the upload token route, and the server action so the limits stay in lockstep.
  */
 export const MAX_RECOGNITION_IMAGES = 4;
+/** Sanity ceiling on people in one recognition (a whole company fits). */
+export const MAX_RECOGNITION_RECIPIENTS = 1000;
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",

@@ -44,6 +44,7 @@ export async function sendRecognitionCopies(
 
 export async function notifyRecognition(
   recognitionId: string, recipients: Person[], appName: string, author: Person, points: number,
+  audience: string | null = null,
 ) {
   if (process.env.VERCEL_ENV !== "production" || !recipients.length) return;
   try {
@@ -67,7 +68,7 @@ export async function notifyRecognition(
     // New shout-outs are public to all active accounts, across sites.
     const staff = await prisma.user.findMany({ where: { active: true }, select: { id: true, email: true } });
     await sendRecognitionCopies(recognitionId, sender, appName, emailRecipients(staff, [author, ...recipients]), {
-      kind: "team", recognisedBy: author.name, recipientNames: recipients.map(person => person.name), recognitionId,
+      kind: "team", recognisedBy: author.name, recipientNames: recipients.map(person => person.name), recognitionId, audience,
     });
   } catch (error) {
     console.error("Could not complete recognition email delivery", { recognitionId, reason: mailFailure(error) });

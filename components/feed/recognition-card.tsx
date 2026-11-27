@@ -130,7 +130,7 @@ function switchReaction(
  * message as a quote. So what people buy shows up every time they're
  * recognised.
  */
-function BannerHero({ card }: { card: FeedCard }) {
+function BannerHero({ card, onMore }: { card: FeedCard; onMore: () => void }) {
   const people = card.recipients.slice(0, 3);
   const extra = card.recipients.length - people.length;
   const lead = card.recipients[0];
@@ -163,7 +163,17 @@ function BannerHero({ card }: { card: FeedCard }) {
         </div>
       )}
       {extra > 0 && (
-        <span className="relative -mt-1 rounded-full bg-black/40 px-2.5 py-0.5 text-xs font-bold">+{extra} more</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMore();
+          }}
+          data-numeric
+          className="relative -mt-1 rounded-full bg-black/40 px-2.5 py-0.5 text-xs font-bold"
+        >
+          +{formatNumber(extra)} more
+        </button>
       )}
       <p
         className={cn(
@@ -254,6 +264,7 @@ export function RecognitionCard({
   const [deleted, setDeleted] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reactorsOpen, setReactorsOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [burst, setBurst] = useState(0);
@@ -373,7 +384,13 @@ export function RecognitionCard({
   // Posts can be deleted by whoever wrote them, and by admins (moderation).
   const canDelete = isPost && (card.sender.id === viewer.id || viewer.role === "admin");
 
-  const people = card.recipients.slice(0, 3);
+  // A big group (a whole site, or everyone) reads "Aoife, Cian & 40 others",
+  // with the viewer first when they're in it; the rest open in a sheet.
+  const recipients = card.recipients.some((r) => r.id === viewer.id)
+    ? [...card.recipients.filter((r) => r.id === viewer.id), ...card.recipients.filter((r) => r.id !== viewer.id)]
+    : card.recipients;
+  const bigGroup = recipients.length > 4;
+  const people = recipients.slice(0, 3);
   const accent = card.recipients[0]?.look.theme ?? DEFAULT_LOOK.theme;
   const hasMedia = card.imageUrls.length > 0;
   // Who the post is about: the recipients of a shout-out, the author of a post.
@@ -415,6 +432,17 @@ export function RecognitionCard({
                 />
               </Link>
             ))}
+            {recipients.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setPeopleOpen(true)}
+                aria-label={`See all ${recipients.length} people`}
+                data-numeric
+                className="bg-surface-2 border-background relative z-10 -ml-4 flex size-11 items-center justify-center rounded-full border-2 text-xs font-bold"
+              >
+                +{formatNumber(recipients.length - 3)}
+              </button>
+            )}
           </div>
         ) : (
           <span className="bg-brand flex size-11 shrink-0 items-center justify-center rounded-full text-white">
@@ -428,10 +456,18 @@ export function RecognitionCard({
                 <Link href={`/profile/${card.sender.id}`}>{card.sender.name}</Link>
                 <NameMedal months={card.sender.serviceMonths} />
               </>
+            ) : bigGroup ? (
+              <>
+                <Link href={`/profile/${recipients[0].id}`}>{recipients[0].name.split(" ")[0]}</Link>
+                {" & "}
+                <button type="button" onClick={() => setPeopleOpen(true)} className="font-bold">
+                  <span data-numeric>{formatNumber(recipients.length - 1)}</span> others
+                </button>
+              </>
             ) : (
-              card.recipients.map((r, i) => (
+              recipients.map((r, i) => (
                 <Fragment key={r.id}>
-                  {i > 0 && (i === card.recipients.length - 1 ? " & " : ", ")}
+                  {i > 0 && (i === recipients.length - 1 ? " & " : ", ")}
                   <Link href={`/profile/${r.id}`}>{r.name}</Link>
                   <NameMedal months={r.serviceMonths} />
                 </Fragment>
@@ -541,7 +577,7 @@ export function RecognitionCard({
         ) : isPost ? (
           <PostBanner banner={card.sender.look.banner} message={card.message} />
         ) : (
-          <BannerHero card={card} />
+          <BannerHero card={card} onMore={() => setPeopleOpen(true)} />
         )}
 
         {/* Burst of the emoji you just reacted with */}
@@ -626,6 +662,7 @@ export function RecognitionCard({
               style={{ backgroundColor: accent, color: isLight(accent) ? "#0a0a0a" : "#fff" }}
             >
               +{pts(effectivePoints)}
+              {card.recipients.length > 1 && " each"}
               {activeBoost && (
                 <span aria-label={`${activeBoost.label} boost`}>
                   · {activeBoost.emoji} {activeBoost.multiplier}×
@@ -809,6 +846,29 @@ export function RecognitionCard({
                 </li>
               )),
             )}
+          </ul>
+        </SheetContent>
+      </Sheet>
+
+      {/* Everyone a group recognition went to. */}
+      <Sheet open={peopleOpen} onOpenChange={setPeopleOpen}>
+        <SheetContent side="bottom" showCloseButton={false} className="gap-0 p-0">
+          <SheetHeader className="border-b pt-1 pb-3">
+            <SheetTitle className="text-center text-base">
+              {isCover ? "Thanked" : "Recognised"} · <span data-numeric>{formatNumber(recipients.length)}</span> people
+            </SheetTitle>
+            <SheetDescription className="sr-only">Everyone this {noun} went to</SheetDescription>
+          </SheetHeader>
+          <ul className="max-h-[60svh] overflow-y-auto py-2">
+            {recipients.map((r) => (
+              <li key={r.id}>
+                <Link href={`/profile/${r.id}`} className="active:bg-surface-2 flex items-center gap-3 px-4 py-2.5">
+                  <FramedAvatar name={r.name} avatarUrl={r.avatarUrl} frame={r.look.frame} className="size-11 text-sm" />
+                  <span className="text-sm font-semibold">{r.name}</span>
+                  <NameMedal months={r.serviceMonths} />
+                </Link>
+              </li>
+            ))}
           </ul>
         </SheetContent>
       </Sheet>

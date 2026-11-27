@@ -13,6 +13,7 @@ import {
   Loader2,
   ChevronRight,
   LifeBuoy,
+  Users,
 } from "lucide-react";
 import { createRecognition, type ActionResult } from "@/lib/recognition/actions";
 import { createCover } from "@/lib/covers-actions";
@@ -28,7 +29,7 @@ import { Confetti } from "@/components/fx/confetti";
 import { FramedAvatar } from "@/components/user-avatar";
 import { ValueSeal } from "@/components/value-seal";
 import { tint } from "@/components/value-chip";
-import { pts } from "@/lib/format";
+import { formatNumber, pts } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ValueOption = {
@@ -49,6 +50,20 @@ type RecipientOption = {
   /** Every site they work at, main first. */
   siteCodes: string[];
 };
+/** A one-tap pick of many people: everyone, or everyone at one site. */
+type Group = {
+  key: string;
+  /** "Everyone", "Everyone at Mahon" */
+  title: string;
+  /** For sentences: "everyone", "everyone at Mahon" */
+  label: string;
+  ids: string[];
+};
+
+/** Above this many people, names give way to "Aoife, Cian & 40 others". */
+const SHOWN_NAMES = 3;
+/** Chosen people shown as avatars in the strip before a "+N" bubble. */
+const STRIP_MAX = 12;
 
 /**
  * The Send flow, in the same plain Instagram pattern as the rest of the app:
@@ -72,6 +87,7 @@ export function RecognizeForm({
   mySiteCodes = [],
   me,
   cover,
+  sites = [],
 }: {
   values: ValueOption[];
   recipients: RecipientOption[];
@@ -84,12 +100,14 @@ export function RecognizeForm({
   me: { name: string; avatarUrl: string | null };
   /** Thank-for-covering mode: the suggested points and keypad presets. */
   cover?: { suggested: number; presets: number[] };
+  /** Active sites, for the "Everyone at …" picks. */
+  sites?: { code: string; name: string }[];
 }) {
   const router = useRouter();
   const isCover = Boolean(cover);
   const title = isCover ? "Thank for covering" : "New recognition";
   const [sent, setSent] = useState<{
-    names: string;
+    ids: string[];
     points: number;
     value: ValueOption | null;
   } | null>(null);
@@ -104,12 +122,8 @@ export function RecognizeForm({
       sendAnywayRef.current = false;
       const res = isCover ? await createCover(prev, fd) : await createRecognition(prev, fd);
       if (res.ok) {
-        const names = fd
-          .getAll("recipientIds")
-          .map((id) => recipients.find((r) => r.id === String(id))?.name.split(" ")[0])
-          .filter(Boolean) as string[];
         setSent({
-          names: joinNames(names),
+          ids: fd.getAll("recipientIds").map(String),
           points: Number(fd.get("points") ?? 0),
           value: values.find((v) => v.id === String(fd.get("valueId"))) ?? null,
         });
@@ -155,12 +169,49 @@ export function RecognizeForm({
 
   // Keep points within what the allowance permits as the selection changes.
   const points = Math.min(rawPoints, Math.max(0, maxPerRecipient));
+  const totalPoints = points * selected.length;
+  // Lowered because more people were added than the allowance covers.
+  const lowered = rawPoints > points;
+  // Points left, but not even 1 each for this many people.
+  const tooManyForPoints = allowance.remaining > 0 && maxPerRecipient <= 0 && selected.length > 1;
 
   const selectedPeople = selected
     .map((id) => byId.get(id))
     .filter((r): r is RecipientOption => Boolean(r));
   const firstNames = selectedPeople.map((r) => r.name.split(" ")[0]);
-  const namesLabel = joinNames(firstNames);
+
+  // One-tap groups: everyone, then each site (the sender's own first).
+  // Thanks for covering is always for the specific people who covered.
+  const groups = useMemo<Group[]>(() => {
+    if (isCover) return [];
+    const ordered = [
+      ...mySiteCodes.map((code) => sites.find((s) => s.code === code)).filter((s): s is { code: string; name: string } => Boolean(s)),
+      ...sites.filter((s) => !mySiteCodes.includes(s.code)),
+    ];
+    const all: Group = { key: "all", title: "Everyone", label: "everyone", ids: recipients.map((r) => r.id) };
+    const bySite = ordered
+      .map((site) => ({
+        key: site.code,
+        title: `Everyone at ${site.name}`,
+        label: `everyone at ${site.name}`,
+        ids: recipients.filter((r) => r.siteCodes.includes(site.code)).map((r) => r.id),
+      }))
+      .filter((g) => g.ids.length > 1 && g.ids.length < all.ids.length);
+    return all.ids.length > 1 ? [all, ...bySite] : bySite;
+  }, [isCover, recipients, sites, mySiteCodes]);
+  const selectedSet = new Set(selected);
+  const isAllOf = (g: Group) => g.ids.length > 0 && g.ids.every((id) => selectedSet.has(id));
+  // The selection is exactly one group: say "everyone at Mahon", not 40 names.
+  const exactGroup = groups.find((g) => g.ids.length === selected.length && isAllOf(g)) ?? null;
+  const namesLabel = exactGroup ? exactGroup.label : joinNames(firstNames);
+  /** "everyone at Mahon" or "Cian, Saoirse +2", for any list of ids. */
+  function labelFor(ids: string[]) {
+    const set = new Set(ids);
+    const group = groups.find((g) => g.ids.length === set.size && g.ids.every((id) => set.has(id)));
+    if (group) return group.label;
+    return joinNames(ids.map((id) => byId.get(id)?.name.split(" ")[0]).filter((n): n is string => Boolean(n)));
+  }
+  const many = selected.length > 1;
 
 
   const q = search.trim().toLowerCase();
@@ -190,7 +241,8 @@ export function RecognizeForm({
           people: recipients.filter((r) => atMySite(r) && !recentIds.includes(r.id)),
         },
         {
-          title: "Everyone",
+          // "Everyone" is the one-tap group above; this is the rest, A–Z.
+          title: mySiteCodes.length > 0 ? "Other sites" : "All people",
           people: recipients.filter(
             (r) => !atMySite(r) && !recentIds.includes(r.id),
           ),
@@ -198,7 +250,21 @@ export function RecognizeForm({
       ];
 
   function toggle(id: string) {
+    // Thanks for covering stays a small, specific list.
+    if (isCover && !selected.includes(id) && selected.length >= 10) {
+      toast("Thank at most 10 people at once.");
+      return;
+    }
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+  /** Add everyone in the group, or take them all off if they're all chosen. */
+  function toggleGroup(g: Group) {
+    const ids = new Set(g.ids);
+    setSelected((s) =>
+      g.ids.every((id) => s.includes(id))
+        ? s.filter((id) => !ids.has(id))
+        : [...s, ...g.ids.filter((id) => !s.includes(id))],
+    );
   }
 
   const blocker = isCover
@@ -221,7 +287,7 @@ export function RecognizeForm({
   if (sent) {
     return (
       <Celebration
-        names={sent.names}
+        names={labelFor(sent.ids)}
         points={sent.points}
         value={sent.value}
         cover={isCover}
@@ -304,9 +370,20 @@ export function RecognizeForm({
         </header>
 
         {/* Chosen people, as tappable avatars (tap to remove). */}
+        {selectedPeople.length > 1 && (
+          <div className="-mx-4 flex items-center justify-between px-4 pt-3 text-[0.85rem]">
+            <span className="text-muted">
+              <span data-numeric className="text-foreground font-semibold">{formatNumber(selectedPeople.length)}</span> chosen
+              {exactGroup && <> · {exactGroup.title}</>}
+            </span>
+            <button type="button" onClick={() => setSelected([])} className="text-primary font-semibold">
+              Clear all
+            </button>
+          </div>
+        )}
         {selectedPeople.length > 0 && (
           <div className="no-scrollbar border-border -mx-4 flex gap-4 overflow-x-auto border-b px-4 py-3">
-            {selectedPeople.map((r) => (
+            {selectedPeople.slice(0, STRIP_MAX).map((r) => (
               <button
                 key={r.id}
                 type="button"
@@ -323,10 +400,56 @@ export function RecognizeForm({
                 <span className="w-full truncate text-center text-xs">{r.name.split(" ")[0]}</span>
               </button>
             ))}
+            {selectedPeople.length > STRIP_MAX && (
+              <span className="flex w-16 shrink-0 flex-col items-center gap-1">
+                <span data-numeric className="bg-surface-2 flex size-14 items-center justify-center rounded-full text-sm font-bold">
+                  +{formatNumber(selectedPeople.length - STRIP_MAX)}
+                </span>
+                <span className="text-muted w-full truncate text-center text-xs">more</span>
+              </span>
+            )}
           </div>
         )}
 
         <div className="space-y-4 pt-3 pb-32">
+          {!q && groups.length > 0 && (
+            <section>
+              <h2 className="mb-1 text-[0.95rem] font-bold">Groups</h2>
+              <ul>
+                {groups.map((g) => {
+                  const active = isAllOf(g);
+                  return (
+                    <li key={g.key}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(g)}
+                        aria-pressed={active}
+                        className="active:bg-surface-2 -mx-4 flex w-[calc(100%+2rem)] items-center gap-3 px-4 py-2 text-left transition-colors"
+                      >
+                        <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-full">
+                          <Users className="size-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{g.title}</span>
+                          <span data-numeric className="text-muted block truncate text-[0.8rem]">
+                            {formatNumber(g.ids.length)} people
+                          </span>
+                        </span>
+                        <span
+                          className={cn(
+                            "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                            active ? "border-primary bg-primary text-white" : "border-surface-3",
+                          )}
+                        >
+                          {active && <Check className="size-3.5" strokeWidth={3.5} />}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           {sections
             .filter((s) => s.people.length > 0)
             .map((section) => (
@@ -393,7 +516,7 @@ export function RecognizeForm({
                 }}
                 className="bg-primary text-primary-fg mb-3 flex h-12 w-full items-center justify-center rounded-xl text-[0.95rem] font-bold active:opacity-80"
               >
-                Next · {namesLabel}
+                Next · {exactGroup ? exactGroup.title : namesLabel}
               </button>
             </motion.div>
           )}
@@ -432,12 +555,25 @@ export function RecognizeForm({
                 <FramedAvatar name={r.name} avatarUrl={r.avatarUrl} frame={r.frame} className="size-11 text-sm" />
               </span>
             ))}
+            {selectedPeople.length > 3 && (
+              <span
+                data-numeric
+                className="bg-surface-2 border-background relative z-10 -ml-4 flex size-11 items-center justify-center rounded-full border-2 text-xs font-bold"
+              >
+                +{formatNumber(selectedPeople.length - 3)}
+              </span>
+            )}
           </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-[1.05rem] font-bold tracking-tight">
-              {selectedPeople.map((r) => r.name).join(", ")}
+              {exactGroup
+                ? exactGroup.title
+                : selectedPeople.length > SHOWN_NAMES + 1
+                  ? `${selectedPeople.slice(0, SHOWN_NAMES).map((r) => r.name.split(" ")[0]).join(", ")} & ${formatNumber(selectedPeople.length - SHOWN_NAMES)} others`
+                  : selectedPeople.map((r) => r.name).join(", ")}
             </span>
             <span className="text-muted mt-0.5 block text-[0.82rem]">
+              {many && <span data-numeric>{formatNumber(selectedPeople.length)} people · </span>}
               {isCover ? "thanked by" : "from"} <span className="text-foreground font-semibold">{me.name}</span>
             </span>
           </span>
@@ -497,7 +633,7 @@ export function RecognizeForm({
           placeholder={
             isCover
               ? "Add a thank-you (optional)"
-              : `What did ${firstNames[0] ?? "they"} do? Be specific, it hits harder.`
+              : `What did ${selected.length > 2 ? "they" : (firstNames[0] ?? "they")} do? Be specific, it hits harder.`
           }
           rows={isCover ? 2 : 3}
           maxLength={500}
@@ -582,10 +718,14 @@ export function RecognizeForm({
               ✦
             </span>
             <span className="flex-1">Points</span>
-            <span data-numeric className={cn("text-[0.95rem]", points > 0 ? "text-primary font-bold" : "text-muted")}>
+            <span data-numeric className={cn("text-right text-[0.95rem]", points > 0 ? "text-primary font-bold" : "text-muted")}>
               {points > 0
-                ? `+${pts(points)} each`
-                : allowance.total === 0
+                ? many
+                  ? `+${pts(points)} each · ${pts(totalPoints)} total`
+                  : `+${pts(points)}`
+                : tooManyForPoints
+                  ? "Not enough for 1 each"
+                  : allowance.total === 0
                   ? isCover
                     ? "No cover points on your rank"
                     : "None to give on your rank"
@@ -594,6 +734,13 @@ export function RecognizeForm({
             <ChevronRight className="text-muted size-4.5" />
           </button>
         </div>
+        {(lowered || tooManyForPoints) && (
+          <p data-numeric className="text-muted mt-2 text-[0.82rem]">
+            {tooManyForPoints
+              ? `You have ${pts(allowance.remaining)} left this month, not enough for 1 point each across ${formatNumber(selected.length)} people. Pick fewer people to add points.`
+              : `Lowered to ${pts(points)} each so ${formatNumber(selected.length)} people fit in the ${pts(allowance.remaining)} you have left.`}
+          </p>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -617,7 +764,7 @@ export function RecognizeForm({
             {pending
               ? "Sharing…"
               : blocker ??
-                `${isCover ? "Thank" : "Share with"} ${namesLabel}${points > 0 ? ` · +${pts(points)}` : ""}`}
+                `${isCover ? "Thank" : "Share with"} ${namesLabel}${points > 0 ? ` · +${pts(points)}${many ? " each" : ""}` : ""}`}
           </button>
         </div>
       </div>
@@ -715,7 +862,7 @@ function Celebration({
       >
         {cover
           ? `It's on the feed, and it counts for ${names} on Most helpful.`
-          : `${names} ${names.includes("&") || names.includes("+") ? "are" : "is"} going to love this.`}
+          : `${names.charAt(0).toUpperCase()}${names.slice(1)} ${names.includes("&") || names.includes("+") ? "are" : "is"} going to love this.`}
       </motion.p>
       {points > 0 && (
         <motion.span

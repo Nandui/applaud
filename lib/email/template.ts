@@ -1,6 +1,12 @@
+import { shortNameList } from "@/lib/format";
+
 export type Notification =
   | { kind: "recognition"; recognisedBy: string; points: number }
-  | { kind: "team"; recognisedBy: string; recipientNames: string[]; recognitionId: string }
+  | {
+      kind: "team"; recognisedBy: string; recipientNames: string[]; recognitionId: string;
+      /** "everyone at Mahon" when it went to a whole group. */
+      audience?: string | null;
+    }
   | { kind: "test"; recipientName: string }
   | { kind: "invite"; recipientName: string; welcomePoints: number }
   | { kind: "connected" };
@@ -11,7 +17,10 @@ function copyFor(appName: string, notification: Notification) {
       const { recognisedBy, recipientNames, recognitionId } = notification;
       const firstName = (name: string) => name.trim().split(/\s+/)[0];
       const who = recipientNames.length === 1 ? firstName(recipientNames[0]) : `${recipientNames.length} teammates`;
-      const names = new Intl.ListFormat("en-IE", { type: "conjunction" }).format(recipientNames);
+      // Long lists collapse to "Aoife, Cian, Dara and 39 others".
+      const names = notification.audience
+        ? `${notification.audience} (${recipientNames.length.toLocaleString("en-IE")} people)`
+        : new Intl.ListFormat("en-IE", { type: "conjunction" }).format(shortNameList(recipientNames));
       const summary = `${recognisedBy} recognised ${names} on ${appName}.`;
       return {
         subject: `${firstName(recognisedBy)} gave ${who} a shout-out`, label: "Team recognition",
