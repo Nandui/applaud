@@ -21,6 +21,7 @@ import type { AllowanceStatus } from "@/lib/points";
 import { ALLOWED_IMAGE_TYPES } from "@/lib/config";
 import { GifPicker } from "@/components/recognize/gif-picker";
 import { PointsKeypad } from "@/components/recognize/points-keypad";
+import { NoPointsSheet } from "@/components/recognize/no-points-sheet";
 import { useAttachments } from "@/components/recognize/use-attachments";
 import { AttachmentStrip } from "@/components/recognize/attachment-strip";
 import { Confetti } from "@/components/fx/confetti";
@@ -92,9 +93,15 @@ export function RecognizeForm({
     points: number;
     value: ValueOption | null;
   } | null>(null);
+  // "No points attached" check before sharing; skipped once they say send anyway.
+  const [noPointsOpen, setNoPointsOpen] = useState(false);
+  const sendAnywayRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
   // Celebrate (or toast the error) from inside the action, not an effect.
   const [, formAction, pending] = useActionState<ActionResult | undefined, FormData>(
     async (prev, fd) => {
+      // A failed send asks again next time.
+      sendAnywayRef.current = false;
       const res = isCover ? await createCover(prev, fd) : await createRecognition(prev, fd);
       if (res.ok) {
         const names = fd
@@ -208,6 +215,8 @@ export function RecognizeForm({
           ? "Pick a value"
           : null;
   const canSubmit = selected.length > 0 && blocker === null && !pending && uploadingCount === 0;
+  // Only ask when they could actually add points (not Backoffice, not an empty allowance).
+  const couldAddPoints = maxPerRecipient > 0;
 
   if (sent) {
     return (
@@ -225,6 +234,7 @@ export function RecognizeForm({
           setCoverType("");
           setCoverWhat("");
           setPoints(cover?.suggested ?? 0);
+          sendAnywayRef.current = false;
           clear();
           setStep("to");
           router.refresh();
@@ -234,7 +244,17 @@ export function RecognizeForm({
   }
 
   return (
-    <form action={formAction} className="mx-auto max-w-xl">
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={(e) => {
+        if (points === 0 && couldAddPoints && !sendAnywayRef.current) {
+          e.preventDefault();
+          setNoPointsOpen(true);
+        }
+      }}
+      className="mx-auto max-w-xl"
+    >
       {/* Hidden fields the server action reads */}
       {selected.map((id) => (
         <input key={id} type="hidden" name="recipientIds" value={id} />
@@ -614,6 +634,25 @@ export function RecognizeForm({
         resetsIn={allowance.resetsIn}
         presets={cover?.presets}
         source={isCover ? "From your monthly cover allowance." : undefined}
+      />
+
+      <NoPointsSheet
+        open={noPointsOpen}
+        onOpenChange={setNoPointsOpen}
+        names={namesLabel}
+        people={selected.length}
+        remaining={allowance.remaining}
+        cover={isCover}
+        onAddPoints={() => {
+          setNoPointsOpen(false);
+          // Let the sheet close before the keypad opens.
+          setTimeout(() => setKeypadOpen(true), 200);
+        }}
+        onSendAnyway={() => {
+          setNoPointsOpen(false);
+          sendAnywayRef.current = true;
+          formRef.current?.requestSubmit();
+        }}
       />
     </form>
   );
