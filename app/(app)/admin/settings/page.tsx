@@ -40,11 +40,16 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
       />
       {enabled && (
         <section id="gmail" className="border-border mt-6 max-w-xl space-y-3 rounded-xl border p-4">
-          <h2 className="font-semibold">Recognition emails</h2>
+          <h2 className="font-semibold">Email mailbox</h2>
           <p className="text-muted text-sm">
             {sender ? `Sending from ${settings.appName} <${sender.email}>.` : "Choose the Google Workspace mailbox that will send recognition notifications."}
             {!sender && " Connecting sends a test email to the selected mailbox."}
           </p>
+          {!settings.emailsEnabled && (
+            <p role="status" className="text-warning text-sm font-medium">
+              All emails are paused. Nothing is emailed until you turn Emails back on below.
+            </p>
+          )}
           {mail && Object.hasOwn(mailStatus, mail) && <p role="status" className="text-sm">{mailStatus[mail]}</p>}
           {sender && <TestEmailForm email={admin.email} />}
           <form action="/api/admin/gmail/connect" method="post">
@@ -62,6 +67,10 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           chatAwards: settings.chatAwards,
           chatMilestones: settings.chatMilestones,
           chatRewardClaims: settings.chatRewardClaims,
+          emailsEnabled: settings.emailsEnabled,
+          emailRecognitions: settings.emailRecognitions,
+          emailTeamAnnouncements: settings.emailTeamAnnouncements,
+          emailInvites: settings.emailInvites,
         }}
         chatConnected={chatConfigured()}
       />

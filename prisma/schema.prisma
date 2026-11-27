@@ -590,6 +590,15 @@ model OrgSettings {
   chatAwards                    Boolean @default(true)
   chatMilestones                Boolean @default(true)
   chatRewardClaims              Boolean @default(false)
+  /// Master switch for every email Yayup sends (lib/email/switches.ts). When
+  /// off, nothing is emailed, whatever the per-kind switches below say.
+  emailsEnabled                 Boolean @default(true)
+  /// Personal email to the people who were recognised.
+  emailRecognitions             Boolean @default(true)
+  /// "Someone was recognised" announcement to everyone else.
+  emailTeamAnnouncements        Boolean @default(true)
+  /// Admin > Users "Nudge people to join" invite emails.
+  emailInvites                  Boolean @default(true)
 }
 
 // ---------- next-auth (Auth.js Prisma adapter) ----------

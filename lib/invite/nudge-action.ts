@@ -9,6 +9,7 @@ import { WELCOME_POINTS } from "@/lib/onboarding";
 import { chatConfigured, postJoinInvite } from "@/lib/chat/google-chat";
 import { getGmailSender } from "@/lib/email/sender";
 import { mailFailure, sendGmail } from "@/lib/email/gmail";
+import { emailOn } from "@/lib/email/switches";
 import { canEmail, irishTime, lastNudge, nextNudgeAt, notJoinedPeople } from "./nudge";
 
 export type NudgeResult = { ok: true; message: string } | { ok: false; error: string };
@@ -35,14 +36,23 @@ export async function sendJoinNudge(): Promise<NudgeResult> {
     return { ok: false, error: `A nudge went out in the last 24 hours. You can send the next one from ${irishTime(next)}.` };
   }
 
+  const settings = await getOrgSettings();
+  const emailsAllowed = emailOn(settings, "invite");
   let sender: Awaited<ReturnType<typeof getGmailSender>> = null;
-  try {
-    sender = await getGmailSender();
-  } catch (error) {
-    console.error("Join nudge: Gmail sender unavailable", { reason: mailFailure(error) });
+  if (emailsAllowed) {
+    try {
+      sender = await getGmailSender();
+    } catch (error) {
+      console.error("Join nudge: Gmail sender unavailable", { reason: mailFailure(error) });
+    }
   }
   if (!sender && !chatConfigured()) {
-    return { ok: false, error: "Connect Gmail or Google Chat in Admin > Settings first, so the nudge has somewhere to go." };
+    return {
+      ok: false,
+      error: emailsAllowed
+        ? "Connect Gmail or Google Chat in Admin > Settings first, so the nudge has somewhere to go."
+        : "Invite emails are switched off in Admin > Settings and Google Chat isn't connected, so the nudge has nowhere to go.",
+    };
   }
 
   const chat = await postJoinInvite(WELCOME_POINTS);
@@ -50,7 +60,7 @@ export async function sendJoinNudge(): Promise<NudgeResult> {
   const emailed: string[] = [];
   let failed = 0;
   if (sender) {
-    const { appName } = await getOrgSettings();
+    const { appName } = settings;
     const people = (await notJoinedPeople()).filter((p) => canEmail(p, now));
     const concurrency = 3;
     for (let i = 0; i < people.length; i += concurrency) {

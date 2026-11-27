@@ -133,6 +133,14 @@ const REPAIRS: Repair[] = [
     check: `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'User' AND column_name = 'lastNudgedAt') AS ok`,
     statements: [`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastNudgedAt" TIMESTAMP(3)`],
   },
+  {
+    name: "20261127140000_email_switches",
+    checksum: "01ff26a07ebcc9369b2e1dfa074fb2e63d5fc158eb2269aa642eba09abc3d73f",
+    check: `SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'OrgSettings' AND column_name IN ('emailsEnabled', 'emailRecognitions', 'emailTeamAnnouncements', 'emailInvites')) = 4 AS ok`,
+    statements: [
+      `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "emailsEnabled" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailRecognitions" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailTeamAnnouncements" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailInvites" BOOLEAN NOT NULL DEFAULT true`,
+    ],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {

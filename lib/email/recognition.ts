@@ -2,6 +2,8 @@ import { mailbox, mailFailure, sendGmail } from "./gmail";
 import type { Notification } from "./template";
 import { getGmailSender } from "./sender";
 import { prisma } from "@/lib/prisma";
+import { getOrgSettings } from "@/lib/org-settings";
+import { emailOn } from "./switches";
 
 type Person = { id: string; email: string; name: string };
 
@@ -45,13 +47,23 @@ export async function notifyRecognition(
 ) {
   if (process.env.VERCEL_ENV !== "production" || !recipients.length) return;
   try {
+    const settings = await getOrgSettings();
+    const personalOn = emailOn(settings, "recognition");
+    const teamOn = emailOn(settings, "team");
+    if (!personalOn && !teamOn) {
+      console.info("Recognition emails skipped: switched off in Admin > Settings", { recognitionId });
+      return;
+    }
     const sender = await getGmailSender();
     if (!sender) {
       console.warn("Recognition emails skipped: no connected mailbox", { recognitionId });
       return;
     }
-    const personal = emailRecipients(recipients, [author]);
-    await sendRecognitionCopies(recognitionId, sender, appName, personal, { kind: "recognition", recognisedBy: author.name, points });
+    if (personalOn) {
+      const personal = emailRecipients(recipients, [author]);
+      await sendRecognitionCopies(recognitionId, sender, appName, personal, { kind: "recognition", recognisedBy: author.name, points });
+    }
+    if (!teamOn) return;
     // New shout-outs are public to all active accounts, across sites.
     const staff = await prisma.user.findMany({ where: { active: true }, select: { id: true, email: true } });
     await sendRecognitionCopies(recognitionId, sender, appName, emailRecipients(staff, [author, ...recipients]), {
