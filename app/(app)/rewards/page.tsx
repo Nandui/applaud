@@ -11,6 +11,7 @@ import { ClaimsStrip } from "@/components/rewards/active-claims";
 import { loadRewardsShop } from "@/lib/rewards/shop";
 import { RewardsShop } from "@/components/rewards/rewards-shop";
 import { IdeasEntry } from "@/components/ideas/ideas-entry";
+import { OpenFromUrl } from "@/components/open-from-url";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rewards" };
@@ -52,6 +53,7 @@ export default async function RewardsPage({
       />
       {/* A filtered view doesn't show everything, so only the full list counts as seen. */}
       {!filtered ? <MarkSeen area="rewards" renderedAt={renderedAt} /> : null}
+      <OpenFromUrl />
       <RewardsShop
         data={data}
         balance={user.walletBalance}

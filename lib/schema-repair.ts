@@ -141,6 +141,16 @@ const REPAIRS: Repair[] = [
       `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "emailsEnabled" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailRecognitions" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailTeamAnnouncements" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "emailInvites" BOOLEAN NOT NULL DEFAULT true`,
     ],
   },
+  {
+    name: "20261127200000_suggestion_approval",
+    checksum: "00074ace08e210dc1931d33273f8803fb21f7abd442183565c5fcf5126b0d824",
+    check: `SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'Suggestion' AND column_name IN ('rewardId', 'cosmeticId', 'announcedAt')) = 3
+      AND (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'OrgSettings' AND column_name IN ('emailSuggestions', 'chatSuggestions')) = 2 AS ok`,
+    statements: [
+      `ALTER TABLE "Suggestion" ADD COLUMN IF NOT EXISTS "rewardId" TEXT, ADD COLUMN IF NOT EXISTS "cosmeticId" TEXT, ADD COLUMN IF NOT EXISTS "announcedAt" TIMESTAMP(3)`,
+      `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "emailSuggestions" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatSuggestions" BOOLEAN NOT NULL DEFAULT true`,
+    ],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {

@@ -21,6 +21,11 @@ export type ChatEvent =
   | { kind: "award"; id: string; winner: string; award: string; points: number }
   | { kind: "milestone"; id: string; message: string }
   | { kind: "claim"; person: string; reward: string; points: number }
+  | {
+      /** A staff idea is now a real reward or profile shop item. */
+      kind: "suggestion"; area: "reward" | "shop"; person: string; idea: string; item: string;
+      votes: number; path: string; image?: string | null;
+    }
   | { kind: "invite"; welcomePoints: number }
   | { kind: "test"; admin: string };
 
@@ -30,6 +35,7 @@ const settingFor = {
   award: "chatAwards",
   milestone: "chatMilestones",
   claim: "chatRewardClaims",
+  suggestion: "chatSuggestions",
 } as const satisfies Record<Exclude<ChatEvent["kind"], "test" | "invite">, keyof OrgSettings>;
 
 const MAX_QUOTE = 400;
@@ -111,6 +117,9 @@ export function chatText(appName: string, event: ChatEvent): string {
     case "claim":
       return `🎁 *${clean(event.person)}* claimed *${clean(event.reward)}* for ${event.points.toLocaleString("en-IE")} pts`
         + link("/admin/redemptions", "Open claims");
+    case "suggestion":
+      return `💡 *${clean(event.item)}* is now in ${event.area === "shop" ? "the profile shop" : "Rewards"}, thanks to *${clean(event.person)}*'s idea!`
+        + link(event.path, `Open ${clean(appName)}`);
     case "invite":
       return `👋 *Not on ${clean(appName)} yet?* Your team is already recognising each other there. `
         + "Get recognised, earn points and choose rewards."
@@ -216,6 +225,23 @@ function cardParts(appName: string, event: ChatEvent): CardParts {
         path: "/admin/redemptions",
         button: "Open claims in Yayup",
       };
+    case "suggestion": {
+      const where = event.area === "shop" ? "the profile shop" : "Rewards";
+      const sameName = event.idea.trim().toLowerCase() === event.item.trim().toLowerCase();
+      return {
+        title: event.area === "shop" ? "New in the profile shop" : "New reward added",
+        subtitle: `${app} · thanks to ${event.person}`,
+        lines: [
+          `💡 <b>${html(event.item)}</b> is now in ${where}, thanks to <b>${html(event.person)}</b>'s idea!`,
+          sameName ? "" : `<i>Suggested as “${html(event.idea)}”</i>`,
+          event.votes > 1 ? `<font color="${VIOLET_HEX}"><b>${event.votes.toLocaleString("en-IE")} people upvoted it</b></font>` : "",
+          "Got an idea of your own? Suggest it in Store > Ideas.",
+        ],
+        image: event.image,
+        path: event.path,
+        button: `Open ${app}`,
+      };
+    }
     case "invite":
       return {
         title: `Not on ${app} yet?`,

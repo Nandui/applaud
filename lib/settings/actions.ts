@@ -12,6 +12,7 @@ const CHAT_SWITCHES = [
   "chatAwards",
   "chatMilestones",
   "chatRewardClaims",
+  "chatSuggestions",
 ] as const;
 
 const EMAIL_SWITCHES = [
@@ -19,6 +20,7 @@ const EMAIL_SWITCHES = [
   "emailRecognitions",
   "emailTeamAnnouncements",
   "emailInvites",
+  "emailSuggestions",
 ] as const;
 
 export type ActionResult =

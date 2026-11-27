@@ -1,17 +1,21 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser } from "@/lib/auth/guards";
 import { isAdmin } from "@/lib/auth/types";
 import { writeAudit } from "@/lib/audit";
+import { announceSuggestion } from "@/lib/suggestion-announce";
 import {
   DAILY_LIMIT,
   DETAILS_MAX,
   NOTE_MAX,
+  ADMIN_STATUS_LABELS,
   TITLE_MAX,
   isSuggestionKind,
   isSuggestionStatus,
+  shouldAnnounce,
 } from "@/lib/suggestions";
 
 export type SuggestionResult = { ok: true; message?: string; id?: string } | { ok: false; error: string };
@@ -128,35 +132,71 @@ export async function deleteSuggestion(formData: FormData): Promise<SuggestionRe
   return { ok: true, message: "Idea removed" };
 }
 
-/** Admin: set where an idea is up to, and the reply everyone sees on it. */
+/**
+ * Admin: approve, decline or mark an idea available, with the reply everyone
+ * sees on it. Marking it Available needs the reward or profile item it became;
+ * the first time that happens the suggester is emailed and the Chat space told.
+ */
 export async function updateSuggestion(formData: FormData): Promise<SuggestionResult> {
   const me = await requireAdmin();
   const id = clean(formData.get("id"));
   const status = formData.get("status");
   const noteRaw = formData.get("adminNote");
   const adminNote = noteRaw === null ? undefined : cleanLong(noteRaw);
+  const itemRaw = formData.get("itemId");
+  const itemId = itemRaw === null ? undefined : clean(itemRaw) || null;
   if (!isSuggestionStatus(status)) return { ok: false, error: "Unknown status." };
   if (adminNote && adminNote.length > NOTE_MAX) return { ok: false, error: `Keep the reply under ${NOTE_MAX} characters.` };
 
-  const idea = await prisma.suggestion.findUnique({ where: { id }, select: { status: true, title: true } });
+  const idea = await prisma.suggestion.findUnique({
+    where: { id },
+    select: { status: true, title: true, kind: true, rewardId: true, cosmeticId: true, announcedAt: true },
+  });
   if (!idea) return { ok: false, error: "This idea was removed." };
+  const shop = idea.kind === "shop";
 
+  // Only an available idea points at an item; any other status unlinks it.
+  let linked = status === "added" ? (itemId === undefined ? (shop ? idea.cosmeticId : idea.rewardId) : itemId) : null;
+  let itemName: string | null = null;
+  if (linked) {
+    const item = shop
+      ? await prisma.cosmetic.findUnique({ where: { id: linked }, select: { name: true, active: true } })
+      : await prisma.reward.findUnique({ where: { id: linked }, select: { name: true, active: true } });
+    if (!item) {
+      if (itemId !== undefined) return { ok: false, error: "That item no longer exists. Pick another." };
+      linked = null;
+    } else if (!item.active && itemId !== undefined && itemId !== (shop ? idea.cosmeticId : idea.rewardId)) {
+      return { ok: false, error: `${item.name} is hidden. Show it first, or pick another.` };
+    } else itemName = item.name;
+  }
+  if (status === "added" && !linked && idea.status !== "added") {
+    return { ok: false, error: shop ? "Pick the profile shop item this idea became." : "Pick the reward this idea became." };
+  }
+
+  const announce = shouldAnnounce({ status, itemId: linked, announcedAt: idea.announcedAt });
   await prisma.suggestion.update({
     where: { id },
     data: {
       status,
       ...(adminNote === undefined ? {} : { adminNote: adminNote || null }),
       ...(status !== idea.status ? { statusChangedAt: new Date() } : {}),
+      ...(shop ? { cosmeticId: linked } : { rewardId: linked }),
+      ...(announce ? { announcedAt: new Date() } : {}),
     },
   });
+  if (announce) after(() => announceSuggestion(id));
+
   await writeAudit({
     actor: me,
     action: "suggestion.updated",
     entityType: "suggestion",
     entityId: id,
-    summary: `${me.name} set "${idea.title}" to ${status}`,
-    metadata: { from: idea.status, to: status },
+    summary: `${me.name} set "${idea.title}" to ${ADMIN_STATUS_LABELS[status]}${itemName ? ` (${itemName})` : ""}`,
+    metadata: { from: idea.status, to: status, itemId: linked, announced: announce },
   });
   refresh();
-  return { ok: true, message: "Saved" };
+  revalidatePath(shop ? "/shop" : "/rewards");
+  const message =
+    announce ? "Available! We're letting everyone know." : status === "planned" && idea.status !== "planned" ? "Approved" : "Saved";
+  return { ok: true, message };
 }

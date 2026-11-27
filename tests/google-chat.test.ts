@@ -91,3 +91,20 @@ test("the test message opens Yayup's home page", () => {
   assert.equal(buttons.buttonList!.buttons[0].text, "Open Yayup");
   assert.equal(buttons.buttonList!.buttons[0].onClick.openLink.url, "https://yayup.app/");
 });
+
+test("an idea made available credits the person and opens the item", () => {
+  const event = {
+    kind: "suggestion", area: "shop", person: "Barrie Paine", idea: "South African flag", item: "SA flag frame",
+    votes: 3, path: "/shop?open=c1", image: null,
+  } as const;
+  const text = chatText("Yayup", event);
+  assert.match(text, /SA flag frame\* is now in the profile shop, thanks to \*Barrie Paine\*'s idea/);
+  const card = chatMessage("Yayup", event).cardsV2[0].card;
+  assert.equal(card.header.title, "New in the profile shop");
+  const widgets = card.sections[0].widgets;
+  assert.match(widgets[0].textParagraph!.text, /Suggested as “South African flag”/);
+  assert.match(widgets[0].textParagraph!.text, /3 people upvoted it/);
+  const button = widgets.at(-1)!.buttonList!.buttons[0];
+  assert.equal(button.text, "Open Yayup");
+  assert.match(button.onClick.openLink.url, /\/shop\?open=c1$/);
+});

@@ -67,10 +67,12 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           chatAwards: settings.chatAwards,
           chatMilestones: settings.chatMilestones,
           chatRewardClaims: settings.chatRewardClaims,
+          chatSuggestions: settings.chatSuggestions,
           emailsEnabled: settings.emailsEnabled,
           emailRecognitions: settings.emailRecognitions,
           emailTeamAnnouncements: settings.emailTeamAnnouncements,
           emailInvites: settings.emailInvites,
+          emailSuggestions: settings.emailSuggestions,
         }}
         chatConnected={chatConfigured()}
       />

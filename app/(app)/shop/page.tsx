@@ -14,6 +14,7 @@ import { isNewSince, visitStamp } from "@/lib/seen";
 import { RANK_LABELS, isPointsRank, shopIsFreeFor } from "@/lib/ranks";
 import { Crown } from "lucide-react";
 import { IdeasEntry } from "@/components/ideas/ideas-entry";
+import { OpenFromUrl } from "@/components/open-from-url";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Profile shop" };
@@ -64,6 +65,7 @@ export default async function ShopPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <AppBar title="Store" tabs={<StoreTabs active="shop" />} />
+      <OpenFromUrl />
       <MarkSeen area="shop" renderedAt={renderedAt} />
 
       <div className="flex items-center justify-between gap-3">
