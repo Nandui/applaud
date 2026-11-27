@@ -28,7 +28,7 @@ export function PostBanner({
   label?: ReactNode;
   className?: string;
 }) {
-  const isPicture = banner.includes("url(");
+  const isPicture = isPictureBanner(banner);
   return (
     <div
       className={cn(
@@ -58,6 +58,39 @@ export function PostBanner({
           {message}
         </p>
       </div>
+    </div>
+  );
+}
+
+/** Shop banners are either a plain colour/gradient or an uploaded picture/GIF. */
+export function isPictureBanner(banner: string) {
+  return banner.includes("url(");
+}
+
+/**
+ * Frosted glass behind words that sit on a banner picture: it softens and
+ * darkens only the patch under the words, so they read on any picture while
+ * the rest of the banner keeps its colour and motion. On plain colour banners
+ * (made for white text) it draws nothing extra.
+ */
+export function BannerTextGlass({
+  picture,
+  className,
+  children,
+}: {
+  picture: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "relative rounded-2xl",
+        picture && "bg-black/45 px-4 py-2.5 shadow-lg ring-1 ring-white/10 backdrop-blur-[6px]",
+        className,
+      )}
+    >
+      {children}
     </div>
   );
 }

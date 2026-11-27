@@ -44,7 +44,7 @@ import { isLight } from "@/lib/contrast";
 import { optimizedImage } from "@/lib/image-url";
 import { fallBackTo, isGiphyMediaUrl } from "@/lib/recognition/gif";
 import { ValueSeal } from "@/components/value-seal";
-import { PostBanner } from "@/components/feed/post-banner";
+import { BannerTextGlass, PostBanner, isPictureBanner } from "@/components/feed/post-banner";
 import { PollChoices } from "@/components/feed/poll";
 import { QuestionAnswers } from "@/components/feed/question";
 import { tint } from "@/components/value-chip";
@@ -140,10 +140,11 @@ function BannerHero({ card, onMore }: { card: FeedCard; onMore: () => void }) {
   const people = card.recipients.slice(0, 3);
   const extra = card.recipients.length - people.length;
   const lead = card.recipients[0];
+  const banner = lead?.look.banner ?? DEFAULT_LOOK.banner;
   return (
     <div
       className="relative flex aspect-[5/4] flex-col items-center justify-center gap-3 px-6 text-center text-white"
-      style={{ background: lead?.look.banner ?? DEFAULT_LOOK.banner }}
+      style={{ background: banner }}
     >
       <div aria-hidden className="absolute inset-0 bg-black/10" />
       {people.length > 0 && (
@@ -181,14 +182,19 @@ function BannerHero({ card, onMore }: { card: FeedCard; onMore: () => void }) {
           +{formatNumber(extra)} more
         </button>
       )}
-      <p
-        className={cn(
-          "relative line-clamp-5 max-w-sm leading-snug font-bold tracking-tight [text-shadow:0_2px_12px_rgb(0_0_0/0.35)]",
-          card.message.length > 90 ? "text-lg" : "text-2xl",
-        )}
-      >
-        {card.system ? card.message : `“${card.message}”`}
-      </p>
+      {/* The quote gets frosted glass on picture banners, so busy art (rainbows,
+          lettering, light skies) can't swallow it; the avatar and the rest of
+          the banner stay untouched. */}
+      <BannerTextGlass picture={isPictureBanner(banner)} className="max-w-sm">
+        <p
+          className={cn(
+            "line-clamp-5 leading-snug font-bold tracking-tight [text-shadow:0_1px_3px_rgb(0_0_0/0.45)]",
+            card.message.length > 90 ? "text-lg" : "text-2xl",
+          )}
+        >
+          {card.system ? card.message : `“${card.message}”`}
+        </p>
+      </BannerTextGlass>
     </div>
   );
 }
