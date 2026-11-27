@@ -1,3 +1,4 @@
+import { canPinToFeed } from "@/lib/feed-pins";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/guards";
@@ -21,7 +22,7 @@ export default async function RecognitionPage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto max-w-xl">
       <Link href="/" className="text-primary mb-4 inline-block text-sm font-semibold">Back to feed</Link>
-      <RecognitionCard card={card} viewer={{ id: me.id, name: me.name, avatarUrl: me.avatarUrl, role: me.role }}
+      <RecognitionCard card={card} viewer={{ id: me.id, name: me.name, avatarUrl: me.avatarUrl, role: me.role, canPinToFeed: canPinToFeed(me) }}
         pinned={parseProfile(user?.profile).pinned.includes(id)} />
       {me.role === "admin" && !card.system && process.env.VERCEL_ENV === "production" && (
         <div className="mt-5"><TestEmailForm email={me.email} recognitionId={id} /></div>

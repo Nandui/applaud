@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ImagePlus, Plus, LifeBuoy, ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { getFeedCards } from "@/lib/recognition/queries";
+import { getFeedCards, getPinnedFeedCards } from "@/lib/recognition/queries";
+import { canPinToFeed } from "@/lib/feed-pins";
 import { lookOf, parseProfile } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import { formatNumber } from "@/lib/format";
@@ -28,8 +29,9 @@ export const dynamic = "force-dynamic";
 export default async function FeedPage() {
   const me = await requireUser();
   const askBirthday = (me.onboarded ?? true) && !(me.hasBirthday ?? true);
-  const [feed, wallet, catalogue, myClaims, birthdayPoints, settings, discounts] = await Promise.all([
+  const [feed, pinnedCards, wallet, catalogue, myClaims, birthdayPoints, settings, discounts] = await Promise.all([
     getFeedCards(me.id),
+    getPinnedFeedCards(me.id),
     prisma.user.findUnique({
       where: { id: me.id },
       select: { walletBalance: true, profile: true, rewardsSeenAt: true },
@@ -53,6 +55,7 @@ export default async function FeedPage() {
     avatarUrl: me.avatarUrl ?? null,
     role: me.role,
     frame: myFrame,
+    canPinToFeed: canPinToFeed(me),
   };
   const myPins = parseProfile(wallet?.profile).pinned;
   const cards = feed.cards;
@@ -166,6 +169,7 @@ export default async function FeedPage() {
         </div>
       ) : (
         <FeedList
+          pinnedCards={pinnedCards}
           initialCards={cards}
           initialCursor={feed.nextCursor}
           viewer={viewer}

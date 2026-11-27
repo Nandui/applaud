@@ -151,6 +151,16 @@ const REPAIRS: Repair[] = [
       `ALTER TABLE "OrgSettings" ADD COLUMN IF NOT EXISTS "emailSuggestions" BOOLEAN NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS "chatSuggestions" BOOLEAN NOT NULL DEFAULT true`,
     ],
   },
+  {
+    name: "20261127210000_feed_pins",
+    checksum: "2b4a6fd4902525edcffa87a28453f2a49d088188d3cc1d8321903c87a7130156",
+    check: `SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'Recognition' AND column_name IN ('feedPinnedUntil', 'feedPinnedAt', 'feedPinnedById')) = 3 AS ok`,
+    statements: [
+      `ALTER TABLE "Recognition" ADD COLUMN IF NOT EXISTS "feedPinnedUntil" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "feedPinnedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "feedPinnedById" TEXT`,
+      `CREATE INDEX IF NOT EXISTS "Recognition_feedPinnedUntil_idx" ON "Recognition"("feedPinnedUntil")`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Recognition_feedPinnedById_fkey') THEN ALTER TABLE "Recognition" ADD CONSTRAINT "Recognition_feedPinnedById_fkey" FOREIGN KEY ("feedPinnedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$`,
+    ],
+  },
 ];
 
 async function isOk(sql: string): Promise<boolean> {

@@ -7,6 +7,7 @@ import { audienceLabel, audienceLabels, audienceWhere } from "@/lib/posts/audien
 import { lookOf } from "@/lib/profile-custom";
 import { getCatalogue } from "@/lib/catalogue";
 import { serviceMonths } from "@/lib/service";
+import { isPinActive, pinUntilLabel } from "@/lib/feed-pins";
 import type { Cosmetic, FrameArt, Look } from "@/lib/cosmetics";
 import {
   summarizeCommentReactions,
@@ -129,6 +130,8 @@ export type FeedCard = {
   question: FeedQuestion | null;
   /** "Bishopstown only" when a poll or question is limited to some sites. */
   audienceLabel: string | null;
+  /** Pinned to the top of the Home feed right now (null when not, or the pin ran out). */
+  feedPin: { byId: string | null; byName: string | null; untilLabel: string } | null;
 };
 
 /**
@@ -159,6 +162,7 @@ const feedInclude = (viewerId: string) => ({
   pollVotes: { where: { userId: viewerId }, select: { optionId: true } },
   answers: { where: { userId: viewerId }, select: { body: true } },
   _count: { select: { pollVotes: true, answers: true } },
+  feedPinnedBy: { select: { name: true } },
 }) satisfies Prisma.RecognitionInclude;
 
 type RawRecognition = Prisma.RecognitionGetPayload<{
@@ -259,6 +263,14 @@ export function toFeedCard(
         ? { answerCount: r._count.answers, myAnswer: r.answers[0]?.body ?? null }
         : null,
     audienceLabel: audienceLabel(r.audienceSiteIds, siteNames),
+    feedPin:
+      r.feedPinnedUntil && isPinActive(r.feedPinnedUntil)
+        ? {
+            byId: r.feedPinnedById,
+            byName: r.feedPinnedBy?.name ?? null,
+            untilLabel: pinUntilLabel(r.feedPinnedUntil),
+          }
+        : null,
   };
 }
 
@@ -371,6 +383,26 @@ export async function getFeedCards(
     cards: page.map((r) => toFeedCard(r, viewerId, catalogue, siteNames)),
     nextCursor: hasMore ? page[page.length - 1].id : null,
   };
+}
+
+/**
+ * What's pinned to the top of the Home feed right now, most recently pinned
+ * first. Pins whose time has passed are simply left out (that is the
+ * auto-unpin). Polls and questions limited to other sites stay hidden.
+ */
+export async function getPinnedFeedCards(viewerId: string): Promise<FeedCard[]> {
+  const [catalogue, audience, siteNames] = await Promise.all([
+    getCatalogue(),
+    audienceWhere(viewerId),
+    audienceLabels(),
+  ]);
+  const rows = await prisma.recognition.findMany({
+    where: { AND: [{ feedPinnedUntil: { gt: new Date() } }, audience] },
+    orderBy: [{ feedPinnedAt: "desc" }, { id: "desc" }],
+    take: 10,
+    include: feedInclude(viewerId),
+  });
+  return rows.map((r) => toFeedCard(r, viewerId, catalogue, siteNames));
 }
 
 /**

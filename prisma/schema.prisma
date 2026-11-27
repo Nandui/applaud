@@ -107,6 +107,7 @@ model User {
   lastNudgedAt  DateTime?
 
   sentRecognitions     Recognition[]          @relation("Sender")
+  feedPins             Recognition[]          @relation("FeedPinner")
   receivedRecognitions RecognitionRecipient[]
   reactions            Reaction[]
   comments             Comment[]
@@ -196,6 +197,12 @@ model Recognition {
   /// one in the manager's words (e.g. "Sat 10am Level 3 swim").
   coverType  String?
   coverWhat  String?
+  /// Pinned to the top of everyone's Home feed until this time (null or past =
+  /// not pinned). Set by Manager rank and above, or admins; see lib/feed-pins.ts.
+  feedPinnedUntil DateTime?
+  feedPinnedAt    DateTime?
+  feedPinnedById  String?
+  feedPinnedBy    User?     @relation("FeedPinner", fields: [feedPinnedById], references: [id], onDelete: SetNull)
   createdAt  DateTime  @default(now())
 
   recipients RecognitionRecipient[]
@@ -207,6 +214,7 @@ model Recognition {
 
   @@index([createdAt])
   @@index([senderId, createdAt])
+  @@index([feedPinnedUntil])
 }
 
 /// A choice on a poll post (Recognition kind "poll").

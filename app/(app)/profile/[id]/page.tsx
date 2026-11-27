@@ -1,3 +1,4 @@
+import { canPinToFeed } from "@/lib/feed-pins";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pin } from "lucide-react";
@@ -111,6 +112,7 @@ export default async function ProfilePage({
     avatarUrl: viewer.avatarUrl ?? null,
     role: viewer.role,
     frame: isMe ? look.frame : null,
+    canPinToFeed: canPinToFeed(viewer),
   };
   const href = (t: Tab) => (t === "showcase" ? `/profile/${user.id}` : `/profile/${user.id}?tab=${t}`);
 
