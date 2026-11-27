@@ -642,7 +642,7 @@ export function RecognitionCard({
           <PostBanner
             banner={card.sender.look.banner}
             message={card.message}
-            className="aspect-[2/1] min-h-44 py-6"
+            className="aspect-[2/1] py-6"
             label={
               isPoll ? (
                 <>
