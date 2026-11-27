@@ -9,7 +9,12 @@ export type Notification =
     }
   | { kind: "test"; recipientName: string }
   | { kind: "invite"; recipientName: string; welcomePoints: number }
-  | { kind: "connected" };
+  | { kind: "connected" }
+  | {
+      /** Your idea is now a real reward or profile shop item. */
+      kind: "suggestion"; recipientName: string; area: "reward" | "shop"; idea: string; item: string;
+      votes: number; path: string;
+    };
 
 function copyFor(appName: string, notification: Notification) {
   switch (notification.kind) {
@@ -56,6 +61,26 @@ function copyFor(appName: string, notification: Notification) {
             : []),
         ],
         points: "", action: `Join ${appName}`, path: "/sign-in",
+      };
+    }
+    case "suggestion": {
+      const first = notification.recipientName.trim().split(/\s+/)[0] || "there";
+      const where = notification.area === "shop" ? "the profile shop" : "Rewards";
+      const sameName = notification.idea.trim().toLowerCase() === notification.item.trim().toLowerCase();
+      const others = notification.votes - 1;
+      return {
+        subject: "Your idea is now in " + appName + "!", label: "Your idea",
+        title: "You asked, we added it!",
+        preview: `${notification.item} is now in ${where}, thanks to you.`,
+        paragraphs: [
+          `Hi ${first},`,
+          sameName
+            ? `Thanks to your suggestion, ${notification.item} is now in ${where} on ${appName}.`
+            : `Thanks to your suggestion “${notification.idea}”, ${notification.item} is now in ${where} on ${appName}.`,
+          ...(others > 0 ? [`${others.toLocaleString("en-IE")} ${others === 1 ? "teammate" : "teammates"} upvoted your idea too.`] : []),
+          "Keep them coming: you can suggest more in Store > Ideas.",
+        ],
+        points: "", action: "See it in " + appName, path: notification.path,
       };
     }
     case "test":

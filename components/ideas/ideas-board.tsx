@@ -3,7 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronUp, Lightbulb, MessageSquare, Plus } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, ChevronUp, Lightbulb, MessageSquare, PartyPopper, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,9 +43,19 @@ export type IdeaData = {
   createdAt: string;
   mine: boolean;
   author: { id: string; name: string; avatarUrl: string | null };
+  /** What it became, once it's available and still on show. */
+  item: { name: string; href: string } | null;
 };
 
-export function IdeaStatusBadge({ status, className }: { status: SuggestionStatus; className?: string }) {
+export function IdeaStatusBadge({
+  status,
+  label,
+  className,
+}: {
+  status: SuggestionStatus;
+  label?: string;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
@@ -53,7 +64,7 @@ export function IdeaStatusBadge({ status, className }: { status: SuggestionStatu
         className,
       )}
     >
-      {STATUS_LABELS[status]}
+      {label ?? STATUS_LABELS[status]}
     </span>
   );
 }
@@ -113,7 +124,7 @@ export function IdeasBoard({ kind, ideas: initial }: { kind: SuggestionKind; ide
       ) : null}
 
       {added.length > 0 ? (
-        <Section title="Added">
+        <Section title="Now available">
           {added.map((idea) => (
             <IdeaRow key={idea.id} idea={idea} onVoted={onVoted} />
           ))}
@@ -246,6 +257,19 @@ function IdeaRow({
             </button>
           ) : null}
         </div>
+        {idea.status === "added" && idea.item ? (
+          <Link
+            href={idea.item.href}
+            className="bg-success/10 text-success hover:bg-success/15 mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors"
+          >
+            <PartyPopper className="size-4 shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1 truncate">
+              {idea.mine ? "Your idea is in: " : "Now in the store: "}
+              {idea.item.name}
+            </span>
+            <ChevronRight className="size-4 shrink-0" aria-hidden />
+          </Link>
+        ) : null}
         {idea.adminNote ? (
           <div className="bg-surface mt-2 flex gap-2 rounded-xl px-3 py-2 text-sm">
             <MessageSquare className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />

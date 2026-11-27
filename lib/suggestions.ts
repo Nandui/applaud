@@ -32,9 +32,17 @@ export const KIND_TEXT: Record<SuggestionKind, { tab: string; one: string; promp
 /** What staff see on an idea. "New" ideas show no status at all. */
 export const STATUS_LABELS: Record<SuggestionStatus, string> = {
   new: "New",
-  planned: "Planned",
-  added: "Added",
+  planned: "Coming soon",
+  added: "Available",
   declined: "Not planned",
+};
+
+/** The same statuses as an admin decides them in Admin > Suggestions. */
+export const ADMIN_STATUS_LABELS: Record<SuggestionStatus, string> = {
+  new: "New",
+  planned: "Approved",
+  added: "Available",
+  declined: "Declined",
 };
 
 export const STATUS_TONE: Record<SuggestionStatus, string> = {
@@ -43,6 +51,23 @@ export const STATUS_TONE: Record<SuggestionStatus, string> = {
   added: "bg-success/15 text-success",
   declined: "bg-danger/10 text-danger",
 };
+
+/**
+ * Where an available idea lives: the Rewards page or the profile shop, with
+ * ?open= so the item's sheet opens straight away (components/open-from-url.tsx).
+ */
+export function itemPath(kind: SuggestionKind, itemId: string): string {
+  return `${kind === "shop" ? "/shop" : "/rewards"}?open=${encodeURIComponent(itemId)}`;
+}
+
+/**
+ * Whether saving an idea should tell the suggester and the Chat space it's
+ * available: only the first time it's marked Available with an item linked.
+ * Approving alone never announces anything.
+ */
+export function shouldAnnounce(next: { status: SuggestionStatus; itemId: string | null; announcedAt: Date | null }): boolean {
+  return next.status === "added" && next.itemId !== null && next.announcedAt === null;
+}
 
 export const TITLE_MAX = 80;
 export const DETAILS_MAX = 280;

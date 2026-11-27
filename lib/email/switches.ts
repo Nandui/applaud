@@ -6,14 +6,15 @@ import type { OrgSettings } from "@/lib/org-settings";
  * The admin "Send a test email" button is not covered: it only ever goes to
  * the admin who presses it.
  */
-export type EmailKind = "recognition" | "team" | "invite";
+export type EmailKind = "recognition" | "team" | "invite" | "suggestion";
 
-type EmailSwitches = Pick<OrgSettings, "emailsEnabled" | "emailRecognitions" | "emailTeamAnnouncements" | "emailInvites">;
+type EmailSwitches = Pick<OrgSettings, "emailsEnabled" | "emailRecognitions" | "emailTeamAnnouncements" | "emailInvites" | "emailSuggestions">;
 
 const SWITCH: Record<EmailKind, keyof Omit<EmailSwitches, "emailsEnabled">> = {
   recognition: "emailRecognitions",
   team: "emailTeamAnnouncements",
   invite: "emailInvites",
+  suggestion: "emailSuggestions",
 };
 
 export function emailOn(settings: EmailSwitches, kind: EmailKind): boolean {

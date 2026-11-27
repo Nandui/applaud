@@ -19,27 +19,31 @@ export type SettingsData = {
   chatAwards: boolean;
   chatMilestones: boolean;
   chatRewardClaims: boolean;
+  chatSuggestions: boolean;
   emailsEnabled: boolean;
   emailRecognitions: boolean;
   emailTeamAnnouncements: boolean;
   emailInvites: boolean;
+  emailSuggestions: boolean;
 };
 
-type EmailKey = "emailRecognitions" | "emailTeamAnnouncements" | "emailInvites";
+type EmailKey = "emailRecognitions" | "emailTeamAnnouncements" | "emailInvites" | "emailSuggestions";
 
 const EMAIL_KINDS: { key: EmailKey; label: string; hint: string }[] = [
   { key: "emailRecognitions", label: "To the people recognised", hint: "A personal email when someone recognises them." },
   { key: "emailTeamAnnouncements", label: "Recognition news to everyone else", hint: "“Someone was just recognised” to every other active person." },
   { key: "emailInvites", label: "Join invites", hint: "The emails sent by “Nudge people to join” in Users." },
+  { key: "emailSuggestions", label: "Ideas now available", hint: "Tells whoever suggested an idea when it’s added to Rewards or the profile shop." },
 ];
 
-type ChatKey = "chatRecognitions" | "chatCovers" | "chatAwards" | "chatMilestones" | "chatRewardClaims";
+type ChatKey = "chatRecognitions" | "chatCovers" | "chatAwards" | "chatMilestones" | "chatRewardClaims" | "chatSuggestions";
 
 const CHAT_EVENTS: { key: ChatKey; label: string; hint: string }[] = [
   { key: "chatRecognitions", label: "New recognitions", hint: "Who recognised whom, the value and the message." },
   { key: "chatCovers", label: "Thanks for covering", hint: "When a manager thanks someone for a last-minute cover." },
   { key: "chatAwards", label: "Award winners", hint: "When someone wins an award." },
   { key: "chatMilestones", label: "Birthdays and work anniversaries", hint: "The same celebrations posted in the feed." },
+  { key: "chatSuggestions", label: "Staff ideas now available", hint: "A new reward or profile item added thanks to someone’s idea." },
   { key: "chatRewardClaims", label: "Reward claims", hint: "Who claimed which reward. Best for an admins-only space." },
 ];
 

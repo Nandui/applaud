@@ -116,7 +116,7 @@ export function ShopItem({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button type="button" className="text-left transition-opacity active:opacity-70">
+        <button type="button" data-open-id={item.id} className="text-left transition-opacity active:opacity-70">
           {/* Bounces when it's put on or taken off. */}
           <PopOnChange value={String(wearing)} className="block w-full">
             <span className="bg-surface border-border relative block aspect-square w-full overflow-hidden rounded-xl border">

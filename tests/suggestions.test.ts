@@ -22,3 +22,20 @@ test("kind and status guards", () => {
   assert.ok(isSuggestionStatus("declined"));
   assert.ok(!isSuggestionStatus("done"));
 });
+
+import { itemPath, shouldAnnounce } from "../lib/suggestions";
+
+test("only the first save as Available with an item announces the idea", () => {
+  assert.equal(shouldAnnounce({ status: "added", itemId: "r1", announcedAt: null }), true);
+  // Approving never tells anyone.
+  assert.equal(shouldAnnounce({ status: "planned", itemId: null, announcedAt: null }), false);
+  // No item linked: nothing to point people at.
+  assert.equal(shouldAnnounce({ status: "added", itemId: null, announcedAt: null }), false);
+  // Already announced: re-saving (a new reply, a different item) stays quiet.
+  assert.equal(shouldAnnounce({ status: "added", itemId: "r2", announcedAt: new Date() }), false);
+});
+
+test("an available idea links straight to its reward or profile item", () => {
+  assert.equal(itemPath("reward", "abc"), "/rewards?open=abc");
+  assert.equal(itemPath("shop", "frame neon"), "/shop?open=frame%20neon");
+});

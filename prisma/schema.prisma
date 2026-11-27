@@ -590,6 +590,8 @@ model OrgSettings {
   chatAwards                    Boolean @default(true)
   chatMilestones                Boolean @default(true)
   chatRewardClaims              Boolean @default(false)
+  /// "New reward added thanks to X's idea" when an idea becomes available.
+  chatSuggestions               Boolean @default(true)
   /// Master switch for every email Yayup sends (lib/email/switches.ts). When
   /// off, nothing is emailed, whatever the per-kind switches below say.
   emailsEnabled                 Boolean @default(true)
@@ -599,6 +601,8 @@ model OrgSettings {
   emailTeamAnnouncements        Boolean @default(true)
   /// Admin > Users "Nudge people to join" invite emails.
   emailInvites                  Boolean @default(true)
+  /// "Your idea is now available" to whoever suggested it.
+  emailSuggestions              Boolean @default(true)
 }
 
 // ---------- next-auth (Auth.js Prisma adapter) ----------
@@ -653,6 +657,14 @@ model Suggestion {
   /// Cached number of upvotes, written in the same transaction as the vote.
   voteCount       Int              @default(0)
   statusChangedAt DateTime?
+  /// What the idea became once it's in (status "added"): a Reward id for
+  /// reward ideas, a Cosmetic id for profile shop ideas. No foreign key, so a
+  /// deleted item just leaves the idea unlinked.
+  rewardId        String?
+  cosmeticId      String?
+  /// When the suggester was emailed and the Chat space told it's available.
+  /// Set once, so re-saving never announces it twice.
+  announcedAt     DateTime?
   createdAt       DateTime         @default(now())
   votes           SuggestionVote[]
 
