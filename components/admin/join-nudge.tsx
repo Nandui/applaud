@@ -25,6 +25,8 @@ export type JoinNudgeProps = {
   nextAt: string | null;
   chatReady: boolean;
   mailReady: boolean;
+  /** Invite emails are switched off in Admin > Settings > Emails. */
+  mailOff: boolean;
   /** Only production sends. */
   live: boolean;
 };
@@ -42,7 +44,8 @@ function lastLine(last: NonNullable<JoinNudgeProps["last"]>) {
 }
 
 export function JoinNudge(props: JoinNudgeProps) {
-  const { appName, waiting, last, nextAt, chatReady, mailReady, live } = props;
+  const { appName, waiting, last, nextAt, chatReady, mailOff, live } = props;
+  const mailReady = props.mailReady && !mailOff;
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const emailable = waiting.filter((p) => p.due).length;
@@ -53,7 +56,9 @@ export function JoinNudge(props: JoinNudgeProps) {
     : nextAt
       ? `A nudge went out in the last 24 hours. You can send the next one from ${nextAt}.`
       : !chatReady && !mailReady
-        ? "Connect Gmail or Google Chat in Admin > Settings first."
+        ? mailOff
+          ? "Emails are switched off in Admin > Settings and Google Chat isn't connected."
+          : "Connect Gmail or Google Chat in Admin > Settings first."
         : !chatReady && emailable === 0
           ? "Everyone waiting was emailed in the last week, and Google Chat isn't connected."
           : null;
@@ -112,7 +117,9 @@ export function JoinNudge(props: JoinNudgeProps) {
                   {mailReady ? `Email to ${plural(emailable, "person", "people")}` : "Email"}
                 </span>
                 <span className="text-muted block text-xs">
-                  {!mailReady
+                  {mailOff
+                    ? "Emails are switched off in Admin > Settings, so no emails are sent. Turn them back on there."
+                    : !mailReady
                     ? "Gmail isn’t connected, so no emails are sent. Connect it in Admin > Settings."
                     : waiting.length === 0
                       ? "Nobody to email: everyone with an account has signed in."

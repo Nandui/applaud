@@ -14,6 +14,13 @@ const CHAT_SWITCHES = [
   "chatRewardClaims",
 ] as const;
 
+const EMAIL_SWITCHES = [
+  "emailsEnabled",
+  "emailRecognitions",
+  "emailTeamAnnouncements",
+  "emailInvites",
+] as const;
+
 export type ActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
@@ -34,6 +41,10 @@ export async function updateOrgSettings(
     CHAT_SWITCHES.map((key) => [key, String(formData.get(key) ?? "false") === "true"]),
   ) as Record<(typeof CHAT_SWITCHES)[number], boolean>;
 
+  const email = Object.fromEntries(
+    EMAIL_SWITCHES.map((key) => [key, String(formData.get(key) ?? "true") === "true"]),
+  ) as Record<(typeof EMAIL_SWITCHES)[number], boolean>;
+
   if (appName.length < 1) return { ok: false, error: "App name is required." };
 
   const data = {
@@ -41,6 +52,7 @@ export async function updateOrgSettings(
     allowSelfRecognition,
     autoCreateGoogleUsers,
     ...chat,
+    ...email,
   };
   await prisma.orgSettings.upsert({
     where: { id: "singleton" },

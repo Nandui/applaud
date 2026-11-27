@@ -6,6 +6,7 @@ import { GooglePhotosButton } from "@/components/admin/google-photos-button";
 import { googleSignInEnabled } from "@/lib/auth/mode";
 import { isTestEmail } from "@/lib/test-accounts";
 import { JoinNudge } from "@/components/admin/join-nudge";
+import { emailOn } from "@/lib/email/switches";
 import { canEmail, EMAIL_GAP_DAYS, irishTime, lastNudge, nextNudgeAt, notJoinedPeople } from "@/lib/invite/nudge";
 import { chatConfigured } from "@/lib/chat/google-chat";
 import { getOrgSettings } from "@/lib/org-settings";
@@ -112,6 +113,7 @@ export default async function AdminUsersPage() {
         })()}
         chatReady={chatConfigured()}
         mailReady={live && googleSignInEnabled && mailbox !== null}
+        mailOff={!emailOn(settings, "invite")}
         live={live}
       />
       <UsersManager

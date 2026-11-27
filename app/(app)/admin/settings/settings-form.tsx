@@ -19,7 +19,19 @@ export type SettingsData = {
   chatAwards: boolean;
   chatMilestones: boolean;
   chatRewardClaims: boolean;
+  emailsEnabled: boolean;
+  emailRecognitions: boolean;
+  emailTeamAnnouncements: boolean;
+  emailInvites: boolean;
 };
+
+type EmailKey = "emailRecognitions" | "emailTeamAnnouncements" | "emailInvites";
+
+const EMAIL_KINDS: { key: EmailKey; label: string; hint: string }[] = [
+  { key: "emailRecognitions", label: "To the people recognised", hint: "A personal email when someone recognises them." },
+  { key: "emailTeamAnnouncements", label: "Recognition news to everyone else", hint: "“Someone was just recognised” to every other active person." },
+  { key: "emailInvites", label: "Join invites", hint: "The emails sent by “Nudge people to join” in Users." },
+];
 
 type ChatKey = "chatRecognitions" | "chatCovers" | "chatAwards" | "chatMilestones" | "chatRewardClaims";
 
@@ -42,6 +54,11 @@ export function SettingsForm({ settings, chatConnected }: { settings: SettingsDa
     Object.fromEntries(CHAT_EVENTS.map(({ key }) => [key, settings[key]])) as Record<ChatKey, boolean>,
   );
 
+  const [emailsEnabled, setEmailsEnabled] = useState(settings.emailsEnabled);
+  const [emails, setEmails] = useState<Record<EmailKey, boolean>>(() =>
+    Object.fromEntries(EMAIL_KINDS.map(({ key }) => [key, settings[key]])) as Record<EmailKey, boolean>,
+  );
+
   useEffect(() => {
     if (state?.ok) toast.success(state.message ?? "Saved.");
     else if (state && !state.ok) toast.error(state.error);
@@ -53,6 +70,10 @@ export function SettingsForm({ settings, chatConnected }: { settings: SettingsDa
       <input type="hidden" name="autoCreateGoogleUsers" value={String(autoCreate)} />
       {CHAT_EVENTS.map(({ key }) => (
         <input key={key} type="hidden" name={key} value={String(chat[key])} />
+      ))}
+      <input type="hidden" name="emailsEnabled" value={String(emailsEnabled)} />
+      {EMAIL_KINDS.map(({ key }) => (
+        <input key={key} type="hidden" name={key} value={String(emails[key])} />
       ))}
 
       <Card>
@@ -93,6 +114,47 @@ export function SettingsForm({ settings, chatConnected }: { settings: SettingsDa
             </div>
             <Switch checked={autoCreate} onCheckedChange={setAutoCreate} />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card id="emails">
+        <CardContent className="space-y-3">
+          <div>
+            <h2 className="font-semibold">Emails</h2>
+            <p className="text-muted text-sm">
+              Turn off “Send emails” to pause every email {settings.appName} sends, for example while
+              testing or before launch. Nothing is queued: emails skipped while paused are never sent
+              later. Google Chat posts are not affected.
+            </p>
+          </div>
+          <div
+            className={`flex items-center justify-between gap-4 rounded-lg border p-3 ${emailsEnabled ? "border-border" : "border-warning bg-warning/10"}`}
+          >
+            <div>
+              <p className="text-sm font-medium">Send emails</p>
+              <p className="text-muted text-xs">
+                {emailsEnabled ? "On. The emails switched on below are sent." : "Off. No emails are sent at all."}
+              </p>
+            </div>
+            <Switch checked={emailsEnabled} onCheckedChange={setEmailsEnabled} aria-label="Send emails" />
+          </div>
+          {EMAIL_KINDS.map(({ key, label, hint }) => (
+            <div
+              key={key}
+              className={`border-border flex items-center justify-between gap-4 rounded-lg border p-3 ${emailsEnabled ? "" : "opacity-50"}`}
+            >
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-muted text-xs">{hint}</p>
+              </div>
+              <Switch
+                checked={emails[key]}
+                disabled={!emailsEnabled}
+                onCheckedChange={(on) => setEmails((prev) => ({ ...prev, [key]: on }))}
+                aria-label={label}
+              />
+            </div>
+          ))}
         </CardContent>
       </Card>
 
