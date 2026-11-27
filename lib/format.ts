@@ -23,3 +23,14 @@ export function formatSigned(n: number): string {
 export function pts(n: number): string {
   return `${formatNumber(n)} ${Math.abs(n) === 1 ? "pt" : "pts"}`;
 }
+
+/**
+ * Names for a sentence, collapsed once a list gets long:
+ * ["Aoife"] -> ["Aoife"]; 5 names -> ["Aoife", "Cian", "Dara", "2 others"].
+ * Pair with Intl.ListFormat for "Aoife, Cian, Dara and 2 others".
+ */
+export function shortNameList(names: string[], shown = 3): string[] {
+  if (names.length <= shown + 1) return names;
+  const rest = names.length - shown;
+  return [...names.slice(0, shown), `${formatNumber(rest)} others`];
+}

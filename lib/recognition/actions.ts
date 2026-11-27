@@ -13,6 +13,7 @@ import { allowanceForRank, getMonthlyAllowanceUsage, getMonthlyBonusUsage } from
 import { maxPointsForRank } from "@/lib/ranks";
 import {
   MAX_RECOGNITION_IMAGES,
+  MAX_RECOGNITION_RECIPIENTS,
   MAX_POST_LENGTH,
   REACTION_EMOJIS,
   BOOSTS,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/config";
 import { isGiphyMediaUrl } from "@/lib/recognition/gif";
 import { canSeeRecognition } from "@/lib/recognition/live";
+import { audienceLabel } from "@/lib/recognition/audience";
 import { isProjectBlobUrl } from "@/lib/blob";
 import { writeAudit } from "@/lib/audit";
 import { lockPool } from "@/lib/locks";
@@ -47,7 +49,12 @@ const attachmentUrl = z
   );
 
 const createSchema = z.object({
-  recipientIds: z.array(z.string().min(1)).min(1, "Pick at least one recipient.").max(10),
+  // No small cap: a recognition can go to a whole site or everyone. The
+  // ceiling is only a sanity limit; points are bounded by the allowance below.
+  recipientIds: z
+    .array(z.string().min(1))
+    .min(1, "Pick at least one recipient.")
+    .max(MAX_RECOGNITION_RECIPIENTS, `A recognition can go to at most ${MAX_RECOGNITION_RECIPIENTS} people.`),
   valueId: z.string().min(1, "Choose a value."),
   message: z.string().trim().min(3, "Write a short message.").max(500),
   points: z.coerce.number().int().min(0).max(100_000),
@@ -116,8 +123,11 @@ export async function createRecognition(
         const used = await getMonthlyAllowanceUsage(me.id, new Date(), tx);
         const allowance = allowanceForRank(me.pointsRank, settings);
         if (used + totalPoints > allowance) {
+          const left = Math.max(0, allowance - used);
           throw new AllowanceError(
-            `That's more than you have left to give this month (${Math.max(0, allowance - used)}).`,
+            recipientIds.length > 1
+              ? `${points} each for ${recipientIds.length} people is ${totalPoints} points, more than you have left to give this month (${left}).`
+              : `That's more than you have left to give this month (${left}).`,
           );
         }
       }
@@ -137,22 +147,22 @@ export async function createRecognition(
       });
 
       if (points > 0) {
-        for (const userId of recipientIds) {
-          await tx.rewardLedger.create({
-            data: {
-              userId,
-              amount: points,
-              type: "RECOGNITION",
-              sourceType: "recognition_recipient",
-              sourceId: recognition.id,
-              note: `Recognition from ${me.name}`,
-            },
-          });
-          await tx.user.update({
-            where: { id: userId },
-            data: { walletBalance: { increment: points } },
-          });
-        }
+        // Batched so a whole-company recognition stays a few queries, well
+        // inside the transaction timeout.
+        await tx.rewardLedger.createMany({
+          data: recipientIds.map((userId) => ({
+            userId,
+            amount: points,
+            type: "RECOGNITION",
+            sourceType: "recognition_recipient",
+            sourceId: recognition.id,
+            note: `Recognition from ${me.name}`,
+          })),
+        });
+        await tx.user.updateMany({
+          where: { id: { in: recipientIds } },
+          data: { walletBalance: { increment: points } },
+        });
       }
       return recognition.id;
     });
@@ -161,13 +171,18 @@ export async function createRecognition(
     throw error;
   }
 
+  // One Chat post and one email per person, however many were recognised:
+  // each recipient gets their own, everyone else the single team teaser.
   after(async () => {
-    await notifyRecognition(createdId, recipients, settings.appName, me, points);
+    const audience = await audienceLabel(recipientIds, me.id).catch(() => null);
+    await Promise.all([
+      notifyRecognition(createdId, recipients, settings.appName, me, points, audience),
+      postToGoogleChat({
+        kind: "recognition", id: createdId, from: me.name, to: recipients.map((r) => r.name),
+        value: value.name, message, points, image: imageUrls[0] ?? null, audience,
+      }),
+    ]);
   });
-  after(() => postToGoogleChat({
-    kind: "recognition", id: createdId, from: me.name, to: recipients.map((r) => r.name),
-    value: value.name, message, points, image: imageUrls[0] ?? null,
-  }));
 
   await writeAudit({
     actor: me,
@@ -550,24 +565,31 @@ export async function toggleBoost(formData: FormData): Promise<ActionResult> {
           );
         }
       }
+      // Batched by amount (recipients normally all share one), so boosting a
+      // whole-company recognition is a few queries, not two per person.
+      const byNet = new Map<number, string[]>();
       for (const r of rec.recipients) {
         if (r.points <= 0) continue;
         const net = r.points * (addMult - removeMult);
         if (net === 0) continue;
-        await tx.rewardLedger.create({
-          data: {
-            userId: r.userId,
+        byNet.set(net, [...(byNet.get(net) ?? []), r.userId]);
+      }
+      const note = target
+        ? `${BOOSTS[target].label} boost (${boostMultiplier(target)}×) by ${me.name}`
+        : `${BOOSTS[current as BoostType].label} boost removed by ${me.name}`;
+      for (const [net, userIds] of byNet) {
+        await tx.rewardLedger.createMany({
+          data: userIds.map((userId) => ({
+            userId,
             amount: net,
             type: "BOOST",
             sourceType: "recognition_boost",
             sourceId: rec.id,
-            note: target
-              ? `${BOOSTS[target].label} boost (${boostMultiplier(target)}×) by ${me.name}`
-              : `${BOOSTS[current as BoostType].label} boost removed by ${me.name}`,
-          },
+            note,
+          })),
         });
-        await tx.user.update({
-          where: { id: r.userId },
+        await tx.user.updateMany({
+          where: { id: { in: userIds } },
           data: { walletBalance: { increment: net } },
         });
       }
